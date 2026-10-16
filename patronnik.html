@@ -1,0 +1,1028 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Патронник</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800;900&family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&family=STIX+Two+Text:ital,wght@0,400;1,400&display=swap">
+<style>[hidden]{display:none!important}body{margin:0}</style>
+<style>
+/* Layout: phone-first oscilloscope column; on wide screens a side column holds the dealer's clues and the leaderboard. Single dark look by design. */
+:root{
+  --bg:#090f0c;
+  --bg-glow:#122019;
+  --panel:#0e1713;
+  --panel-2:#13201a;
+  --line:#1c2b24;
+  --line-2:#27392f;
+  --fg:#e6efe9;
+  --muted:#7f978a;
+  --dim:#56695f;
+  --amber:#ffc845;
+  --live:#ff3d5e;
+  --blank:#55c7ff;
+  --pill:#e8234f;
+  --note:#ffd53a;
+  --ink:#0c110f;
+  --white:#ffffff;
+  --brass-1:#f3cc66;
+  --brass-2:#8f6a1f;
+  --f-display:"Montserrat","Arial Black",system-ui,sans-serif;
+  --gridline:#122119;
+  --f-body:"Golos Text",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+  --f-math:"STIX Two Text","Times New Roman",Times,serif;
+  color-scheme:dark;
+}
+html,body{background:var(--bg);color:var(--fg)}
+body{
+  font-family:var(--f-body);font-size:15px;line-height:1.45;
+  background:radial-gradient(ellipse 75% 60% at 50% 35%,transparent 0%,var(--bg) 85%) fixed,repeating-linear-gradient(0deg,var(--gridline) 0 1px,transparent 1px 46px) fixed,repeating-linear-gradient(90deg,var(--gridline) 0 1px,transparent 1px 46px) fixed,radial-gradient(ellipse 70% 45% at 50% 30%,var(--bg-glow) 0%,var(--bg) 75%) fixed,var(--bg);
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-block:16px 24px;
+}
+.app{max-width:540px;margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr);gap:14px;
+  grid-template-areas:"hdr" "hud" "mag" "stage" "formula" "side" "controls"}
+.side{grid-area:side;display:grid;gap:14px;align-content:start}
+@media (min-width:980px){
+  .app{max-width:980px;grid-template-columns:minmax(0,540px) minmax(0,1fr);column-gap:32px;
+    grid-template-areas:"hdr side" "hud side" "mag side" "stage side" "controls side" "formula side"}
+  .controls{position:static;padding-block:0;background:none}
+  .side{align-self:start;position:sticky;top:max(16px,env(safe-area-inset-top,0px));margin-top:8px}
+}
+
+/* header */
+.hdr{grid-area:hdr;display:grid;justify-items:center;padding-top:2px}
+.pill-main{font-family:var(--f-display);font-size:clamp(28px,8vw,40px);letter-spacing:.02em;line-height:1.1;color:var(--white);background:var(--pill);padding:3px 18px 5px;border-radius:8px;transform:rotate(-1.4deg);box-shadow:0 0 0 1px color-mix(in srgb,var(--white) 12%,transparent) inset,0 8px 30px color-mix(in srgb,var(--pill) 40%,transparent)}
+.pill-sub{font-weight:700;font-size:13.5px;color:var(--ink);background:var(--fg);padding:2px 10px 3px;border-radius:4px;margin-top:-4px;transform:rotate(-1.4deg);transition:background .2s,color .2s}
+.pill-sub.hot{background:var(--pill);color:var(--white);font-family:var(--f-display);font-weight:400;letter-spacing:.05em;text-transform:uppercase;font-size:12px;padding:3px 10px}
+
+/* hud */
+.hud{grid-area:hud;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--line);border-radius:12px;background:color-mix(in srgb,var(--panel) 85%,transparent);overflow:hidden}
+.stat{display:grid;gap:1px;padding:8px 10px;text-align:center;border-left:1px solid var(--line)}
+.stat:first-child{border-left:0}
+.stat .k{font:600 10px var(--f-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+.stat b{font:700 18px var(--f-mono);font-variant-numeric:tabular-nums;color:var(--fg)}
+.stat.score b{color:var(--amber)}
+.lives{display:flex;gap:4px;justify-content:center;align-items:center;height:24px}
+.life{width:7px;height:17px;border-radius:2px 2px 1px 1px;background:linear-gradient(180deg,var(--live) 0 72%,var(--brass-1) 72% 100%);box-shadow:0 0 8px color-mix(in srgb,var(--live) 50%,transparent)}
+.life.off{background:linear-gradient(180deg,var(--line-2) 0 72%,var(--dim) 72% 100%);box-shadow:none}
+
+/* magazine */
+.magbox{grid-area:mag;display:grid;justify-items:center;gap:8px}
+.mag{display:flex;gap:8px;justify-content:center;min-height:46px;align-items:flex-end}
+.shell{display:flex;flex-direction:column;width:17px;transition:transform .2s}
+.shell .body{height:30px;border-radius:4px 4px 1px 1px;background:linear-gradient(90deg,#1d2823,#2b3832 55%,#1d2823);border:1px solid #3b4b43;display:grid;place-items:center;font:700 10px var(--f-mono);color:var(--amber)}
+.shell .base{height:10px;border-radius:0 0 2px 2px;background:linear-gradient(180deg,var(--brass-1),var(--brass-2));box-shadow:inset 0 2px 0 color-mix(in srgb,var(--white) 25%,transparent)}
+.shell.live .body{background:linear-gradient(90deg,#c2223f,var(--live) 55%,#c2223f);border-color:var(--live);color:transparent}
+.shell.blank .body{background:linear-gradient(90deg,#2d8fc0,var(--blank) 55%,#2d8fc0);border-color:var(--blank);color:transparent}
+.shell.cur{transform:translateY(-5px)}
+.shell.cur .body{box-shadow:0 0 0 2px var(--amber),0 0 16px var(--amber)}
+.chance{font:700 11px var(--f-mono);letter-spacing:.1em;color:var(--fg);text-transform:uppercase}
+.chance b{color:var(--live)}
+.badge{font-family:var(--f-display);font-size:13px;letter-spacing:.05em;padding:4px 12px 5px;border-radius:6px;background:var(--panel-2);border:1px solid var(--line-2);color:var(--fg);text-transform:uppercase}
+.badge.live{background:var(--live);border-color:var(--live);color:var(--white)}
+.badge.blank{background:var(--blank);border-color:var(--blank);color:var(--ink)}
+.prog{width:150px;height:4px;border-radius:2px;background:var(--panel-2);overflow:hidden}
+.prog i{display:block;height:100%;width:0;background:var(--amber)}
+.prog i.late{background:var(--live)}
+
+/* stage */
+.stage{grid-area:stage;position:relative;border-radius:14px;overflow:hidden;background:color-mix(in srgb,var(--panel) 75%,transparent);border:1px solid var(--line);box-shadow:0 20px 50px -30px #000}
+.stage canvas{display:block;width:100%}
+.chip{position:absolute;top:9px;font:600 10px var(--f-mono);letter-spacing:.06em;color:var(--muted);background:color-mix(in srgb,var(--bg) 70%,transparent);border:1px solid var(--line-2);border-radius:999px;padding:2px 8px;pointer-events:none;white-space:nowrap}
+.chip.tl{left:10px} .chip.tr{right:10px}
+.stage.flash-live{animation:flashL .45s ease-out}
+.stage.flash-blank{animation:flashB .45s ease-out}
+.stage.shake{animation:flashL .45s ease-out,shake .35s linear}
+@keyframes flashL{0%{box-shadow:inset 0 0 0 999px color-mix(in srgb,var(--live) 32%,transparent)}100%{box-shadow:inset 0 0 0 999px transparent}}
+@keyframes flashB{0%{box-shadow:inset 0 0 0 999px color-mix(in srgb,var(--blank) 22%,transparent)}100%{box-shadow:inset 0 0 0 999px transparent}}
+@keyframes shake{0%,100%{transform:none}20%{transform:translate(-6px,2px)}40%{transform:translate(5px,-3px)}60%{transform:translate(-4px,1px)}80%{transform:translate(3px,-1px)}}
+.judge{position:absolute;left:0;right:0;top:34%;text-align:center;font-family:var(--f-display);font-size:30px;letter-spacing:.04em;pointer-events:none;opacity:0;text-shadow:0 0 18px currentColor}
+.judge small{display:block;font:700 12px var(--f-mono);letter-spacing:.06em;color:var(--fg);text-shadow:none;margin-top:2px}
+.judge.show{animation:pop 1.3s ease-out forwards}
+@keyframes pop{0%{opacity:0;transform:scale(.8)}12%{opacity:1;transform:scale(1.05)}70%{opacity:1;transform:none}100%{opacity:0}}
+.overlay{position:absolute;inset:0;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(3px);display:flex;flex-direction:column;justify-content:safe center;align-items:center;gap:10px;padding:18px 20px;text-align:center;overflow:auto}
+.overlay[hidden]{display:none}
+.overlay h2{font-family:var(--f-display);font-weight:400;font-size:24px;margin:0;line-height:1.15;text-wrap:balance}
+.overlay h2 .l{color:var(--live)} .overlay h2 .b{color:var(--blank)}
+.overlay p{margin:0;max-width:40ch;color:var(--muted);font-size:14px;text-wrap:pretty}
+.overlay .meta{font:700 11px var(--f-mono);letter-spacing:.1em;color:var(--amber);text-transform:uppercase}
+.overlay .prog-chords{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
+.overlay .prog-chords span{font:700 13px var(--f-mono);border:1px solid var(--line-2);border-radius:6px;padding:2px 8px;color:var(--fg);background:var(--panel-2)}
+.overlay ul{list-style:none;margin:0;padding:0;display:grid;gap:6px;text-align:left;font-size:14px;max-width:42ch}
+.overlay ul li{padding-left:18px;position:relative}
+.overlay ul li::before{content:"";position:absolute;left:3px;top:.55em;width:7px;height:7px;border-radius:2px;background:var(--amber);transform:rotate(45deg)}
+.overlay ul li b{color:var(--amber)}
+.overlay .big{font:700 46px var(--f-mono);color:var(--amber);line-height:1;font-variant-numeric:tabular-nums}
+.overlay .stats{display:flex;gap:16px;font:12px var(--f-mono);color:var(--muted);flex-wrap:wrap;justify-content:center}
+.overlay .stats b{color:var(--fg)}
+.go{font-family:var(--f-display);font-size:16px;letter-spacing:.06em;background:var(--amber);color:var(--ink);border:0;border-radius:9px;padding:11px 24px;cursor:pointer;text-transform:uppercase;box-shadow:0 8px 24px -10px var(--amber)}
+.go:hover{filter:brightness(1.07)}
+.go:disabled{opacity:.6;cursor:default}
+.go kbd{font:700 10px var(--f-mono);opacity:.65;margin-left:8px}
+.go:focus-visible,.choice:focus-visible{outline:2px solid var(--fg);outline-offset:3px}
+
+/* formula */
+.formula{grid-area:formula;text-align:center;display:grid;gap:3px;justify-items:center}
+.f-main{font-family:var(--f-math);font-size:22px;line-height:1.3;text-wrap:balance}
+.f-main i,.f-sub i{font-style:italic}
+.f-sub{font-family:var(--f-math);font-size:14.5px;color:var(--muted)}
+.f-sub.res-live{color:var(--live)} .f-sub.res-blank{color:var(--blank)}
+.caption{background:var(--note);color:var(--ink);font-weight:700;font-size:13px;padding:3px 10px;border-radius:4px;text-align:center;text-wrap:balance;margin-top:6px;max-width:44ch}
+.caption i{font-style:italic}
+
+/* cards */
+.card{border:1px solid var(--line);border-radius:14px;background:color-mix(in srgb,var(--panel) 85%,transparent);padding:14px 16px;display:grid;gap:10px}
+.card-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+.card-h h3{margin:0;font-family:var(--f-display);font-weight:400;font-size:14px;letter-spacing:.07em;text-transform:uppercase;color:var(--amber)}
+.card-h span{font:11px var(--f-mono);color:var(--muted)}
+
+.clues ol{margin:0;padding:0;list-style:none;display:grid;gap:6px;counter-reset:c}
+.clues li{font-size:14px;padding-left:28px;position:relative;counter-increment:c;min-height:20px}
+.clues li::before{content:"§" counter(c);position:absolute;left:0;top:1px;font:700 11px var(--f-mono);color:var(--dim)}
+.clues li b{color:var(--amber);font-weight:700}
+.meter{height:6px;border-radius:3px;background:var(--panel-2);overflow:hidden}
+.meter i{display:block;height:100%;background:linear-gradient(90deg,var(--amber),var(--live));width:100%;transition:width .3s}
+.key{font-size:12px;color:var(--muted)}
+.key code{font-family:var(--f-mono);color:var(--fg)}
+.bin{font:700 13px var(--f-mono);letter-spacing:.1em;font-variant-numeric:tabular-nums}
+.bin:empty{display:none}
+.bin .l{color:var(--live)} .bin .b{color:var(--blank)}
+
+/* controls */
+.controls{grid-area:controls;position:sticky;bottom:0;z-index:5;display:grid;grid-template-columns:1fr 1fr;gap:10px;padding-block:12px calc(10px + env(safe-area-inset-bottom,0px));background:linear-gradient(180deg,transparent,var(--bg) 30%)}
+.choice{font-family:var(--f-display);font-size:19px;letter-spacing:.05em;border-radius:12px;padding:12px 8px 10px;cursor:pointer;display:grid;justify-items:center;gap:2px;border:2px solid;background:color-mix(in srgb,var(--bg) 70%,transparent);backdrop-filter:blur(6px);touch-action:manipulation;user-select:none;-webkit-user-select:none;transition:background .12s,transform .08s}
+.choice small{font:600 10px var(--f-mono);letter-spacing:.1em;opacity:.7}
+.choice.live{color:var(--live);border-color:var(--live)}
+.choice.blank{color:var(--blank);border-color:var(--blank)}
+.choice:active{transform:scale(.97)}
+.choice.picked.live{background:var(--live);color:var(--white)}
+.choice.picked.blank{background:var(--blank);color:var(--ink)}
+
+/* leaderboard */
+
+.board ol{margin:0;padding:0;list-style:none;display:grid;gap:2px}
+.board li{display:grid;grid-template-columns:26px minmax(0,1fr) auto auto;gap:10px;align-items:baseline;padding:6px 8px;border-radius:7px;font-variant-numeric:tabular-nums}
+.board li:nth-child(odd){background:var(--panel-2)}
+.board li.me{outline:1px solid var(--amber)}
+.board .rk{font:700 12px var(--f-mono);color:var(--dim)}
+.board .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.board .rd{font:11px var(--f-mono);color:var(--muted)}
+.board .sc{font:700 14px var(--f-mono);color:var(--amber)}
+.board .note{font-size:13px;color:var(--muted);margin:0}
+.board .keys{font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px}
+.board .keys kbd{font:700 11px var(--f-mono);color:var(--fg);border:1px solid var(--line-2);border-radius:4px;padding:0 5px}
+
+.prog{position:relative;overflow:visible}
+.prog i{border-radius:2px}
+.prog b{position:absolute;top:50%;left:0;width:9px;height:9px;border-radius:50%;background:var(--white);transform:translate(-50%,-50%);box-shadow:0 0 8px var(--white)}
+.flash{position:fixed;inset:0;pointer-events:none;z-index:50;opacity:0}
+.flash.live{background:var(--live);animation:fpage .55s ease-out}
+.flash.blank{background:var(--blank);animation:fpage .5s ease-out}
+@keyframes fpage{0%{opacity:.32}100%{opacity:0}}
+.stage.glitch{animation:glitch .28s steps(3)}
+@keyframes glitch{0%{filter:none;transform:none}33%{filter:drop-shadow(3px 0 0 var(--live)) drop-shadow(-3px 0 0 var(--blank));transform:translateX(2px)}66%{filter:drop-shadow(-2px 0 0 var(--live)) drop-shadow(2px 0 0 var(--blank));transform:translateX(-2px)}100%{filter:none;transform:none}}
+.intro{font-family:var(--f-display);line-height:1.25;text-align:center}
+.intro .w{display:inline-block;animation:win .25s ease-out}
+.intro .w.l{color:var(--live);font-size:38px}.intro .w.b{color:var(--blank);font-size:38px}.intro .w.or{color:var(--fg);font-size:20px}
+.intro .w.g{color:var(--fg);font-size:26px;letter-spacing:.06em}.intro .w.x{color:var(--live);font-size:26px;letter-spacing:.06em;text-shadow:0 0 18px var(--live)}
+@keyframes win{0%{opacity:0;transform:scale(1.25)}100%{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.stage.glitch{animation:none}.intro .w{animation:none}}
+
+/* closer to the reference: heavy rounded type, graph sits on the page, answers as badges */
+.pill-main{font-weight:900;letter-spacing:-.01em}
+.pill-sub{font-family:var(--f-display);font-weight:800}
+.badge,.chance,.go,.judge,.overlay h2,.intro .w,.choice{font-weight:900}
+.badge{font-family:var(--f-display);letter-spacing:.01em}
+.chance{font-family:var(--f-display);letter-spacing:.04em}
+.stage{background:transparent;border:0;box-shadow:none;border-radius:0;overflow:visible}
+.overlay{border-radius:14px}
+.hud{background:none;border:0}
+.stat .k{font-family:var(--f-display);font-weight:800}
+.choice{border:0;font-family:var(--f-display);letter-spacing:.02em;border-radius:10px}
+.choice.live{background:var(--live);color:var(--white)}
+.choice.blank{background:var(--blank);color:var(--ink)}
+.choice.picked{box-shadow:0 0 0 3px var(--fg),0 0 26px currentColor}
+.controls.chosen .choice:not(.picked){opacity:.38}
+.card{background:color-mix(in srgb,var(--panel) 55%,transparent)}
+.card-h h3{font-weight:900}
+@media (prefers-reduced-motion:reduce){.stage.shake{animation:flashL .45s ease-out}.judge.show{animation-duration:1.6s}.shell{transition:none}}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="hdr">
+    <div class="pill-main">ПАТРОННИК</div>
+    <div class="pill-sub" id="sub">рулетка, но это математика</div>
+  </header>
+
+  <div class="hud" aria-live="polite">
+    <div class="stat"><span class="k">Раунд</span><b id="hRound">1</b></div>
+    <div class="stat score"><span class="k">Очки</span><b id="hScore">0</b></div>
+    <div class="stat"><span class="k">Комбо</span><b id="hMult">×1</b></div>
+    <div class="stat"><span class="k">Жизни</span><span class="lives" id="hLives"></span></div>
+  </div>
+
+  <section class="magbox" aria-label="Магазин">
+    <div class="mag" id="mag"></div>
+    <div class="chance"><b id="chance">50 %</b> шанс, что боевой</div>
+    <div class="badge" id="badge">#1/8 боевой или холостой?</div>
+    <div class="prog"><i id="progFill"></i><b id="progKnob"></b></div>
+  </section>
+
+  <div class="stage" id="stage">
+    <canvas id="scope" aria-label="Осциллограф: мелодия текущего патрона"></canvas>
+    <div class="judge" id="judge"></div>
+    <div class="overlay" id="overlay"></div>
+  </div>
+
+  <div class="formula">
+    <div class="f-main" id="fMain"></div>
+    <div class="f-sub" id="fSub1"></div>
+    <div class="f-sub" id="fSub2"></div>
+    <div class="caption" id="caption"></div>
+  </div>
+
+  <aside class="side">
+  <section class="card clues" aria-label="Улики дилера">
+    <div class="card-h"><h3>Улики дилера</h3><span id="cands">раскладов: —</span></div>
+    <div class="meter"><i id="meter"></i></div>
+    <ol id="clueList"><li>Улики появятся в начале раунда.</li></ol>
+    <div class="key">Боевой = <code>1</code>, холостой = <code>0</code>. Магазин читается слева направо как двоичное число.</div>
+    <div class="bin" id="bin"></div>
+  </section>
+
+  <section class="card board">
+    <div class="card-h"><h3>Таблица рекордов</h3></div>
+    <ol id="lb"></ol>
+    <p class="note" id="lbNote">Загружаю рекорды…</p>
+    <div class="keys"><kbd>←</kbd> боевой · <kbd>→</kbd> холостой · <kbd>Пробел</kbd> дальше. Ответ точно в долю даёт +25 очков.</div>
+  </section>
+  </aside>
+
+  <div class="controls">
+    <button class="choice live" id="btnLive" type="button">БОЕВОЙ<small>← или A</small></button>
+    <button class="choice blank" id="btnBlank" type="button">ХОЛОСТОЙ<small>→ или D</small></button>
+  </div>
+</div>
+<div class="flash" id="flash"></div>
+
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+const rnd = (a,b) => a + Math.floor(Math.random()*(b-a+1));
+const shuffle = a => { a=a.slice(); for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; };
+const sum = s => s.reduce((x,y)=>x+y,0);
+function mulberry(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+const ri=(R,a,b)=>a+Math.floor(R()*(b-a+1));
+const rp=(R,arr)=>arr[Math.floor(R()*arr.length)];
+const rw=(R,pairs)=>{ const tot=pairs.reduce((a,p)=>a+p[1],0); let x=R()*tot; for(const p of pairs){ x-=p[1]; if(x<=0) return p[0]; } return pairs[0][0]; };
+const rf=(R,a,b,d=2)=>+(a+R()*(b-a)).toFixed(d);
+const plural=(n,a,b,c)=>{ const m10=n%10,m100=n%100; return m10===1&&m100!==11?a:(m10>=2&&m10<=4&&(m100<10||m100>=20)?b:c); };
+const I=s=>`<i>${s}</i>`;
+const gcd=(a,b)=>b?gcd(b,a%b):a;
+const mod=(a,m)=>((a%m)+m)%m;
+const newSeed=()=>(Math.random()*4294967296)>>>0;
+
+/* ================= one key, one tempo: everything fits together ================= */
+const F1=43.6535, hz=s=>F1*Math.pow(2,s/12);          // s = semitones above F1
+const NOTE=['F','G♭','G','A♭','A','B♭','B','C','D♭','D','E♭','E'];
+const BPM=120, BEAT=60/BPM, S16=BEAT/4;
+const MODES={
+  tense:  [['фригийский',[0,1,3,5,7,8,10]],['локрийский',[0,1,3,5,6,8,10]],['гарм. минор',[0,2,3,5,7,8,11]]],
+  neutral:[['фригийский',[0,1,3,5,7,8,10]],['минор',[0,2,3,5,7,8,10]],['дорийский',[0,2,3,5,7,9,10]]],
+  relaxed:[['дорийский',[0,2,3,5,7,9,10]],['мажорная пентатоника',[0,2,4,7,9]],['миксолидийский',[0,2,4,5,7,9,10]],['лидийский',[0,2,4,6,7,9,11]]],
+};
+const degSemi=(st,d)=>st[mod(d,st.length)]+12*Math.floor(d/st.length);
+const moodOf=m=>m<-.3?'tense':m>.3?'relaxed':'neutral';
+
+/* ================= melody: math families (values + a fact computed from them) ================= */
+const NL=256, A=f=>Array.from({length:NL},(_,n)=>f(n));
+function periodOf(v,from=0){ for(let P=1;P<=128;P++){ let ok=true; for(let i=from;i+P<NL;i++) if(v[i]!==v[i+P]){ok=false;break;} if(ok) return P; } return 0; }
+function perFact(v){ const P=periodOf(v); if(P) return `повторяется каждые ${P} ${plural(P,'шаг','шага','шагов')}`; const Q=periodOf(v,40); if(Q) return `после разгона ходит по кругу длины ${Q}`; return `за ${NL} шагов ни разу не повторилась`; }
+function setFact(v,m){ const s=[...new Set(v)].sort((a,b)=>a-b); return s.length<m?`по модулю ${m} бывает только ${s.join(', ')}`:`обходит все ${m} остатков`; }
+const term=(k,x)=>k===0?'':k===1?x:k+x;
+const CONST={'π':'314159265358979323846264338327950288419716939937','e':'271828182845904523536028747135266249775724709369',
+  'φ':'161803398874989484820458683436563811772030917980','√2':'141421356237309504880168872420969807856967187537'};
+const ALPHA={'φ':(1+Math.sqrt(5))/2,'√2':Math.SQRT2,'√3':Math.sqrt(3),'e':Math.E,'π':Math.PI};
+const PRIMES=(()=>{ const p=[]; for(let n=2;p.length<NL;n++){ if(p.every(q=>q*q>n||n%q)) p.push(n); } return p; })();
+const popc=n=>{let c=0;while(n){c+=n&1;n>>=1;}return c;};
+const tz=n=>{let c=0;while(n%2===0){n/=2;c++;}return c;};
+const MELS=[
+  {w:4,tag:'any',f(R){ const plain=R()<.35, m=plain?8:rp(R,[5,7,8,9]), a=plain?1:ri(R,1,3), b=plain?0:ri(R,0,m-1), c=plain?0:ri(R,0,m-1); const v=A(n=>(a*n*n+b*n+c)%m);
+    const terms=[term(a,I('n')+'<sup>2</sup>'),term(b,I('n')),c?String(c):''].filter(Boolean), set=[...new Set(v)].sort((x,y)=>x-y);
+    return {v,html:`${I('d<sub>n</sub>')} = ${terms.length>1?'('+terms.join(' + ')+')':terms[0]} mod ${m}${set.length<m?' ∈ {'+set.join(', ')+'}':''}`,cap:(b===0&&c===0?`квадрат ${setFact(v,m)}`:`этот многочлен ${setFact(v,m)}`)}; }},
+  {w:3,tag:'any',f(R){ const m=rp(R,[7,8,9]); const a=ri(R,2,m-1), c=ri(R,1,m-1); let x=ri(R,0,m-1); const v=A(()=>(x=(a*x+c)%m)); const P=periodOf(v,40);
+    return {v,run:true,html:`${I('x')}<sub>${I('n')}+1</sub> = (${a}${I('x<sub>n</sub>')} + ${c}) mod ${m}`,cap:P===m?`так компьютер тасует: каждая нота ровно один раз за круг из ${m}`:`генератор застревает в цикле длины ${P}`}; }},
+  {w:2,tag:'any',f(R){ const m=rp(R,[7,9]); let a=ri(R,2,m-1); while(gcd(a,m)!==1) a=ri(R,2,m-1); let x=1; const v=A(()=>{const r=x; x=x*a%m; return r;});
+    return {v,html:`${I('p<sub>n</sub>')} = ${a}<sup>${I('n')}</sup> mod ${m}`,cap:`степени ${a} по модулю ${m} ${perFact(v)}`}; }},
+  {w:3,tag:'glide',f(R){ const T=rp(R,[['треугольные','<i>n</i>(<i>n</i>+1)/2',n=>n*(n+1)/2],['пятиугольные','<i>n</i>(3<i>n</i>−1)/2',n=>n*(3*n-1)/2],['шестиугольные','<i>n</i>(2<i>n</i>−1)',n=>n*(2*n-1)],['тетраэдрические','<i>n</i>(<i>n</i>+1)(<i>n</i>+2)/6',n=>n*(n+1)*(n+2)/6]]);
+    const m=rp(R,[5,7,8,9]); const v=A(n=>T[2](n)%m); const P=periodOf(v); let pal=false; if(P){ const s=v.slice(0,P); pal=s.every((x,i)=>x===s[P-1-i]); }
+    return {v,html:`${I('T<sub>n</sub>')} = ${T[1]} mod ${m}`,cap:`${T[0]} числа mod ${m} ${pal?'читаются одинаково с конца':perFact(v)}`}; }},
+  {w:3,tag:'any',f(R){ const m=rp(R,[5,7,8,9]), p=ri(R,1,2), q=ri(R,1,2); let a=ri(R,0,m-1), b=ri(R,1,m-1); const v=A(()=>{ const r=a; [a,b]=[b,(p*b+q*a)%m]; return r; });
+    return {v,html:`${I('x<sub>n</sub>')} = (${term(p,I('x')+'<sub>'+I('n')+'−1</sub>')} + ${term(q,I('x')+'<sub>'+I('n')+'−2</sub>')}) mod ${m}`,cap:`${p===1&&q===1?'Фибоначчи':'рекуррента'} по модулю ${m} ${perFact(v)}`}; }},
+  {w:2,tag:'any',f(R){ const k=rp(R,Object.keys(CONST)), m=rp(R,[8,9,10]); const d=CONST[k].split('').map(Number); const v=A(n=>d[n%d.length]%m);
+    return {v,html:`${I(k)}<sub>${I('n')}</sub>${m<10?' mod '+m:''}`,cap:m===10?`это просто цифры числа ${k}`:`цифры числа ${k} по модулю ${m}`}; }},
+  {w:2,tag:'any',f(R){ const k=rp(R,Object.keys(ALPHA)), a=ALPHA[k], m=rp(R,[5,7,8]); const v=A(n=>Math.floor((n+1)*a)%m);
+    const ds=[...new Set(A(n=>Math.floor((n+2)*a)-Math.floor((n+1)*a)))].sort((x,y)=>x-y);
+    return {v,html:`⌊${I('n')}·${k}⌋ mod ${m}`,cap:`шаги ⌊${I('n')}·${k}⌋ бывают только ${ds.join(' и ')}`}; }},
+  {w:2,tag:'any',f(R){ const s0=rp(R,[7,9,15,19,25,27,31,41,47,54,73,97]), m=rp(R,[5,7,8]); let c=s0, steps=0, hit=false; const v=A(()=>{ const r=c; if(!hit&&c===1) hit=true; if(!hit) steps++; c=c%2?3*c+1:c/2; return r%m; });
+    return {v,html:`${I('c')}<sub>${I('n')}+1</sub> = ${I('c<sub>n</sub>')}/2 или 3${I('c<sub>n</sub>')}+1, mod ${m}`,cap:`Коллатц из ${s0}: падает до 1 за ${steps} ${plural(steps,'шаг','шага','шагов')}`}; }},
+  {w:1,tag:'any',f(){ return {v:A(n=>tz(n+1)),html:`ν<sub>2</sub>(${I('n')}+1)`,cap:'линейка: каждая вторая нота — 0, каждая четвёртая — выше'}; }},
+  {w:1,tag:'any',f(){ return {v:A(n=>(n^(n>>1))%8),html:`${I('g<sub>n</sub>')} = (${I('n')} xor ⌊${I('n')}/2⌋) mod 8`,cap:'код Грея: соседние ноты отличаются одним битом'}; }},
+  {w:1,tag:'any',f(R){ const hi=ri(R,2,4); return {v:A(n=>popc(n)%2?hi:0),lab:v=>v?1:0,html:`${I('t<sub>n</sub>')} = (единиц в ${I('n')}) mod 2`,cap:'Туэ — Морс: ни один кусок не повторяется трижды подряд'}; }},
+  {w:2,tag:'glide',f(R){ const Am=ri(R,2,4), P=rp(R,[6,8,8,12,16]); const v=A(n=>Math.round(Am*Math.sin(2*Math.PI*n/P)));
+    return {v,html:`round(${Am} sin(2π${I('n')}/${P}))`,cap:`синус, округлённый до ступеней: период ${P}`}; }},
+  {w:1,tag:'any',f(R){ const m=rp(R,[7,8]); const seen=new Set([0]); let a=0; const v=A(n=>{ if(n>0){ const b=a-n; a=(b>0&&!seen.has(b))?b:a+n; seen.add(a);} return a%m; });
+    return {v,html:`${I('a<sub>n</sub>')} = ${I('a')}<sub>${I('n')}−1</sub> ∓ ${I('n')}, mod ${m}`,cap:'Рекаман: шаг назад, если там ещё не были, иначе вперёд'}; }},
+  {w:1,tag:'any',f(R){ const m=rp(R,[6,8]); const v=A(n=>PRIMES[n]%m); const s=[...new Set(v.slice(1))].sort((a,b)=>a-b);
+    return {v,html:`${I('p<sub>n</sub>')} mod ${m}, &nbsp;${I('p')} — простые`,cap:`после двойки простые mod ${m} — только ${s.join(', ')}`}; }},
+  {w:2,tag:'any',f(R){ const m=rp(R,[7,8,9]); let k=ri(R,2,m-1); while(gcd(k,m)!==1) k=ri(R,2,m-1);
+    return {v:A(n=>k*n%m),run:true,html:`${k}${I('n')} mod ${m}`,cap:`НОД(${k}, ${m}) = 1, поэтому обходит все ${m} нот`}; }},
+  {w:2,tag:'glide',f(R){ const m=ri(R,3,5), k=ri(R,1,2); return {v:A(n=>Math.abs((k*n)%(2*m)-m)),html:`|(${term(k,I('n'))} mod ${2*m}) − ${m}|`,cap:'остатки, сложенные пополам, рисуют треугольную волну'}; }},
+];
+const MW=t=>MELS.filter(m=>!t||m.tag===t||t==='any');
+function pickMel(R,tag){ const pool=tag==='glide'?MELS.filter(m=>m.tag==='glide'):MELS; for(let i=0;i<12;i++){ const tot=pool.reduce((a,m)=>a+m.w,0); let x=R()*tot, F=pool[0]; for(const m of pool){ x-=m.w; if(x<=0){F=m;break;} } const mel=F.f(R); if(new Set(mel.v.slice(0,16)).size>=3||i===11) return mel; } }
+
+/* ================= sound-design concepts: each shell is one idea, explained by math ================= */
+const OFFS=[-.11,-.063,-.0195,0,.02,.062,.107];               // seven-voice supersaw spread
+const CONCEPTS=[
+  {id:'pulse',w:5,mood:{},make(R){ const mel=pickMel(R); return {mel,html:mel.html,cap:mel.cap,rh:mel.run?'run':rp(R,['8','8','8','run','tres','dot']),voice:'lead',look:'steps',plainSub:true}; }},
+  {id:'hills',w:2,mood:{tense:.5,relaxed:2},make(R){ const mel=pickMel(R,'glide'); return {mel,html:mel.html,cap:mel.cap,rh:'8',voice:'glide',look:'smooth',plainSub:true}; }},
+  {id:'reese',w:2,mood:{tense:2,relaxed:.5},make(R){ const seq=rp(R,[[0,0,2,-1],[0,3,0,-2],[0,1,-2,0],[0,-1,2,3]]); const a=ri(R,1,3), b=a+ri(R,3,5);
+    return {mel:{v:A(n=>seq[n%seq.length])},p:{df:[a,b]},rh:'long',voice:'reese',look:'steps',live:'reese',noLabels:true,
+      html:`${I('y')} = saw(${I('ft')}) + saw((${I('f')} + Δ${I('f')})${I('t')})`,sub:`Δ${I('f')} = ${a} → ${b} Гц: пилы то сходятся, то расходятся по фазе`,cap:'две пилы в паре герц друг от друга — это риз-бас'}; }},
+  {id:'mirror',w:2,mood:{},make(R){ const ch=rp(R,[[3,7,10],[3,7,12],[4,7,11],[5,7,10]]), up=[0,...ch];
+    return {mel:{v:A(n=>{ const i=n%8; return i<4?up[i]:-up[i-4]; }),lab:x=>x>0?'+'+x:x<0?'−'+(-x):'0'},kind:'semi',rh:'8',voice:'lead',look:'mirror',
+      html:`${I('y')}<sub>такт 2</sub>(${I('t')}) = −${I('y')}<sub>такт 1</sub>(${I('t')})`,sub:`(+${ch.join(', +')}) → (−${ch.join(', −')})`,cap:'переверни арпеджио вниз головой — минор становится мажором'}; }},
+  {id:'poly',w:2,mood:{tense:1.5},make(R){ const p=rp(R,[3,3,5]), seq=rp(R,[[0,0,12,1],[0,0,7,12],[0,5,0,12]]);
+    return {mel:{v:A(n=>seq[n%seq.length])},kind:'semi',rh:'p'+p,voice:'blip',look:'steps',bracket:p,
+      html:`удар, если ${I('k')} mod ${p} = 0, &nbsp;нота = (${seq.join(', ')})<sub>${I('j')} mod 4</sub>`,sub:`4 ноты × ${p} шестнадцатых = петля на ${p} ${plural(p,'долю','доли','долей')} в такте на 4`,cap:`каждая ${p===3?'третья':'пятая'} шестнадцатая: риф на ${p} поверх 4`}; }},
+  {id:'shep',w:1.5,mood:{},make(R){ const dir=R()<.5?-1:1;
+    return {mel:{v:A(n=>dir*n)},kind:'shep',rh:'8',voice:'shep',look:'shep',blank:'shep',noLabels:true,
+      html:`${I('y<sub>k</sub>')} = ${I('y')}<sub>0</sub> ${dir<0?'−':'+'} ${I('t')}/${I('T')} + ${I('k')} (mod 4), &nbsp;громкость = ${I('e')}<sup>−${I('y')}²</sup>`,sub:'4 копии через октаву: сверху проявляются, снизу тают',cap:dir<0?'тон Шепарда: падает вечно, но ниже не становится':'тон Шепарда: растёт вечно, но выше не становится'}; }},
+  {id:'fm',w:3,mood:{tense:.5,relaxed:2},make(R){ const mel=pickMel(R), r=rp(R,[1.4,1.4,2,3.5,1,3]), Ix=ri(R,3,9), tau=rf(R,.15,.5);
+    const bellish=r%1!==0;
+    return {mel,p:{r,I:Ix,tau},rh:rp(R,['8','4','off','8','tres']),voice:'fm',look:'decay',blank:'fm',
+      html:`${I('y')} = sin(2π${I('ft')} + ${Ix}${I('e')}<sup>−${I('t')}/${tau}</sup> sin(2π·${r}${I('ft')}))`,cap:bellish?`дробное отношение 1 : ${r} даёт негармонические обертоны — колокол`:`целое отношение 1 : ${r} даёт гармонический тембр — электропиано`}; }},
+  {id:'ks',w:3,mood:{tense:.5,relaxed:2},make(R){ const mel=pickMel(R), damp=rf(R,.493,.4985,4);
+    return {mel,p:{damp},rh:rp(R,['8','run','off','tres','dot']),voice:'ks',look:'decay',blank:'ks',
+      html:`${I('y')}[${I('n')}] = ${damp}·(${I('y')}[${I('n')}−${I('N')}] + ${I('y')}[${I('n')}−${I('N')}−1]), &nbsp;${I('N')} = ${I('f<sub>s</sub>')}/${I('f')}`,cap:'шум, прогнанный по короткой петле задержки, сам становится струной'}; }},
+  {id:'supersaw',w:2.5,mood:{tense:1.3},make(R){ const mel=pickMel(R), d=rf(R,.12,.35);
+    return {mel,p:{det:d},kind:'chord',rh:rp(R,['off','8','4','off']),voice:'supersaw',look:'thick',live:'wall',
+      html:`${I('y')} = Σ<sub>${I('k')}=1…7</sub> saw((1 + δ<sub>${I('k')}</sub>)${I('ft')}), &nbsp;δ ∈ ±${d} пт`,cap:'семь расстроенных пил на каждую ноту аккорда — суперсо, звук транса'}; }},
+  {id:'crush',w:2,mood:{tense:2,relaxed:.3},make(R){ const mel=pickMel(R), b0=rp(R,[8,6]), b1=rp(R,[2,3]);
+    return {mel,p:{b0,b1},rh:mel.run?'run':rp(R,['8','run']),voice:'crush',look:'crush',
+      html:`${I('x<sub>q</sub>')} = round(${I('x')}·2<sup>${I('b')}</sup>) / 2<sup>${I('b')}</sup>, &nbsp;${I('b')}: ${b0} → ${b1} бит`,cap:'чем меньше бит, тем крупнее ступени: шум квантования становится тембром'}; }},
+  {id:'fold',w:2,mood:{tense:1.5,relaxed:.5},make(R){ const mel=pickMel(R), gmax=ri(R,3,7);
+    return {mel,p:{gmax},rh:rp(R,['8','8','run']),voice:'fold',look:'fold',
+      html:`${I('y')} = sin(${I('g')}·${I('x')}), &nbsp;${I('g')}: 1 → ${gmax}`,cap:'волна складывается сама в себя и рождает обертоны без всякого фильтра'}; }},
+  {id:'ring',w:2,mood:{tense:2,relaxed:.3},make(R){ const mel=pickMel(R), rm=rp(R,[1.5,2.01,.5,2.76,1.41]);
+    return {mel,p:{rm},rh:rp(R,['8','off','run','tres']),voice:'ring',look:'ring',
+      html:`${I('y')} = ${I('x')}(${I('t')})·sin(2π·${rm}${I('f')}${I('t')})`,cap:'кольцевая модуляция: суммы и разности частот — металлический звон'}; }},
+  {id:'pump',w:2,mood:{relaxed:1.5},make(R){ const mel=pickMel(R), tau=rf(R,.06,.16);
+    return {mel,p:{tau},rh:'8',voice:'pump',look:'pump',
+      html:`${I('a')}(${I('t')}) = 1 − ${I('e')}<sup>−${I('t')}/${tau}</sup>`,cap:'сайдчейн: громкость проваливается на каждой доле — так дышит танцевальная музыка'}; }},
+  {id:'echo',w:2,mood:{relaxed:2,tense:.7},make(R){ const mel=pickMel(R), g=rf(R,.4,.6,2), D=rp(R,[3,3,6]);
+    return {mel,p:{g,D},rh:'sparse',voice:'echo',look:'echo',
+      html:`${I('y')}(${I('t')}) = Σ ${g}<sup>${I('k')}</sup>·${I('x')}(${I('t')} − ${I('k')}·${D}/16)`,cap:`эхо — геометрическая прогрессия: каждый повтор в ${(1/g).toFixed(1).replace('.',',')} раза тише`}; }},
+  {id:'arp',w:2,mood:{},make(R){ const mel=pickMel(R), shape=rp(R,[[0,2,4,7],[0,4,2,7],[0,2,4,2],[7,4,2,0]]);
+    return {mel,p:{shape},kind:'arp',rh:'4',voice:'chip',look:'steps',
+      html:`аккорд(${I('d<sub>n</sub>')}) → ступени (${shape.join(', ')}) по шестнадцатым`,cap:'8-битные приставки играли аккорд одной нотой, быстро перебирая его'}; }},
+  {id:'harm',w:1.5,mood:{relaxed:1.5,tense:.5},make(R){ const set=[1,2,3,4,5,6,7,8], shape=rp(R,['up','updown']); const base=shape==='up'?set:set.concat(set.slice(1,-1).reverse());
+    return {mel:{v:A(n=>base[n%base.length]),lab:x=>'n'+x},kind:'harm',rh:'8',voice:'organ',look:'fan',
+      html:`${I('f<sub>n</sub>')} = ${I('n')}·${I('f')}<sub>0</sub>, &nbsp;${I('n')} = 1…8`,cap:'натуральный звукоряд: 7-й обертон не попадает в клавиши пианино'}; }},
+  {id:'acid',w:2,mood:{tense:2,relaxed:.3},make(R){ const mel=pickMel(R), q=ri(R,9,18), env=rf(R,1.5,3,1);
+    return {mel,p:{q,env},rh:rp(R,['8','run','dot','tres']),voice:'acid',look:'acid',
+      html:`${I('f<sub>c</sub>')}(${I('t')}) = ${I('f')}<sub>0</sub>·2<sup>${env}${I('e')}<sup>−${I('t')}/τ</sup></sup>, &nbsp;${I('Q')} = ${q}`,cap:'резонансный фильтр с огибающей: «чавкающий» эсид-бас'}; }},
+  {id:'pwm',w:1.5,mood:{},make(R){ const mel=pickMel(R), a=rf(R,.2,.4), r=rf(R,.5,2,1);
+    return {mel,p:{a,r},rh:rp(R,['8','dot','4','tres']),voice:'pwm',look:'pwm',
+      html:`${I('d')}(${I('t')}) = ½ + ${a}·sin(2π·${r}${I('t')})`,cap:'ширина импульса гуляет, и тембр дышит без единого фильтра'}; }},
+  {id:'vib',w:1.5,mood:{relaxed:2,tense:.5},make(R){ const mel=pickMel(R,'glide'), dep=rf(R,.2,.6), rate=rf(R,4,7,1);
+    return {mel,p:{dep,rate},rh:rp(R,['8','4']),voice:'vib',look:'vib',
+      html:`${I('f')}(${I('t')}) = ${I('f')}·2<sup>${dep}·sin(2π·${rate}${I('t')})/12</sup>`,cap:'вибрато — это синус, вложенный в частоту'}; }},
+  {id:'stab',w:1.5,mood:{},make(R){ const mel=pickMel(R); let a='1', b='10'; while(b.length<40){ const c=b+a; a=b; b=c; }
+    return {mel,p:{word:b},kind:'chord',rh:'fib',voice:'stab',look:'thick',live:'wall',
+      html:`${I('S<sub>n</sub>')} = ${I('S')}<sub>${I('n')}−1</sub>${I('S')}<sub>${I('n')}−2</sub> → ${b.slice(0,13)}…`,cap:'слово Фибоначчи: ритм, который никогда не повторяется'}; }},
+  {id:'toms',w:1.5,mood:{tense:1.3},make(R){ const mel=pickMel(R), k=rp(R,[5,7,9,11]), rot=ri(R,0,15);
+    return {mel,p:{k,rot},rh:'euclid',voice:'tom',look:'stems',
+      html:`удар, если ⌊${k}${I('i')}/16⌋ ≠ ⌊${k}(${I('i')}−1)/16⌋`,cap:`E(${k}, 16): алгоритм Евклида раскладывает ${k} ударов как можно ровнее`}; }},
+];
+function magazineConcept(bits){ return {mel:{v:bits.map(b=>b?0:4),lab:x=>x?0:1},kind:'mag',bits,rh:'8',voice:'lead',look:'mag',live:'wall',noLabels:true,
+  html:`${bits.join(' ')} = магазин этого раунда`,sub:'1 = низкий удар, 0 = высокая нота',cap:'финальный патрон играет магазин: боевой = 1'}; }
+let recent=[];
+function pickConcept(R,mood){
+  for(let tries=0;tries<20;tries++){
+    const pool=CONCEPTS.map(c=>[c,c.w*(c.mood[mood]||1)]); const c=rw(R,pool);
+    if(!recent.includes(c.id)||tries>15){ recent=[c.id,...recent].slice(0,5); return c; }
+  }
+  return CONCEPTS[0];
+}
+
+/* ================= rhythm ================= */
+const euclid=(k,N,rot)=>Array.from({length:N},(_,j)=>{ const i=mod(j+rot,N); return Math.floor(k*i/N)!==Math.floor(k*(i-1)/N)?1:0; });
+function hitsFor(c,total){ const h=[], rh=c.rh;
+  let eu=null; if(rh==='euclid') eu=euclid(c.p.k,16,c.p.rot);
+  for(let k=0;k<total;k++){
+    if(rh==='8'&&k%2===0) h.push([k,2,1]);
+    else if(rh==='run'&&k%8<5) h.push([k,1,1]);
+    else if(rh==='long'&&k%8===0) h.push([k,8,.9]);
+    else if(rh==='4'&&k%4===0) h.push([k,4,.9]);
+    else if(rh==='tres'&&(k%8===0||k%8===3||k%8===6)) h.push([k,k%8===6?2:3,.9]);
+    else if(rh==='dot'&&(k%4===0||k%4===3)) h.push([k,k%4===0?3:1,.9]);
+    else if(rh==='off'&&k%4===2) h.push([k,2,.6]);
+    else if(rh==='p3'&&k%3===0) h.push([k,1,.55]);
+    else if(rh==='p5'&&k%5===0) h.push([k,1,.55]);
+    else if(rh==='sparse'&&(k%16===0||k%16===10)) h.push([k,2,.7]);
+    else if(rh==='fib'&&k%2===0&&c.p.word[(k/2)%c.p.word.length]==='1') h.push([k,2,.5]);
+    else if(rh==='euclid'&&eu[k%16]) h.push([k,1,.6]);
+  } return h; }
+
+/* ================= lead patch, shaped by the mood ================= */
+function makePatch(R,mood){
+  const pool={tense:[['sawtooth',3],['square',3]],neutral:[['square',5],['p25',2],['sawtooth',1]],relaxed:[['triangle',4],['square',1],['p25',1]]}[mood];
+  const wave=rw(R,pool);
+  return {wave,cut:{tense:3200+R()*1800,neutral:2600+R()*1400,relaxed:1300+R()*700}[mood],q:.8+R()*1.5,drive:mood==='tense'?4+R()*6:0,
+    glide:.06,swoop:mood==='relaxed'?1.5:2,level:{square:.055,sawtooth:.05,p25:.05,triangle:.13}[wave]};
+}
+
+/* ================= a shell = concept + melody + rhythm + sound, all in F ================= */
+function makeShell(seed,mood,fixed){
+  const R=mulberry(seed);
+  const def=fixed?null:pickConcept(R,mood);
+  const c=fixed||def.make(R);
+  c.id=fixed?'mag':def.id; c.p=c.p||{};
+  return {seed,mood,mode:rp(R,MODES[mood]),c,P:makePatch(R,mood)};
+}
+function pitchOf(S,v){
+  const st=S.mode[1], k=S.c.kind;
+  if(k==='semi') return 24+v;
+  if(S.c.voice==='reese') return 24+degSemi(st,v);
+  if(k==='shep') return 24+degSemi(st,mod(v,st.length));
+  if(k==='harm') return 12+12*Math.log2(v);
+  let s=24+degSemi(st,v); while(s>40) s-=12; while(s<14) s+=12; return s;
+}
+function buildShell(S,start,pre,post,out){
+  const total=(pre+post)*4, notes=[], c=S.c, st=S.mode[1], mel=c.mel;
+  hitsFor(c,total).forEach(([k,d,leg],j)=>{
+    const v=mel.v[j%mel.v.length], isPost=k>=pre*4;
+    const push=(kk,dd,ll,vv,s)=>{ let sp=isPost?(out?s-24:s+12):s; if(isPost){ while(sp<2) sp+=12; while(sp>53) sp-=12; }
+      const nt={t:start+kk*S16,dur:dd*S16*ll,slot:dd*S16,v:vv,x:mel.lab?mel.lab(vv):vv,s,sp,post:isPost,k:kk}; notes.push(nt); return nt; };
+    if(c.kind==='arp'){ const sh=c.p.shape; for(let i=0;i<4;i++){ const dv=v+sh[i], s=pitchOf(S,dv); push(k+i,1,.9,dv,s); } return; }
+    const s=pitchOf(S,v), nt=push(k,d,leg,v,s);
+    const u=Math.max(0,Math.min(1,k/(pre*4)));
+    if(c.id==='crush') nt.bits=Math.round(c.p.b0+(c.p.b1-c.p.b0)*u);
+    if(c.id==='fold') nt.g=1+(c.p.gmax-1)*u;
+    if(c.id==='pwm') nt.duty=.5+c.p.a*Math.sin(2*Math.PI*c.p.r*k*S16);
+    if(c.id==='acid') nt.acc=mod(v,2)===0?1:.6;
+    if(c.kind==='chord'){ const base=v; nt.ch=[0,2,4].map(x=>{ let p=24+degSemi(st,base+x); while(p>40) p-=12; return p; }).sort((a,b)=>a-b); nt.chp=nt.ch.map(p=>p+(nt.sp-nt.s)); }
+    if(c.kind==='shep'){ nt.cp=[-1,0,1,2].map(cc=>{ const cs=s+12*cc, y=(cs-30)/14; return {s:cs,a:Math.exp(-y*y)}; }); }
+  });
+  return {S,start,trig:start+pre*BEAT,end:start+(pre+post)*BEAT,pre,post,out,notes,answer:null,at:0,onbeat:false,resolved:false,pNaive:0,pExact:0};
+}
+
+/* ================= logic: candidates & clues ================= */
+function combos(n,k){ const out=[]; for(let m=0;m<(1<<n);m++){ const s=[]; for(let i=0;i<n;i++) s.push((m>>(n-1-i))&1); if(sum(s)===k) out.push(s);} return out; }
+function cluePool(b){
+  const n=b.length, P=[], val=s=>s.reduce((a,x)=>a*2+x,0), adj=s=>s.some((x,i)=>x===1&&s[i+1]===1), pal=s=>s.every((x,i)=>x===s[n-1-i]);
+  const odd=b[n-1]; P.push({t:`Как двоичное число магазин <b>${odd?'нечётный':'чётный'}</b>`,f:s=>s[n-1]===odd});
+  const d3=val(b)%3===0; P.push({t:`Это число <b>${d3?'делится':'не делится'}</b> на 3`,f:s=>(val(s)%3===0)===d3});
+  const a=adj(b); P.push({t:a?'Где-то <b>два боевых идут подряд</b>':'Два боевых <b>подряд не идут нигде</b>',f:s=>adj(s)===a});
+  if(pal(b)) P.push({t:'Магазин — <b>палиндром</b>, с конца читается так же',f:pal});
+  const h=Math.floor(n/2), ch=sum(b.slice(0,h)); P.push({t:`Среди первых ${h} патронов боевых: <b>${ch}</b>`,f:s=>sum(s.slice(0,h))===ch});
+  const ev=s=>s.reduce((acc,x,i)=>acc+(i%2===1?x:0),0), ce=ev(b); P.push({t:`На чётных местах (#2, #4, …) боевых: <b>${ce}</b>`,f:s=>ev(s)===ce});
+  const ps=s=>s.reduce((acc,x,i)=>acc+(x?i+1:0),0), sp=ps(b); P.push({t:`Сумма номеров боевых: <b>${sp}</b>`,f:s=>ps(s)===sp});
+  for(let r=0;r<2;r++){ const i=rnd(0,n-2), j=rnd(i+1,n-1), same=b[i]===b[j]; P.push({t:`#${i+1} и #${j+1} — <b>${same?'одинаковые':'разные'}</b>`,f:s=>(s[i]===s[j])===same}); }
+  const run=s=>{let m=0,c=0; for(const x of s){c=x?0:c+1; m=Math.max(m,c);} return m;}, rb=run(b); P.push({t:`Самая длинная серия холостых: <b>${rb}</b> подряд`,f:s=>run(s)===rb});
+  return P;
+}
+function pickClues(b,k,want,minRemain){
+  let cands=combos(b.length,k); const chosen=[];
+  for(const c of shuffle(cluePool(b))){ if(chosen.length>=want) break; const nx=cands.filter(c.f); if(nx.length<cands.length&&nx.length>=minRemain){ chosen.push(c); cands=nx; } }
+  return {chosen,cands};
+}
+
+/* ================= audio engine ================= */
+let AC=null, master=null, bus=null, verbIn=null, noiseBuf=null; const curveCache={}, waveCache={}, ksCache={};
+function initAudio(){
+  if(AC){ if(AC.state!=='running') AC.resume(); return; }
+  AC=new (window.AudioContext||window.webkitAudioContext)();
+  const comp=AC.createDynamicsCompressor(); comp.threshold.value=-14; comp.ratio.value=3; comp.attack.value=.003; comp.release.value=.12;
+  master=AC.createGain(); master.gain.value=.85;
+  const hp=lp(28,.7,'highpass'); master.connect(hp); hp.connect(comp); comp.connect(AC.destination);
+  verbIn=makeVerb(comp);
+  noiseBuf=AC.createBuffer(1,AC.sampleRate*2,AC.sampleRate); const d=noiseBuf.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
+}
+function makeVerb(dest){
+  const verb=AC.createConvolver(), wet=AC.createGain(); wet.gain.value=.35;
+  const ir=AC.createBuffer(2,AC.sampleRate*2,AC.sampleRate);
+  for(let c=0;c<2;c++){ const d=ir.getChannelData(c); for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,3.2); }
+  verb.buffer=ir; const inp=AC.createGain(); inp.connect(lp(5000)).connect(verb); verb.connect(wet); wet.connect(dest); return inp;
+}
+function curve(k){ k=Math.round(k); const key='d'+k; if(curveCache[key]) return curveCache[key]; const c=new Float32Array(1024); for(let i=0;i<1024;i++){ const x=i/511.5-1; c[i]=(1+k)*x/(1+k*Math.abs(x)); } return curveCache[key]=c; }
+function crushCurve(b){ const key='c'+b; if(curveCache[key]) return curveCache[key]; const L=Math.pow(2,b-1), c=new Float32Array(2048); for(let i=0;i<2048;i++){ const x=i/1023.5-1; c[i]=Math.round(x*L)/L; } return curveCache[key]=c; }
+function foldCurve(g){ g=Math.round(g*2)/2; const key='f'+g; if(curveCache[key]) return curveCache[key]; const c=new Float32Array(2048); for(let i=0;i<2048;i++){ const x=i/1023.5-1; c[i]=Math.sin(g*x*Math.PI/2); } return curveCache[key]=c; }
+function pw(duty){ duty=Math.round(duty*20)/20; const k='p'+duty; if(waveCache[k]&&waveCache[k].ctx===AC) return waveCache[k].w; const N=48, re=new Float32Array(N), im=new Float32Array(N); for(let n=1;n<N;n++) re[n]=2/(n*Math.PI)*Math.sin(n*Math.PI*duty); const w=AC.createPeriodicWave(re,im); waveCache[k]={w,ctx:AC}; return w; }
+function osc(type,f,t){ const o=AC.createOscillator(); if(type==='p25') o.setPeriodicWave(pw(.25)); else if(type==='p12') o.setPeriodicWave(pw(.125)); else o.type=type; o.frequency.setValueAtTime(f,t); return o; }
+function lp(f,q=1,type='lowpass'){ const b=AC.createBiquadFilter(); b.type=type; b.frequency.value=f; b.Q.value=q; return b; }
+function gainN(v=0){ const g=AC.createGain(); g.gain.value=v; return g; }
+function perc(g,t,peak,dec,att=.003){ g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(peak,t+att); g.gain.exponentialRampToValueAtTime(.0005,t+att+dec); return t+att+dec; }
+function chain(nodes,out){ for(let i=0;i<nodes.length-1;i++) nodes[i].connect(nodes[i+1]); nodes[nodes.length-1].connect(out); }
+function noise(out,t,type,freq,peak,dec,q=1){ const s=AC.createBufferSource(); s.buffer=noiseBuf; const f=lp(freq,q,type), g=gainN(); const e=perc(g,t,peak,dec); chain([s,f,g],out); s.start(t); s.stop(e+.05); }
+function ksBuf(f,damp){ const key=Math.round(f*4)+':'+damp+':'+AC.sampleRate; if(ksCache[key]) return ksCache[key]; const sr=AC.sampleRate, len=Math.floor(sr*1.3), N=Math.max(2,Math.round(sr/f)); const b=AC.createBuffer(1,len,sr), d=b.getChannelData(0); for(let i=0;i<N;i++) d[i]=Math.random()*2-1; for(let i=N;i<len;i++) d[i]=damp*(d[i-N]+d[i-N+1]); return ksCache[key]=b; }
+/* held-note envelope used by most lead voices: attack, quick dip, hold, short release */
+function leadEnv(g,t,end,lvl){ g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(lvl*1.25,t+.004); g.gain.setTargetAtTime(lvl*.62,t+.01,.09); g.gain.setTargetAtTime(0,Math.max(t+.02,end-.006),.012); }
+
+/* --- the pulse: a sine kick whose pitch leaps up and falls exponentially, plus a filtered click --- */
+function kick(out,t,amp,dirt){
+  const o=osc('sine',88,t), g=gainN(); o.frequency.setValueAtTime(160,t); o.frequency.exponentialRampToValueAtTime(88,t+.014); o.frequency.exponentialRampToValueAtTime(50,t+.42);
+  g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(amp,t+.003); g.gain.setTargetAtTime(amp*.55,t+.02,.06); g.gain.exponentialRampToValueAtTime(.0008,t+.47);
+  if(dirt){ const sh=AC.createWaveShaper(); sh.curve=curve(dirt); chain([o,sh,g],out); } else chain([o,g],out);
+  o.start(t); o.stop(t+.5); noise(out,t,'lowpass',3500,amp*.12,.01);
+}
+const hat=(out,t,a)=>noise(out,t,'highpass',8000,a,.03);
+function riser(out,t0,dur,amp=.12){
+  const s=AC.createBufferSource(); s.buffer=noiseBuf; s.loop=true; const f=lp(300,4,'bandpass'), g=gainN();
+  f.frequency.setValueAtTime(300,t0); f.frequency.exponentialRampToValueAtTime(5000,t0+dur);
+  g.gain.setValueAtTime(0,t0); g.gain.linearRampToValueAtTime(amp,t0+dur*.95); g.gain.linearRampToValueAtTime(0,t0+dur);
+  chain([s,f,g],out); s.start(t0); s.stop(t0+dur+.05);
+}
+function impact(out,t){ kick(out,t,.6,8); noise(out,t,'lowpass',2500,.35,.6); const o=osc('sine',hz(12),t), g=gainN(), sh=AC.createWaveShaper(); sh.curve=curve(20); o.frequency.exponentialRampToValueAtTime(hz(0),t+.3); const e=perc(g,t,.25,.9); chain([o,sh,lp(900),g],out); o.start(t); o.stop(e+.05); }
+
+/* --- voices: one per concept --- */
+const V={
+  lead(out,n,S,key){ const P=S.P, f=hz(n[key]), t=n.t, end=n.t+n.dur, o=osc(P.wave,f,t), fl=lp(P.cut,P.q), g=gainN();
+    o.frequency.setValueAtTime(f*P.swoop,t); o.frequency.setTargetAtTime(f,t,.016);
+    fl.frequency.setValueAtTime(Math.min(12000,P.cut*2.4),t); fl.frequency.setTargetAtTime(P.cut,t,.05);
+    leadEnv(g,t,end,P.level); let nodes=[o,fl]; if(P.drive){ const sh=AC.createWaveShaper(); sh.curve=curve(P.drive); nodes=[o,sh,fl]; }
+    chain([...nodes,g],out); o.start(t); o.stop(end+.12); },
+  blip(out,n,S,key){ const P=S.P, f=hz(n[key]), o=osc(P.wave,f,n.t), fl=lp(P.cut,P.q), g=gainN(); o.frequency.setValueAtTime(f*1.5,n.t); o.frequency.exponentialRampToValueAtTime(f,n.t+.02); const e=perc(g,n.t,P.level*1.3,Math.max(.08,n.dur*1.3)); chain([o,fl,g],out); o.start(n.t); o.stop(e+.05); },
+  fm(out,n,S,key){ const p=S.c.p, f=hz(n[key]), t=n.t, c=osc('sine',f,t), m=osc('sine',f*p.r,t), mg=gainN(), g=gainN(); const dec=Math.max(.3,Math.min(1.4,n.slot*2.4));
+    mg.gain.setValueAtTime(f*p.I,t); mg.gain.setTargetAtTime(f*p.I*.04,t,p.tau); m.connect(mg).connect(c.frequency);
+    g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(.14,t+.003); g.gain.exponentialRampToValueAtTime(.0005,t+dec); chain([c,g],out); c.start(t); m.start(t); c.stop(t+dec+.05); m.stop(t+dec+.05); },
+  ks(out,n,S,key){ const f=hz(n[key]), s=AC.createBufferSource(); s.buffer=ksBuf(f,S.c.p.damp); const g=gainN(.34), fl=lp(5000,.7); const end=n.t+Math.max(n.slot*1.6,.2); g.gain.setValueAtTime(.34,n.t); g.gain.setTargetAtTime(0,end,.05); chain([s,fl,g],out); s.start(n.t); s.stop(end+.3); },
+  supersaw(out,n,S,key){ const ch=key==='s'?n.ch:n.chp, d=S.c.p.det, t=n.t, end=n.t+n.dur, mix=gainN(1), fl=lp(S.mood==='relaxed'?1800:3200,.8), g=gainN();
+    ch.forEach(p=>OFFS.forEach((o,i)=>{ if(i%2&&i!==3) return; const x=osc('sawtooth',hz(p),t); x.detune.value=o/0.11*d*100; const a=gainN(i===3?.22:.14); x.connect(a).connect(mix); x.start(t); x.stop(end+.15); }));
+    fl.frequency.setValueAtTime(fl.frequency.value*2,t); fl.frequency.setTargetAtTime(fl.frequency.value,t,.08);
+    g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(.05,t+.006); g.gain.setTargetAtTime(.032,t+.01,.1); g.gain.setTargetAtTime(0,end-.01,.03); chain([mix,fl,g],out); },
+  crush(out,n,S,key,sh){ const P=S.P, p=S.c.p, b=n.bits||p.b0;
+    const f=hz(n[key]), o=osc(P.wave==='triangle'?'sawtooth':P.wave,f,n.t), pre=gainN(.9), c=AC.createWaveShaper(); c.curve=crushCurve(b); const fl=lp(Math.max(P.cut,3000),.7), g=gainN();
+    o.frequency.setValueAtTime(f*P.swoop,n.t); o.frequency.setTargetAtTime(f,n.t,.016); leadEnv(g,n.t,n.t+n.dur,.05); chain([o,pre,c,fl,g],out); o.start(n.t); o.stop(n.t+n.dur+.12); n.bits=b; },
+  fold(out,n,S,key,sh){ const p=S.c.p, gg=n.g||1;
+    const f=hz(n[key]), o=osc('sine',f,n.t), c=AC.createWaveShaper(); c.curve=foldCurve(gg); const fl=lp(6000,.7), g=gainN();
+    o.frequency.setValueAtTime(f*1.5,n.t); o.frequency.setTargetAtTime(f,n.t,.016); leadEnv(g,n.t,n.t+n.dur,.07); chain([o,c,fl,g],out); o.start(n.t); o.stop(n.t+n.dur+.12); },
+  ring(out,n,S,key){ const P=S.P, f=hz(n[key]), o=osc(P.wave==='triangle'?'triangle':'square',f,n.t), m=osc('sine',f*S.c.p.rm,n.t), rg=gainN(0), fl=lp(4000,.7), g=gainN();
+    m.connect(rg.gain); leadEnv(g,n.t,n.t+n.dur,.1); chain([o,rg,fl,g],out); o.start(n.t); m.start(n.t); o.stop(n.t+n.dur+.12); m.stop(n.t+n.dur+.12); },
+  echo(out,n,S,key){ V.lead(S._echoIn||out,n,S,key); },
+  pump(out,n,S,key){ V.lead(S._pumpIn||out,{...n,dur:n.slot},S,key); },
+  chip(out,n,S,key){ const f=hz(n[key]), o=osc('p12',f,n.t), g=gainN(); g.gain.setValueAtTime(0,n.t); g.gain.linearRampToValueAtTime(.06,n.t+.002); g.gain.setValueAtTime(.06,n.t+n.dur*.8); g.gain.linearRampToValueAtTime(0,n.t+n.dur); chain([o,g],out); o.start(n.t); o.stop(n.t+n.dur+.02); },
+  organ(out,n,S,key){ const f=hz(n[key]), t=n.t, end=n.t+n.dur; [[1,.11],[2,.03]].forEach(([r,a])=>{ const o=osc('sine',f*r,t), g=gainN(); g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(a,t+.01); g.gain.setTargetAtTime(a*.7,t+.02,.1); g.gain.setTargetAtTime(0,end-.01,.02); chain([o,g],out); o.start(t); o.stop(end+.1); }); },
+  pwm(out,n,S,key){ const p=S.c.p, f=hz(n[key]), d=n.duty||.5, o=AC.createOscillator(); o.setPeriodicWave(pw(Math.max(.08,Math.min(.92,d)))); o.frequency.setValueAtTime(f*S.P.swoop,n.t); o.frequency.setTargetAtTime(f,n.t,.016); n.duty=d;
+    const fl=lp(S.P.cut,.8), g=gainN(); leadEnv(g,n.t,n.t+n.dur,.05); chain([o,fl,g],out); o.start(n.t); o.stop(n.t+n.dur+.12); },
+  stab(out,n,S,key){ const ch=key==='s'?n.ch:n.chp, t=n.t, mix=gainN(1), fl=lp(2600,2), g=gainN(); ch.forEach(p=>{ const o=osc(S.P.wave==='triangle'?'sawtooth':S.P.wave,hz(p),t); o.connect(mix); o.start(t); o.stop(t+.5); });
+    fl.frequency.setValueAtTime(5200,t); fl.frequency.setTargetAtTime(900,t,.07); const e=perc(g,t,.06,.32); chain([mix,fl,g],out); },
+  tom(out,n,S,key){ const f=hz(n[key]), o=osc('sine',f*2.4,n.t), g=gainN(); o.frequency.exponentialRampToValueAtTime(f,n.t+.06); const e=perc(g,n.t,.22,.38); chain([o,g],out); o.start(n.t); o.stop(e+.05); noise(out,n.t,'bandpass',f*6,.05,.03,2); },
+};
+/* mono voices that need the whole phrase at once */
+function glideVoice(out,notes,S,key,tEnd){ if(!notes.length) return; const P=S.P, t0=notes[0].t-.004, f0=hz(notes[0][key]);
+  const o=osc(P.wave==='square'?'triangle':P.wave,f0,t0), fl=lp(P.cut,P.q), g=gainN(); chain([o,fl,g],out); let prev=f0;
+  notes.forEach((n,i)=>{ const f=hz(n[key]); if(i>0){ o.frequency.setValueAtTime(prev,n.t); o.frequency.exponentialRampToValueAtTime(f,n.t+Math.min(.07,n.dur*.5)); }
+    if(i===0) g.gain.setTargetAtTime(P.wave==='square'?.13:P.level,n.t,.005); prev=f; });
+  g.gain.setTargetAtTime(0,tEnd,.02); o.start(t0); o.stop(tEnd+.3); }
+function vibVoice(out,notes,S,key,tEnd){ if(!notes.length) return; const p=S.c.p, t0=notes[0].t-.004, f0=hz(notes[0][key]);
+  const o=osc('triangle',f0,t0), lf=osc('sine',p.rate,t0), lg=gainN(p.dep*100), g=gainN(); lf.connect(lg).connect(o.detune); chain([o,lp(2400,.7),g],out); let prev=f0;
+  notes.forEach((n,i)=>{ const f=hz(n[key]); if(i>0){ o.frequency.setValueAtTime(prev,n.t); o.frequency.exponentialRampToValueAtTime(f,n.t+.05); } prev=f; });
+  g.gain.setValueAtTime(0,t0); g.gain.linearRampToValueAtTime(.14,t0+.03); g.gain.setTargetAtTime(0,tEnd,.03); o.start(t0); lf.start(t0); o.stop(tEnd+.3); lf.stop(tEnd+.3); }
+function acidVoice(out,notes,S,key,tEnd){ if(!notes.length) return; const p=S.c.p, t0=notes[0].t-.004, f0=hz(notes[0][key]-12);
+  const o=osc('sawtooth',f0,t0), fl=lp(500,p.q), sh=AC.createWaveShaper(), g=gainN(); sh.curve=curve(3); chain([o,fl,sh,g],out); let prev=f0;
+  notes.forEach((n,i)=>{ const f=hz(n[key]-12), slide=i>0&&(n.v%3===0); if(i>0){ o.frequency.setValueAtTime(prev,n.t); if(slide) o.frequency.exponentialRampToValueAtTime(f,n.t+.06); else o.frequency.setValueAtTime(f,n.t); }
+    const acc=n.acc||.6; fl.frequency.setValueAtTime(Math.min(9000,380*Math.pow(2,p.env*acc)),n.t); fl.frequency.setTargetAtTime(380,n.t,.07);
+    g.gain.setTargetAtTime(.065*(.8+.4*acc),n.t,.004); const nx=notes[i+1], e=n.t+n.dur; if(!nx||nx.t-e>.01) g.gain.setTargetAtTime(0,e-.005,.015); prev=f; });
+  g.gain.setTargetAtTime(0,tEnd,.02); o.start(t0); o.stop(tEnd+.3); }
+function reeseVoice(out,notes,S,key,low){ const df=S.c.p.df;
+  notes.forEach(n=>{ const f=hz(n[key]), a=osc('sawtooth',f,n.t), b=osc('sawtooth',f+df[0],n.t), fl=lp(low?500:1100,1.2), g=gainN(), m=gainN(1), lvl=low?.07:.05;
+    b.frequency.linearRampToValueAtTime(f+df[1],n.t+n.dur); a.connect(m); b.connect(m); let nodes=[m,fl]; if(low){ const sh=AC.createWaveShaper(); sh.curve=curve(10); nodes=[m,sh,fl]; }
+    g.gain.setValueAtTime(0,n.t); g.gain.linearRampToValueAtTime(lvl,n.t+.02); g.gain.setValueAtTime(lvl,n.t+n.dur-.03); g.gain.linearRampToValueAtTime(0,n.t+n.dur);
+    chain([...nodes,g],out); a.start(n.t); b.start(n.t); a.stop(n.t+n.dur+.05); b.stop(n.t+n.dur+.05); }); }
+function shepVoice(out,n,key,amp){ n.cp.forEach(c=>{ if(c.a<.03) return; const s=key==='s'?c.s:c.s+(n.sp-n.s); const o=osc(key==='s'?'triangle':'sine',hz(s),n.t), g=gainN(); g.gain.setValueAtTime(0,n.t); g.gain.linearRampToValueAtTime(amp*c.a,n.t+.01); g.gain.setTargetAtTime(0,n.t+n.dur*.9,.03); chain([o,g],out); o.start(n.t); o.stop(n.t+n.dur+.2); }); }
+/* reveal: the very same notes — f/4 as a distorted 808 (or a saw wall), 2f as a glass bell (or the concept itself) */
+function k808(out,n){ const f=hz(n.sp), o=osc('sine',f*2,n.t), sh=AC.createWaveShaper(), fl=lp(1300), g=gainN(); sh.curve=curve(14); o.frequency.exponentialRampToValueAtTime(f,n.t+.04); const e=perc(g,n.t,.3,Math.min(.6,Math.max(.14,n.slot*1.6))); chain([o,sh,fl,g],out); o.start(n.t); o.stop(e+.05); }
+function sawWall(out,n){ const f=hz(n.sp), mix=gainN(1); [-12,0,12].forEach(d=>{ const o=osc('sawtooth',f*2,n.t); o.detune.value=d; o.connect(mix); o.start(n.t); o.stop(n.t+n.slot+.05); }); const sh=AC.createWaveShaper(); sh.curve=curve(6); const fl=lp(1800,1), g=gainN(); g.gain.setValueAtTime(0,n.t); g.gain.linearRampToValueAtTime(.05,n.t+.005); g.gain.setTargetAtTime(0,n.t+n.slot*.8,.03); chain([mix,sh,fl,g],out); }
+function bell(out,n,amp=1){ const f=hz(n.sp); [[1,.085,1.1],[2.76,.03,.5],[5.4,.012,.25]].forEach(([r,a,d])=>{ const o=osc('sine',f*r,n.t), g=gainN(); const e=perc(g,n.t,a*amp,d,.002); chain([o,g],out); o.start(n.t); o.stop(e+.05); }); }
+
+/* adaptive layers: calm drops to half time; tension stacks hats, a sub pulse and a riser into the trigger */
+function scheduleLayers(sh){
+  const out=bus, mood=sh.S.mood, beats=sh.pre+sh.post, crit=G.lives===1;
+  for(let b=0;b<beats;b++){ const t=sh.start+b*BEAT;
+    if(mood==='relaxed'){ if(b%2===0) kick(out,t,.3,0); }
+    else kick(out,t,mood==='tense'?.46:.4,mood==='tense'?3:0);
+    if(mood==='tense'){ hat(out,t+BEAT/2,.035); if(crit){ hat(out,t+BEAT/4,.018); hat(out,t+BEAT*3/4,.018); }
+      const r=hz(12); [0,.5].forEach(o=>{ const tt=t+o*BEAT, s=osc('sine',r,tt), g=gainN(); const e=perc(g,tt,.07,.16); chain([s,g],out); s.start(tt); s.stop(e+.05); }); }
+  }
+  if(mood==='tense') riser(out,sh.trig-BEAT*4,BEAT*4,crit?.1:.06);
+}
+function scheduleShell(sh){
+  const out=bus, S=sh.S, c=S.c, pre=sh.notes.filter(n=>!n.post), post=sh.notes.filter(n=>n.post);
+  scheduleLayers(sh);
+  S._t0=sh.start;
+  const send=gainN({relaxed:.5,neutral:.18,tense:.08}[S.mood]); const lead=gainN(LEVEL[c.id]||1); lead.connect(out); lead.connect(send); send.connect(verbIn);
+  if(c.voice==='echo'){ const inp=gainN(1), dl=AC.createDelay(2), fb=gainN(c.p.g), lpf=lp(2500); dl.delayTime.value=c.p.D*S16; inp.connect(lead); inp.connect(dl); dl.connect(lpf).connect(fb).connect(dl); lpf.connect(lead); S._echoIn=inp; }
+  if(c.voice==='pump'){ const pg=gainN(1); pg.connect(lead); for(let b=0;b<sh.pre;b++){ const t=sh.start+b*BEAT; pg.gain.setValueAtTime(.12,t); pg.gain.setTargetAtTime(1,t,c.p.tau); } S._pumpIn=pg; }
+  if(c.voice==='reese') reeseVoice(lead,pre,S,'s',false);
+  else if(c.voice==='shep') pre.forEach(n=>shepVoice(lead,n,'s',.1));
+  else if(c.voice==='glide') glideVoice(lead,pre,S,'s',sh.trig);
+  else if(c.voice==='vib') vibVoice(lead,pre,S,'s',sh.trig);
+  else if(c.voice==='acid') acidVoice(lead,pre,S,'s',sh.trig);
+  else pre.forEach(n=>V[c.voice](lead,n,S,'s',sh));
+  const pg=gainN(1); pg.connect(out);
+  if(sh.out){
+    if(c.live==='reese') reeseVoice(pg,post,S,'sp',true);
+    else { post.forEach(n=>k808(pg,n)); if(c.live==='wall') post.forEach(n=>sawWall(pg,n)); }
+  } else {
+    if(c.blank==='shep') post.forEach(n=>shepVoice(pg,n,'sp',.09));
+    else if(c.blank==='fm') post.forEach(n=>V.fm(pg,n,S,'sp'));
+    else if(c.blank==='ks') post.forEach(n=>V.ks(pg,n,S,'sp'));
+    else post.forEach(n=>bell(pg,n,1.4));
+    const bs=gainN(.25); pg.connect(bs); bs.connect(verbIn);
+  }
+  noise(out,sh.trig,'bandpass',2400,.12,.03,2);
+}
+/* per-concept loudness trims, measured offline so every idea sits at the same level */
+const LEVEL={pulse:1.24,hills:2.16,reese:1.79,mirror:1.36,poly:5.51,shep:1.13,fm:1.0,ks:0.84,supersaw:3.51,crush:2.64,fold:1.32,ring:1.34,pump:1.95,echo:1.51,arp:3.55,harm:1.07,acid:1.35,pwm:2.28,vib:0.97,stab:1.84,toms:0.72,mag:1.76};
+function newBus(){ bus=AC.createGain(); bus.gain.value=1; bus.connect(master); return bus; }
+function killBus(){ if(!bus) return; const b=bus; bus=null; b.gain.setTargetAtTime(0,AC.currentTime,.15); setTimeout(()=>{try{b.disconnect()}catch(e){}},1800); }
+function ding(){ const t=AC.currentTime; [[hz(48),.04],[hz(55),.03]].forEach(([f,a],i)=>{ const o=osc('sine',f,t+i*.06), g=gainN(); const e=perc(g,t+i*.06,a,.5); chain([o,g],master); o.start(t+i*.06); o.stop(e+.05); }); }
+function bang(){ const t=AC.currentTime; noise(master,t,'lowpass',1400,.45,.45); }
+
+/* ================= game ================= */
+const G={phase:'title',round:0,lives:3,score:0,streak:0,correct:0,total:0,onbeat:0,n:8,k:4,mag:[],clues:[],cands:[],total0:1,shells:[],cur:-1,pre:8,post:8,t0:0,mood:-.15,introDone:false};
+const mult=()=>Math.min(4,1+Math.floor(Math.max(0,G.streak-1)/3));
+
+function newRound(){
+  G.round++; const r=G.round;
+  G.n=r===1?6:r===2?7:8; G.k=rnd(2,G.n-2);
+  G.mag=shuffle(Array.from({length:G.n},(_,i)=>i<G.k?1:0));
+  const {chosen,cands}=pickClues(G.mag,G.k,r===1?1:r<=3?2:3,r<=2?3:2);
+  G.clues=chosen; G.cands=cands; G.total0=combos(G.n,G.k).length;
+  G.pre=r<=3?8:4; G.post=G.pre; G.mood*=.6;
+  G.shells=[]; G.cur=-1; pickedUI(null); setProg(0,false);
+  G.phase='intro'; renderMag(); renderClues(); $('bin').innerHTML=''; hud(); setSub('рулетка, но это математика');
+  $('badge').className='badge'; $('badge').textContent=`#1/${G.n} боевой или холостой?`; setChance(G.k/G.n);
+  showOverlay(`
+    <div class="meta">Раунд ${r}</div>
+    <h2>${G.n} патронов: <span class="l">${G.k} боев${G.k===1?'ой':'ых'}</span>, <span class="b">${G.n-G.k} холост${G.n-G.k===1?'ой':'ых'}</span></h2>
+    <ul>${G.clues.map(c=>`<li>${c.t}</li>`).join('')}</ul>
+    <p>Совместимых раскладов: ${G.cands.length} из ${G.total0}. На ответ — ${G.pre/4} ${plural(G.pre/4,'такт','такта','тактов')}.</p>
+    <button class="go" id="goBtn" type="button"><span>Зарядить</span><kbd>Пробел</kbd></button>`);
+  $('goBtn').onclick=startRound; $('goBtn').focus({preventScroll:true});
+}
+function shellAt(i){
+  const S=makeShell(newSeed(),moodOf(G.mood),i===G.n-1?magazineConcept(G.mag):null);
+  const sh=buildShell(S,G.t0+BEAT*4+i*(G.pre+G.post)*BEAT,G.pre,G.post,G.mag[i]); sh.i=i; return sh;
+}
+function startRound(){
+  if(G.phase!=='intro') return;
+  initAudio(); hideOverlay(); newBus();
+  G.phase='loading'; renderMag();
+  const t0=AC.currentTime+.12; G.t0=t0;
+  for(let b=0;b<4;b++) kick(bus,t0+b*BEAT,.36,0);
+  riser(bus,t0,BEAT*4,.1);
+  G.shells=new Array(G.n).fill(null);
+  G.shells[0]=shellAt(0); scheduleShell(G.shells[0]);
+  G.phase='play';
+}
+function enterShell(i){
+  G.cur=i; const sh=G.shells[i], seen=G.mag.slice(0,i), liveLeft=G.k-sum(seen), left=G.n-i;
+  sh.pNaive=liveLeft/left; sh.pExact=G.cands.length?G.cands.filter(s=>s[i]===1).length/G.cands.length:sh.pNaive;
+  setChance(sh.pNaive); $('badge').className='badge'; $('badge').textContent=`#${i+1}/${G.n} боевой или холостой?`;
+  setFormula(sh,null); renderMag();
+  if(i===G.n-1&&sh.pNaive===1) setSub('последний — боевой',true);
+  else if(i===G.n-1) setSub('последний патрон',true);
+  else if(sh.pNaive===1) setSub('остались только боевые',true);
+  else if(sh.pNaive===0) setSub('остались только холостые',true);
+  else if(i===G.n-2) setSub('осталось два',true);
+  else if(i===1) setSub('очки: +1 за каждый');
+  else setSub('рулетка, но это математика');
+  pickedUI(null);
+}
+function answer(choice){
+  if(G.phase!=='play'||!AC) return; const sh=G.shells[G.cur]; if(!sh) return;
+  const now=AC.currentTime; if(now<sh.start||now>=sh.trig||sh.answer!==null) return;
+  sh.answer=choice; sh.at=now;
+  const ph=(now-G.t0)/BEAT, dist=Math.abs(ph-Math.round(ph))*BEAT; sh.onbeat=dist<=.075;
+  pickedUI(choice); if(sh.onbeat) judge('В ТАКТ','','var(--amber)',true);
+}
+function resolve(sh){
+  sh.resolved=true; G.total++; const ok=sh.answer===sh.out;
+  G.cands=G.cands.filter(s=>s[sh.i]===sh.out);
+  const hint=`по уликам шанс был ${Math.round(sh.pExact*100)} %`;
+  if(ok){ G.correct++; G.streak++; if(sh.onbeat) G.onbeat++; const pts=100*mult()+(sh.onbeat?25:0); G.score+=pts; judge(`ВЕРНО +${pts}`,hint,sh.out?'var(--live)':'var(--blank)'); ding(); G.mood=Math.min(1,G.mood+.3); }
+  else { G.lives--; G.streak=0; judge(sh.answer===null?'НЕ УСПЕЛ':'МИМО',hint,'var(--live)'); bang(); G.mood=Math.max(-1,G.mood-.6); }
+  if(G.lives===1) G.mood=Math.min(G.mood,-.5);
+  flash(sh.out?'live':'blank',!ok);
+  $('badge').className='badge '+(sh.out?'live':'blank'); $('badge').textContent=`#${sh.i+1}/${G.n} ${sh.out?'боевой':'холостой'}`;
+  setSub(ok?(G.streak>=3?`серия: ${G.streak}`:'верно'):'минус жизнь',!ok);
+  setFormula(sh,sh.out); renderMag(); hud(); renderCandCount();
+  if(G.lives<=0){ G.phase='dying'; setTimeout(gameOver,900); return; }
+  if(sh.i+1<G.n){ const nx=shellAt(sh.i+1); G.shells[sh.i+1]=nx; scheduleShell(nx); }
+}
+function endRound(){
+  G.phase='between'; const bits=G.mag, val=bits.reduce((a,x)=>a*2+x,0);
+  $('bin').innerHTML=`Магазин: ${bits.map(x=>`<span class="${x?'l':'b'}">${x}</span>`).join(' ')} = ${val}`;
+  G.lives=Math.min(3,G.lives+1); hud(); killBus();
+  setTimeout(()=>{ if(G.phase==='between') newRound(); },1200);
+}
+function gameOver(){
+  G.phase='over'; killBus();
+  const acc=G.total?Math.round(G.correct/G.total*100):0;
+  let best=0; try{best=+localStorage.getItem('patronnik-best')||0;}catch(e){}
+  const isBest=G.score>best; if(isBest){ try{localStorage.setItem('patronnik-best',String(G.score));}catch(e){} }
+  showOverlay(`
+    <div class="meta">Игра окончена · раунд ${G.round}</div>
+    <div class="big">${G.score}</div>
+    <div class="stats"><span>верно <b>${G.correct}/${G.total}</b></span><span>точность <b>${acc} %</b></span><span>в такт <b>${G.onbeat}</b></span></div>
+    <p>${isBest?'Новый личный рекорд.':'Личный рекорд: '+Math.max(best,G.score)+'.'} <span id="saveNote"></span></p>
+    <button class="go" id="goBtn" type="button"><span>Ещё раз</span><kbd>Пробел</kbd></button>`);
+  $('goBtn').onclick=resetGame; $('goBtn').focus({preventScroll:true});
+  submitScore(acc);
+}
+function resetGame(){
+  if(G.phase!=='over'&&G.phase!=='title') return;
+  Object.assign(G,{round:0,lives:3,score:0,streak:0,correct:0,total:0,onbeat:0,mood:-.15});
+  initAudio();
+  if(!G.introDone){ G.introDone=true; playIntro(); } else newRound();
+}
+function playIntro(){
+  G.phase='introseq'; newBus(); const t0=AC.currentTime+.1;
+  riser(bus,t0,BEAT*8,.14);
+  for(let b=0;b<4;b++) kick(bus,t0+b*BEAT,.38,0);
+  for(let k=0;k<4;k++) kick(bus,t0+4*BEAT+k*BEAT/2,.36,0);
+  for(let k=0;k<8;k++) kick(bus,t0+6*BEAT+k*BEAT/4,.24+k*.02,0);
+  impact(bus,t0+8*BEAT);
+  const words=[[0,'<span class="w l">БОЕВОЙ</span>'],[1,' <span class="w or">или</span> '],[2,'<span class="w b">ХОЛОСТОЙ?</span>'],[4,'<br><span class="w g">УГАДАЙ.</span>'],[7,'<br><span class="w x">…ИНАЧЕ</span>']];
+  showOverlay('<div class="intro" id="introText"></div>');
+  const el=$('introText'); let html='';
+  words.forEach(([b,w])=>setTimeout(()=>{ html+=w; el.innerHTML=html; },(t0-AC.currentTime+b*BEAT)*1000));
+  setTimeout(()=>flash('live',true),(t0-AC.currentTime+8*BEAT)*1000);
+  setTimeout(()=>{ killBus(); newRound(); },(t0-AC.currentTime+8*BEAT+1.1)*1000);
+}
+
+/* ================= UI helpers ================= */
+function hud(){ $('hRound').textContent=G.round||1; $('hScore').textContent=G.score.toLocaleString('ru-RU'); $('hMult').textContent='×'+mult(); $('hLives').innerHTML=[0,1,2].map(i=>`<span class="life ${i<G.lives?'':'off'}"></span>`).join(''); }
+function renderMag(){
+  const el=$('mag'); el.innerHTML='';
+  const show=G.phase==='intro'?[...G.mag].sort((a,b)=>b-a):G.mag;
+  show.forEach((x,i)=>{ const sh=G.shells[i], rev=G.phase==='intro'||(sh&&sh.resolved), d=document.createElement('div');
+    d.className='shell'+(rev?(x?' live':' blank'):'')+(i===G.cur&&!(sh&&sh.resolved)&&G.phase==='play'?' cur':'');
+    d.innerHTML='<div class="body">?</div><div class="base"></div>'; el.appendChild(d); });
+}
+function renderClues(){ $('clueList').innerHTML=G.clues.length?G.clues.map(c=>`<li>${c.t}</li>`).join(''):'<li>В этом раунде без улик: только счёт.</li>'; renderCandCount(); }
+function renderCandCount(){ $('cands').textContent=`раскладов: ${G.cands.length} из ${G.total0}`; $('meter').style.width=Math.max(4,100*G.cands.length/G.total0)+'%'; }
+function setChance(p){ $('chance').textContent=Math.round(p*100)+' %'; }
+function setSub(t,hot){ const s=$('sub'); s.textContent=t; s.classList.toggle('hot',!!hot); }
+const PRE_S='<i>f</i><sub>out</sub> = <i>f</i>·2<sup><i>s</i></sup>,&nbsp; <i>s</i> = ?';
+function noteNames(sh){ return sh.notes.filter(n=>!n.post).slice(0,4).map(n=>NOTE[mod(Math.round(n.s),12)]).join(', '); }
+function setFormula(sh,out){
+  const S=sh.S, c=S.c;
+  $('fMain').innerHTML=c.html;
+  $('fSub1').innerHTML=c.sub?c.sub:c.plainSub?`нота = гамма[${I('d<sub>n</sub>')}]: ${noteNames(sh)} &nbsp;(${S.mode[0]})`:`ноты: ${c.mel.html} → ${noteNames(sh)}`;
+  const live=c.live==='reese'?'риз-бас на две октавы ниже':c.live==='wall'?'808 и стена пил':'перегруженный 808';
+  const blank=c.blank==='shep'?'стеклянные колокола, всё так же падает':c.blank==='fm'?'FM-колокол октавой выше':c.blank==='ks'?'струна октавой выше':'стеклянный колокол';
+  const s2=$('fSub2'); s2.innerHTML=out==null?PRE_S:out?`<i>s</i> = −2: &nbsp;<i>f</i>/4 &nbsp;БОЕВОЙ (${live})`:`<i>s</i> = +1: &nbsp;2<i>f</i> &nbsp;ХОЛОСТОЙ (${blank})`;
+  s2.className='f-sub'+(out==null?'':(out?' res-live':' res-blank'));
+  $('caption').innerHTML=c.cap;
+}
+function pickedUI(c){ $('btnLive').classList.toggle('picked',c===1); $('btnBlank').classList.toggle('picked',c===0); document.querySelector('.controls').classList.toggle('chosen',c===0||c===1); }
+function judge(text,small,color,quick){ const j=$('judge'); j.style.color=color; j.innerHTML=text+(small?`<small>${small}</small>`:''); j.classList.remove('show'); void j.offsetWidth; j.classList.add('show'); j.style.animationDuration=quick?'.6s':''; }
+function flash(kind,hard){ const f=$('flash'); f.className='flash'; void f.offsetWidth; f.className='flash '+kind; const s=$('stage'); s.classList.remove('shake','glitch'); void s.offsetWidth; s.classList.add(hard?'shake':'glitch'); }
+function showOverlay(html){ const o=$('overlay'); o.innerHTML=html; o.hidden=false; }
+function hideOverlay(){ $('overlay').hidden=true; }
+function setProg(p,late){ const f=$('progFill'); f.style.width=(p*100)+'%'; f.classList.toggle('late',late); $('progKnob').style.left=(p*100)+'%'; }
+
+/* ================= the scope ================= */
+const cv=$('scope'), X=cv.getContext('2d'); let dpr=1, W=0, H0=0;
+function resize(){ dpr=Math.min(2,window.devicePixelRatio||1); W=cv.clientWidth; H0=Math.round(Math.min(window.innerWidth>=980?360:420,Math.max(290,W*.82))); cv.style.height=H0+'px'; cv.width=Math.round(W*dpr); cv.height=Math.round(H0*dpr); }
+const FONT=getComputedStyle(document.documentElement).getPropertyValue('--f-display').trim()||'sans-serif';
+const COL={grid:'#15241d',grid2:'#1c2e25',axis:'#8a9bb0',txt:'#6c8a7a',amber:'#ffc845',live:'#ff3d5e',blank:'#55c7ff',tick:'#3f6b50'};
+const S_LO=-3, S_HI=55;
+function drawShell(sh,now,countdown){
+  X.setTransform(dpr,0,0,dpr,0,0); X.clearRect(0,0,W,H0); X.shadowBlur=0; X.globalAlpha=1;
+  const L=30, R=W-14, T=30, B=H0-30, xT=(L+R)/2;
+  const xOf=t=>L+(t-sh.start)/(sh.end-sh.start)*(R-L), yOf=s=>B-(s-S_LO)/(S_HI-S_LO)*(B-T);
+  const ctx={xOf,yOf,B,T,L,R};
+  const revealed=now>=sh.trig, col=revealed?(sh.out?COL.live:COL.blank):COL.amber;
+  X.lineWidth=1;
+  for(let i=0;i<=12;i++){ const x=Math.round(L+(R-L)*i/12)+.5; X.strokeStyle=COL.grid; X.beginPath(); X.moveTo(x,T); X.lineTo(x,B); X.stroke(); }
+  X.font=`800 10px ${FONT}`; X.textAlign='right';
+  for(let k=0;k<5;k++){ const y=Math.round(yOf(12*k))+.5; X.strokeStyle=COL.grid2; X.beginPath(); X.moveTo(L,y); X.lineTo(R,y); X.stroke(); X.fillStyle=COL.txt; X.fillText('F'+(k+1),L-6,y+3); }
+  const ay=yOf(19); X.strokeStyle=COL.axis; X.lineWidth=1.3;
+  X.beginPath(); X.moveTo(L-6,ay); X.lineTo(R,ay); X.moveTo(R-7,ay-4); X.lineTo(R,ay); X.lineTo(R-7,ay+4); X.stroke();
+  X.beginPath(); X.moveTo(xT,B+6); X.lineTo(xT,T-2); X.moveTo(xT-4,T+5); X.lineTo(xT,T-2); X.lineTo(xT+4,T+5); X.stroke();
+  X.fillStyle=COL.axis; X.textAlign='center'; X.font=`800 9px ${FONT}`; X.fillText('СПУСК',xT,T-8);
+  if(!revealed){ const p=Math.max(0,(now-sh.start)/(sh.trig-sh.start)); X.save(); X.setLineDash([5,5]); X.strokeStyle=p>.75?COL.live:'#ff9a3c'; X.globalAlpha=.85; X.lineWidth=1.5; X.beginPath(); X.moveTo(xT,T+8); X.lineTo(xT,B); X.stroke(); X.restore(); }
+  sh.notes.forEach(n=>{ if(n.t>now) return; const x=xOf(n.t)+.5, h=3+(mod(Math.round(n.v),5))*2; X.strokeStyle=n.post?(sh.out?'#7a2a3a':'#2a5f7a'):COL.tick; X.lineWidth=1.5; X.beginPath(); X.moveTo(x,B+20); X.lineTo(x,B+20-h); X.stroke(); });
+  const S=sh.S, c=S.c;
+  const pre=sh.notes.filter(n=>!n.post&&n.t<=now), post=sh.notes.filter(n=>n.post&&n.t<=now), lim=Math.min(now,sh.trig);
+  X.save(); X.font=`800 9px ${FONT}`; X.fillStyle=col; X.strokeStyle=col; X.globalAlpha=.75; X.lineWidth=1;
+  if(c.look==='mirror'){ const y=yOf(24); X.setLineDash([4,4]); X.beginPath(); X.moveTo(L,y); X.lineTo(R,y); X.stroke(); X.setLineDash([]); X.textAlign='left'; X.fillText('зеркало',L+3,y+12); }
+  if(c.bracket){ const p=c.bracket; for(let i=0;i+3<pre.length;i+=4){ const g=pre.slice(i,i+4), xa=xOf(g[0].t), xb=xOf(g[3].t+g[3].slot), y=yOf(44); X.beginPath(); X.moveTo(xa,y+4); X.lineTo(xa,y); X.lineTo(xb,y); X.lineTo(xb,y+4); X.stroke(); X.textAlign='center'; X.fillText(`${p} ${plural(p,'доля','доли','долей')}`,(xa+xb)/2,y-4); } }
+  if(c.look==='mag'){ const y=yOf(44); X.textAlign='left'; X.fillText(c.bits.join(''),L+4,y-8); X.setLineDash([2,3]); X.beginPath(); X.moveTo(L,y); X.lineTo(revealed?R:xOf(now),y); X.stroke(); X.setLineDash([]);
+    pre.forEach(n=>{ if(n.v===0){ X.globalAlpha=1; X.lineWidth=3; X.beginPath(); X.moveTo(xOf(n.t),y); X.lineTo(xOf(n.t+n.dur*.8),y); X.stroke(); } }); }
+  X.restore();
+  if(!c.noLabels){ const preTop=sh.notes.filter(n=>!n.post).reduce((m,n)=>Math.max(m,n.ch?Math.max(...n.ch):n.s),0);
+    X.font=`800 9px ${FONT}`; X.textAlign='center'; X.globalAlpha=.9; let lastR=[-99,-99];
+    sh.notes.forEach((n,j)=>{ if(n.t>now) return; const top=n.post?Math.max(preTop,n.sp):preTop, row=j%2, y=yOf(top)-12-row*10, x=xOf(n.t)+2, lab=String(n.x), hw=X.measureText(lab).width/2;
+      if(x-hw<lastR[row]+3) return; lastR[row]=x+hw; X.fillStyle=n.post?(sh.out?COL.live:COL.blank):col; X.fillText(lab,x,Math.max(T+8,y)); });
+    X.globalAlpha=1; }
+  X.save(); X.strokeStyle=col; X.fillStyle=col; X.lineWidth=2.4; X.lineJoin='round'; X.lineCap='round'; X.shadowColor=col; X.shadowBlur=14;
+  let head=LOOK[c.look](ctx,pre,'s',lim,c,sh,now);
+  X.restore();
+  if(revealed&&post.length){
+    const pc=sh.out?COL.live:COL.blank;
+    X.save(); X.strokeStyle=pc; X.fillStyle=pc; X.lineWidth=2.4; X.lineJoin='round'; X.lineCap='round'; X.shadowColor=pc; X.shadowBlur=14;
+    const y0=head?head.y:yOf(24), y1=yOf(post[0].sp);
+    if(sh.out&&c.live!=='reese'&&c.look!=='shep') head=traceSpikes(ctx,post,now);
+    else head=LOOK[c.look](ctx,post,'sp',now,c,sh,now);
+    if(!sh.out) post.forEach(n=>{ const age=now-n.t; if(age<.5){ X.save(); X.globalAlpha=1-age/.5; X.lineWidth=1.2; X.shadowBlur=6; X.beginPath(); X.arc(xOf(n.t),yOf(n.sp),3+age*16,0,Math.PI*2); X.stroke(); X.restore(); } });
+    X.restore();
+    X.fillStyle=pc; X.font=`800 10px ${FONT}`;
+    if(sh.out){ X.textAlign='right'; X.fillText('÷4  (s = −2)',xT-8,y1+4); } else { X.textAlign='left'; X.fillText('×2  (s = +1)',xT+8,(y0+y1)/2+4); }
+    if(c.voice==='reese'){ X.textAlign='left'; X.fillText(`Δf = ${c.p.df[0]} → ${c.p.df[1]} Гц`,xT+8,yOf(post[0].sp)-10); }
+  }
+  if(sh.answer!==null){ const x=xOf(sh.at), c2=sh.answer?COL.live:COL.blank; X.save(); X.strokeStyle=c2; X.globalAlpha=.7; X.lineWidth=1; X.setLineDash([2,4]); X.beginPath(); X.moveTo(x,T+8); X.lineTo(x,B); X.stroke(); X.restore();
+    X.fillStyle=c2; X.textAlign='left'; X.font=`800 9px ${FONT}`; X.fillText((sh.answer?'БОЕВОЙ':'ХОЛОСТОЙ')+(sh.onbeat?' · в такт':''),x+4,B-4); }
+  if(head&&now<sh.end){ X.save(); X.fillStyle=revealed?(sh.out?COL.live:COL.blank):COL.amber; X.shadowColor=X.fillStyle; X.shadowBlur=18; X.beginPath(); X.arc(head.x,head.y,4.5,0,Math.PI*2); X.fill(); X.restore(); }
+  if(countdown!=null){ X.fillStyle=COL.amber; X.globalAlpha=.9; X.textAlign='center'; X.font=`900 64px ${FONT}`; X.fillText(String(countdown),(L+R)/2,(T+B)/2+22); X.globalAlpha=1; }
+}
+/* stepped pitch line with a textured hold: tex(u) returns an offset in px for 0..1 through the note */
+function traceTex(g,ns,key,lim,tex,stacc,stairs){
+  let h=null, pe=-9; X.beginPath();
+  ns.forEach(n=>{
+    const q=stairs?stairs(n):0, y0=g.yOf(n[key]), y=q?Math.round(y0/q)*q:y0, x0=g.xOf(n.t), xf=g.xOf(n.t+n.dur), xe=g.xOf(Math.min(n.t+n.dur,lim)), w=Math.max(1,xf-x0), gl=q?0:Math.min(5,w*.3);
+    if(stacc){ const yb=y+5; X.moveTo(x0,yb); X.quadraticCurveTo(x0+1,y,x0+gl,y); X.lineTo(Math.max(x0+gl,xe-gl),y); if(n.t+n.dur<=lim) X.quadraticCurveTo(xe-1,y,xe,yb); h={x:xe,y}; return; }
+    if(h&&n.t-pe<.012){ X.lineTo(x0,h.y);
+      if(q) X.lineTo(x0,y); else X.quadraticCurveTo(x0+gl*.2,y,x0+gl,y); }
+    else X.moveTo(x0,y);
+    let ly=y; for(let px=x0+gl;px<=xe;px+=1.2){ ly=y+(tex?tex((px-x0)/w,n):0); X.lineTo(px,ly); }
+    h={x:Math.max(x0+gl,xe),y}; pe=n.t+n.dur;
+  });
+  X.stroke(); return h;
+}
+const isStacc=c=>c.rh&&(c.rh[0]==='p'||c.rh==='off'||c.rh==='sparse'||c.rh==='fib'||c.rh==='euclid');
+const LOOK={
+  steps:(g,ns,key,lim,c)=>traceTex(g,ns,key,lim,null,isStacc(c)),
+  mirror:(g,ns,key,lim)=>traceTex(g,ns,key,lim,null,false),
+  mag:(g,ns,key,lim)=>traceTex(g,ns,key,lim,null,false),
+  smooth:(g,ns,key,lim)=>traceSmooth(g,ns,key,lim,0),
+  vib:(g,ns,key,lim)=>traceSmooth(g,ns,key,lim,2.2),
+  shep:(g,ns,key,lim)=>traceShep(g,ns,key,lim),
+  /* FM: a bell's bright attack eases back onto the note; string: a pluck that settles */
+  decay:(g,ns,key,lim,c)=>{ const ks=c.voice==='ks'; return traceTex(g,ns,key,lim,ks?(u)=>-7*Math.exp(-10*u)+3*(1-Math.exp(-3*u)):(u)=>-11*Math.exp(-5*u),isStacc(c)); },
+  /* fewer bits = the pitch snaps to a coarser grid, square corners */
+  crush:(g,ns,key,lim)=>{ X.lineJoin='miter'; X.lineCap='butt'; return traceTex(g,ns,key,lim,null,false,(n)=>3*Math.pow(2,Math.max(0,7-(n.bits||8))/1.6)); },
+  /* the fold grows: each note bows higher as the gain rises */
+  fold:(g,ns,key,lim)=>traceTex(g,ns,key,lim,(u,n)=>-((n.g||1)-1)*2.4*Math.sin(Math.PI*u),false),
+  /* ring modulation: a slow, smooth tremolo across the note */
+  ring:(g,ns,key,lim,c)=>traceTex(g,ns,key,lim,(u)=>-4*Math.sin(Math.PI*u*(c.p.rm>1?2:1)),isStacc(c)),
+  pwm:(g,ns,key,lim)=>traceTex(g,ns,key,lim,null,false),
+  pump:(g,ns,key,lim,c,sh)=>traceTex(g,ns,key,lim,(u,n)=>{ const t=n.t+u*n.dur, b=t-Math.floor((t-sh.start)/BEAT)*BEAT-sh.start; return 16*Math.exp(-b/c.p.tau); },false),
+  acid:(g,ns,key,lim,c)=>traceTex(g,ns,key,lim,(u,n)=>-10*(n.acc||.6)*Math.exp(-u*7),false),
+  echo:(g,ns,key,lim,c)=>{ const h=traceTex(g,ns,key,lim,null,true); X.save();
+    for(let k=1;k<=4;k++){ X.globalAlpha=Math.pow(c.p.g,k); const sh=ns.map(n=>({...n,t:n.t+k*c.p.D*S16})).filter(n=>n.t<=lim); traceTex(g,sh,key,lim,null,true); } X.restore(); return h; },
+  thick:(g,ns,key,lim)=>{ let h=null;
+    ns.forEach(n=>{ const ps=(key==='s'?n.ch:n.chp)||[n[key]], x0=g.xOf(n.t), xe=g.xOf(Math.min(n.t+n.dur,lim));
+      ps.forEach((p,i)=>{ const y=g.yOf(p); X.beginPath(); X.moveTo(x0,y); X.lineTo(Math.max(x0+3,xe),y); X.stroke();
+        X.save(); X.globalAlpha=.3; X.lineWidth=1; X.shadowBlur=0; [-3,-1.5,1.5,3].forEach(o=>{ X.beginPath(); X.moveTo(x0+1,y+o); X.lineTo(Math.max(x0+3,xe)-1,y+o); X.stroke(); }); X.restore();
+        if(i===ps.length-1) h={x:Math.max(x0+3,xe),y}; });
+      X.save(); X.globalAlpha=.5; X.lineWidth=1; X.beginPath(); X.moveTo(x0,g.yOf(ps[0])); X.lineTo(x0,g.yOf(ps[ps.length-1])); X.stroke(); X.restore(); });
+    return h; },
+  fan:(g,ns,key,lim)=>{ let h=null; const base=g.yOf(key==='s'?12:24);
+    ns.forEach(n=>{ const y=g.yOf(n[key]), x=g.xOf(n.t)+1; X.beginPath(); X.moveTo(x,base); X.lineTo(x,y); X.moveTo(x-4,y); X.lineTo(x+4,y); X.stroke(); h={x,y}; });
+    return h; },
+  stems:(g,ns,key,lim,c,sh,now)=>{ let h=null; const base=g.yOf(20);
+    ns.forEach(n=>{ const y=g.yOf(n[key]), x=g.xOf(n.t)+1, age=now-n.t; X.save(); X.globalAlpha=.5; X.lineWidth=1.2; X.beginPath(); X.moveTo(x,base); X.lineTo(x,y); X.stroke(); X.restore();
+      X.beginPath(); X.arc(x,y,3.2,0,Math.PI*2); X.fill(); if(age<.5){ X.save(); X.globalAlpha=1-age/.5; X.lineWidth=1.3; X.beginPath(); X.arc(x,y,4+age*22,0,Math.PI*2); X.stroke(); X.restore(); } h={x,y}; });
+    return h; },
+};
+function traceSmooth(g,ns,key,lim,wig){
+  if(!ns.length) return null; const cs=ns.map(n=>n.t+n.dur*.5); let h=null; X.beginPath();
+  const xa=g.xOf(ns[0].t), xb=g.xOf(lim);
+  for(let px=xa;px<=xb;px+=1.5){ const t=ns[0].t+(px-xa)/(xb-xa||1)*(lim-ns[0].t); let s=ns[0][key];
+    if(t>cs[0]){ s=ns[ns.length-1][key]; for(let i=0;i<ns.length-1;i++) if(t<cs[i+1]){ const u=(t-cs[i])/(cs[i+1]-cs[i]), e=(1-Math.cos(Math.PI*u))/2; s=ns[i][key]+(ns[i+1][key]-ns[i][key])*e; break; } }
+    const y=g.yOf(s)+(wig?wig*Math.sin(px*.55):0); if(!h) X.moveTo(px,y); else X.lineTo(px,y); h={x:px,y}; }
+  X.stroke(); return h;
+}
+function traceShep(g,ns,key,lim){
+  let h=null;
+  for(let c=0;c<4;c++){ let prev=null;
+    ns.forEach(n=>{ const cp=n.cp[c], s=cp.s+(key==='sp'?n.sp-n.s:0), y=g.yOf(s), x0=g.xOf(n.t), x1=g.xOf(Math.min(n.t+n.dur,lim));
+      X.save(); X.globalAlpha=.1+.9*cp.a; X.beginPath();
+      if(prev&&Math.abs(prev.s-s)<=3){ X.moveTo(prev.x,prev.y); X.lineTo(x0,prev.y); X.lineTo(x0,y); } else X.moveTo(x0,y);
+      X.lineTo(x1,y); X.stroke(); X.restore(); prev={x:x1,y,s}; });
+    if(prev){ const a=ns[ns.length-1].cp[c].a; X.save(); X.globalAlpha=.25+.75*a; X.beginPath(); X.arc(prev.x,prev.y,3.5,0,Math.PI*2); X.fill(); X.restore(); if(a>.5) h={x:prev.x,y:prev.y}; }
+  }
+  return h;
+}
+function traceSpikes(g,ns,now){
+  let h=null, pe=-9; X.beginPath();
+  ns.forEach(n=>{ const y=g.yOf(n.sp), x0=g.xOf(n.t), xs=g.xOf(n.t+n.slot), x1=g.xOf(Math.min(n.t+n.slot,now)), w=Math.max(1,xs-x0), top=(g.B-g.T)*(n.slot<S16*1.5?.18:.28);
+    if(!h||n.t-pe>.01||Math.abs(h.y-y)>2) X.moveTo(x0,y); else X.lineTo(x0,y); pe=n.t+n.slot;
+    X.lineTo(x0+1,y-top);
+    for(let px=x0+1;px<=x1;px+=1.2){ const u=(px-x0)/w; X.lineTo(px,y-top*Math.exp(-6*u)); }
+    h={x:x1,y}; });
+  X.stroke(); return h;
+}
+
+/* title screen: a silent, endless stream of freshly grown shells */
+let demo=null, demoT0=0;
+function demoFrame(){
+  if(!demo){ demo=buildShell(makeShell(newSeed(),rp(Math.random,['neutral','tense','relaxed'])),0,8,8,Math.random()<.5?1:0); demoT0=performance.now(); setFormula(demo,null); }
+  const el=(performance.now()-demoT0)/1000*1.4, t=Math.min(demo.end,el);
+  if(t>=demo.trig&&!demo._rev){ demo._rev=true; setFormula(demo,demo.out); }
+  drawShell(demo,t);
+  if(el>demo.end+1) demo=null;
+}
+function frame(){
+  if(G.phase==='debug'){ requestAnimationFrame(frame); return; }
+  if(G.phase==='play'||G.phase==='dying'||G.phase==='between'){
+    const now=AC.currentTime;
+    if(G.phase==='play'){
+      let idx=-1; for(let i=0;i<G.shells.length;i++) if(G.shells[i]&&now>=G.shells[i].start) idx=i;
+      if(idx>=0&&idx!==G.cur) enterShell(idx);
+      const sh=G.shells[Math.max(0,idx)];
+      if(idx>=0&&now>=sh.trig&&!sh.resolved) resolve(sh);
+      if(G.phase==='play'&&idx===G.n-1&&now>=sh.end) endRound();
+      if(idx<0){ const cd=4-Math.floor((now-G.t0)/BEAT); drawShell(G.shells[0],G.shells[0].start-.001,Math.max(1,Math.min(4,cd))); setProg(0,false); }
+      else { drawShell(sh,now); const p=(now-sh.start)/(sh.trig-sh.start); setProg(Math.max(0,Math.min(1,p)),p>.75); }
+    } else { const sh=G.shells[Math.max(0,G.cur)]; if(sh) drawShell(sh,Math.min(AC.currentTime,sh.end)); }
+  } else demoFrame();
+  requestAnimationFrame(frame);
+}
+
+/* ================= input ================= */
+let lastPointer=0;
+[['btnLive',1],['btnBlank',0]].forEach(([id,v])=>{ const b=$(id); b.addEventListener('pointerdown',()=>{ lastPointer=performance.now(); answer(v); }); b.addEventListener('click',()=>{ if(performance.now()-lastPointer>400) answer(v); }); });
+document.addEventListener('keydown',e=>{
+  if(e.repeat) return; const k=e.code;
+  if(k==='ArrowLeft'||k==='KeyA'||k==='Digit1'){ if(G.phase==='play'){ e.preventDefault(); answer(1);} }
+  else if(k==='ArrowRight'||k==='KeyD'||k==='Digit2'){ if(G.phase==='play'){ e.preventDefault(); answer(0);} }
+  else if(k==='Space'||k==='Enter'){ const go=$('goBtn'); if(go&&!$('overlay').hidden){ if(document.activeElement!==go){ e.preventDefault(); go.click(); } } else if(G.phase==='play') e.preventDefault(); }
+});
+
+/* ================= leaderboard ================= */
+let DB=null, USER=null, UID=null, rows=[], remoteBest=0, canWrite=null;
+function renderLB(){
+  const ol=$('lb'), note=$('lbNote');
+  if(!DB){ ol.innerHTML=''; let best=0; try{best=+localStorage.getItem('patronnik-best')||0;}catch(e){} note.textContent=`Общая таблица работает, когда страница открыта в Claude и вы вошли в аккаунт. Ваш рекорд на этом устройстве: ${best}.`; return; }
+  if(!rows.length){ ol.innerHTML=''; note.textContent='Пока пусто. Сыграйте, и ваш результат станет первым.'; return; }
+  note.textContent=canWrite===false?'У вас доступ только на просмотр, поэтому ваш рекорд сюда не попадёт.':'Сюда попадает лучший результат каждого игрока.';
+  const draw=ps=>{ ol.innerHTML=''; rows.forEach((r,i)=>{ const li=document.createElement('li'); if(r.id===UID) li.className='me';
+    const rk=document.createElement('span'); rk.className='rk'; rk.textContent=String(i+1).padStart(2,'0');
+    const nm=document.createElement('span'); nm.className='nm'; nm.textContent=(ps&&ps[r.id]&&ps[r.id].name)||(r.id===UID?'Вы':'Игрок');
+    const rd=document.createElement('span'); rd.className='rd'; rd.textContent=`раунд ${r.rounds||1}`;
+    const sc=document.createElement('span'); sc.className='sc'; sc.textContent=r.best; li.append(rk,nm,rd,sc); ol.appendChild(li); }); };
+  draw(null); if(USER) USER.profiles(rows.map(r=>r.id)).then(draw).catch(()=>{});
+}
+async function submitScore(acc){
+  const sn=$('saveNote'); if(!DB||!UID||G.score<=remoteBest) return;
+  try{ await DB.doc('scores/'+UID).set({best:G.score,rounds:G.round,acc,at:Date.now()}); remoteBest=G.score; if(sn) sn.textContent='Рекорд записан в общую таблицу.'; }
+  catch(e){ canWrite=false; if(sn) sn.textContent='Записать рекорд в общую таблицу не получилось: у вас доступ только на просмотр.'; renderLB(); }
+}
+(async()=>{
+  renderLB(); if(!window.claude||typeof window.claude.use!=='function') return;
+  try{ const [db,user]=await Promise.all([claude.use('db'),claude.use('user')]); DB=db; USER=user;
+    if(user){ UID=await user.id(); canWrite=await user.can('data.write'); }
+    if(!DB){ renderLB(); return; } $('lbNote').textContent='Загружаю рекорды…';
+    DB.collection('scores').orderBy('best','desc').limit(10).onSnapshot(s=>{ rows=s.docs.map(d=>({id:d.id,...d.data()})); renderLB(); },()=>{ DB=null; renderLB(); });
+    if(UID){ const me=await DB.doc('scores/'+UID).get(); if(me.exists) remoteBest=+(me.data().best||0); }
+  }catch(e){ renderLB(); }
+})();
+
+function boot(){
+  resize(); window.addEventListener('resize',resize);
+  G.mag=Array(8).fill(0); G.n=8; G.k=4; G.cands=combos(8,4); G.total0=G.cands.length;
+  renderMag(); hud(); setChance(.5); renderCandCount();
+  showOverlay(`
+    <h2><span class="l">Боевой</span> или <span class="b">холостой</span>?</h2>
+    <p>Каждый патрон — своя звуковая идея и своя формула. Угадайте его до линии спуска.</p>
+    <ul>
+      <li>Шанс = боевых осталось / патронов осталось</li>
+      <li>Улики дилера помогают вычислить точно</li>
+      <li>В долю: <b>+25</b>. Три ошибки — конец</li>
+    </ul>
+    <button class="go" id="goBtn" type="button"><span>Играть</span><kbd>Пробел</kbd></button>`);
+  $('goBtn').onclick=()=>{ initAudio(); resetGame(); };
+  requestAnimationFrame(frame);
+}
+boot();
+})();
+</script>
+
+</body>
+</html>
