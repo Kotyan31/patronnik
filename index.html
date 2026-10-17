@@ -257,14 +257,73 @@ body{
 .link{background:none;border:0;padding:0;color:var(--amber);font:inherit;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
 .board li.pend .sc{opacity:.6}
 .board li.pend .rd{color:var(--amber)}
+
+/* ===== one screen: the page never scrolls; the graph takes whatever height the other rows leave ===== */
+html,body{height:100%;overflow:hidden}
+body{box-sizing:border-box;padding-block:max(6px,env(safe-area-inset-top,0px)) 0}
+.app{height:calc(100dvh - max(6px,env(safe-area-inset-top,0px)));gap:6px;position:relative;
+  grid-template-rows:auto auto auto minmax(150px,1fr) auto auto auto;
+  grid-template-areas:"hdr" "hud" "mag" "stage" "vol" "formula" "controls"}
+.hdr{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0}
+.hdr-t{display:grid;justify-items:center}
+.pill-main{font-size:clamp(22px,6.4vw,30px);padding:1px 14px 3px}
+.pill-sub{font-size:11px;padding:1px 8px 2px;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.hdr-t{min-width:0;flex:0 1 auto}
+.sheet-btn{font:800 10px var(--f-display);letter-spacing:.04em;text-transform:uppercase;color:var(--amber);background:var(--panel-2);border:1px solid var(--line-2);border-radius:8px;padding:7px 6px;cursor:pointer;flex:0 0 auto}
+.sheet-btn[aria-expanded="true"]{background:var(--amber);color:var(--ink);border-color:var(--amber)}
+.hud{grid-template-columns:repeat(4,minmax(0,1fr))}
+.stat{padding:1px 6px;gap:0}
+.stat .k{font-size:9px}
+.stat b{font-size:16px;line-height:1.2}
+.lives{height:20px}.life{height:14px}
+.magbox{gap:4px}
+.mag{min-height:38px;gap:7px}
+.shell .body{height:24px}.shell .base{height:8px}
+.maginfo{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap}
+.badge{font-size:12px;padding:3px 10px 4px}
+.chance{font-size:11px}
+.stage{grid-area:stage;min-height:0;display:flex;align-items:center;justify-content:center}
+.stage canvas{max-height:100%}
+.overlay{grid-column:1;grid-row:2 / 7;position:relative;inset:auto;z-index:6;min-height:0;border-radius:14px;contain:size}   /* size containment: its text never stretches the rows it covers */
+.vol{margin:0}
+.vol input{width:120px}
+.f-defs{font-size:12px;line-height:1.25}
+.formula{gap:1px;min-height:108px;max-height:150px;overflow:hidden}   /* room for formula, definitions, the rule and the caption, so the graph does not jump */
+.f-main{font-size:clamp(17px,4.8vw,21px);line-height:1.25}
+.f-sub{font-size:13px;line-height:1.3}
+.caption{font-size:12px;margin-top:3px;padding:2px 8px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.controls{position:static;padding-block:4px calc(8px + env(safe-area-inset-bottom,0px));background:none}
+.choice{padding:9px 8px 8px;font-size:18px}
+/* phone: the clues and the leaderboard open as a sheet from the header buttons */
+.side{display:none}
+body.sheet-clues .side,body.sheet-top .side{display:grid;position:fixed;z-index:40;left:max(10px,env(safe-area-inset-left,0px));right:max(10px,env(safe-area-inset-right,0px));top:64px;max-height:calc(100dvh - 150px);overflow:auto;background:var(--bg);border:1px solid var(--line-2);border-radius:14px;padding:10px;box-shadow:0 20px 60px #000}
+body.sheet-clues .side .board,body.sheet-top .side .clues{display:none}
+@media (min-width:980px){
+  .sheet-btn{display:none}
+  .hdr{justify-content:center}
+  .app{grid-template-columns:minmax(0,540px) minmax(0,1fr);grid-template-areas:"hdr side" "hud side" "mag side" "stage side" "vol side" "formula side" "controls side"}
+  .side,body.sheet-clues .side,body.sheet-top .side{display:grid;position:static;max-height:100%;overflow:auto;background:none;border:0;padding:0;box-shadow:none;align-self:start;margin-top:4px}
+  body.sheet-clues .side .board,body.sheet-top .side .clues{display:grid}
+  .overlay{grid-column:1}
+  .pill-main{font-size:32px}
+  .f-main{font-size:21px}
+}
+@media (min-width:1180px){
+  .app{grid-template-columns:minmax(0,1fr) minmax(0,540px) minmax(0,1fr);grid-template-areas:". hdr side" ". hud side" ". mag side" ". stage side" ". vol side" ". formula side" ". controls side"}
+  .overlay{grid-column:2}
+}
+/* too short for one screen (a phone on its side): let the page scroll instead of squeezing the graph to nothing */
+@media (max-height:520px){ html,body{overflow:auto} .app{height:auto} .stage{min-height:300px} }
 </style>
 </head>
 <body>
 
 <div class="app">
   <header class="hdr">
-    <div class="pill-main">ПАТРОННИК</div>
-    <div class="pill-sub" id="sub">рулетка, но это математика</div>
+    <button type="button" class="sheet-btn" id="btnClues" aria-controls="side" aria-expanded="false">Улики</button>
+    <div class="hdr-t"><div class="pill-main">ПАТРОННИК</div>
+    <div class="pill-sub" id="sub">рулетка, но это математика</div></div>
+    <button type="button" class="sheet-btn" id="btnTop" aria-controls="side" aria-expanded="false">Рекорды</button>
   </header>
 
   <div class="hud" aria-live="polite">
@@ -276,28 +335,28 @@ body{
 
   <section class="magbox" aria-label="Магазин">
     <div class="mag" id="mag"></div>
-    <div class="chance"><b id="chance">50 %</b> шанс, что боевой</div>
-    <div class="badge" id="badge">#1/8 боевой или холостой?</div>
+    <div class="maginfo"><div class="chance"><b id="chance">50 %</b> шанс, что боевой</div>
+    <div class="badge" id="badge">#1/8 боевой или холостой?</div></div>
     <div class="prog"><i id="progFill"></i><b id="progKnob"></b></div>
   </section>
 
   <div class="stage" id="stage">
     <canvas id="scope" aria-label="График формулы текущего патрона"></canvas>
     <div class="judge" id="judge"></div>
-    <div class="overlay" id="overlay"></div>
   </div>
+  <div class="overlay" id="overlay"></div>
 
   <div class="vol"><button type="button" id="volBtn" class="vol-btn" aria-label="Выключить звук"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path id="volWaves" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path id="volX" d="M16 9l5 6M21 9l-5 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" hidden/></svg></button>
     <input id="vol" type="range" min="0" max="100" step="1" aria-label="Громкость"></div>
 
   <div class="formula">
     <div class="f-main" id="fMain"></div>
-    <div class="f-sub" id="fSub1"></div>
     <div class="f-sub" id="fSub2"></div>
+    <div class="f-sub f-defs" id="fSub1"></div>
     <div class="caption" id="caption"></div>
   </div>
 
-  <aside class="side">
+  <aside class="side" id="side">
   <section class="card clues" aria-label="Улики дилера">
     <div class="card-h"><h3>Улики дилера</h3><span id="cands">раскладов: —</span></div>
     <div class="meter"><i id="meter"></i></div>
@@ -325,6 +384,10 @@ body{
 
 <script>
 (() => {
+/* The game runs once per tab. A rewrite of this page in place (document.write of a patched copy) keeps the same window,
+   and this mark cannot be deleted or redefined, so the second copy stops here. */
+if(Object.getOwnPropertyDescriptor(window,'__patronnikOnce')){ document.body.innerHTML='<p style="color:#ccc;font:16px sans-serif;padding:24px">Страница была изменена в этой вкладке. Обновите её (F5).</p>'; return; }
+Object.defineProperty(window,'__patronnikOnce',{value:true,writable:false,enumerable:false,configurable:false});
 const $ = id => document.getElementById(id);
 /* The shared table only takes results from the page itself: its real address, not inside a frame, with its own code.
    CODE is a fingerprint of this script's text; the server computes the same fingerprint from the repository, so a
@@ -445,7 +508,7 @@ const nu2=n=>{let c=0;while(n>0&&n%2===0){n/=2;c++;}return c;};
 const dsum=n=>String(n).split('').reduce((a,c)=>a+(+c),0);
 const ndiv=n=>{let c=0; for(let d=1;d*d<=n;d++) if(n%d===0) c+=d*d===n?1:2; return c;};
 function periodOf(v,from=6){ for(let P=1;P<=40;P++){ let ok=true; for(let i=from;i+P<NV;i++) if(v[i]!==v[i+P]){ok=false;break;} if(ok) return P; } return 0; }
-function setFact(v,m){ const s=[...new Set(v.slice(0,48))].sort((a,b)=>a-b); return s.length<m?`по модулю ${m} бывают только ${s.join(', ')}`:`обходит все ${m} остатков`; }
+function setFact(v,m){ const s=[...new Set(v.slice(0,48))].sort((a,b)=>a-b); return s.length<m?`из остатков от деления на ${m} бывают только ${s.join(', ')}`:`проходит все ${m} остатков от деления на ${m}`; }
 const SHAPES=[[0,2,4],[0,2,4,7],[0,1,3],[0,2,3,5],[0,3,2,5],[0,1,2,4],[0,4,2,6],[0,2,4,5,7],[0,3,5,7,8]];
 
 const CLOSED=new Set(['arith','sine','saw2','quad','tri','figur','popc','ruler','digsum','gcd','sqfl','ndiv','beatty']);
@@ -456,13 +519,13 @@ const FAM=[
     const f=x=>Am*Math.sin(2*Math.PI*(x+ph)/P);
     for(let n=0;n<P;n++){ const fr=Math.abs(f(n))%1; if(Math.abs(fr-.5)<.04) return null; }
     const v=A(n=>Math.round(f(n))+Am), Ph=hide?'<b class="q">P</b>':P;
-    return {v,curve:x=>Am+f(x),html:`${Y} = ${Am} + round(${Am}·sin(2π(${NN} + ${ph})/${Ph}))`,htmlRev:hide?`${Y} = ${Am} + round(${Am}·sin(2π(${NN} + ${ph})/${P}))`:null,
-      sub:hide?`период ${I('P')} прочитайте по графику`:null,cap:`синус с периодом ${hide?I('P'):P}, округлённый до целых`}; }},
+    return {v,curve:x=>Am+f(x),html:`${Y} = ${Am} + окр(${Am}·sin(2π(${NN} + ${ph})/${Ph}))`,htmlRev:hide?`${Y} = ${Am} + окр(${Am}·sin(2π(${NN} + ${ph})/${P}))`:null,
+      sub:hide?`окр — округление до целого; период ${I('P')} прочитайте по графику`:'окр — округление до целого',cap:`синус с периодом ${hide?I('P'):P}, округлённый до целых`}; }},
   {id:'saw2',lv:2,w:2,look:'steps',gen(R){ const a=ri(R,2,5); let b=ri(R,2,6); if(b===a) return null; const v=A(n=>n%a+n%b), L=a*b/gcd(a,b);
     return {v,html:`${Y} = (${NN} mod ${a}) + (${NN} mod ${b})`,cap:`две пилы длины ${a} и ${b}: узор повторяется через НОК = ${L}`}; }},
   {id:'quad',lv:2,w:3,look:'steps',gen(R){ const m=rp(R,[5,7,8,9,10]), a=ri(R,1,2), b=ri(R,0,m-1), c=ri(R,0,m-1); const v=A(n=>mod(a*n*n+b*n+c,m));
     const t=[term(a,NN+'<sup>2</sup>'),b?term(b,NN):'',c?String(c):''].filter(Boolean);
-    return {v,html:`${Y} = (${t.join(' + ')}) mod ${m}`,cap:(b===0&&c===0?'квадрат ':'многочлен ')+setFact(v,m)}; }},
+    return {v,html:`${Y} = (${t.join(' + ')}) mod ${m}`,cap:(b===0&&c===0?'квадрат: ':'многочлен: ')+setFact(v,m)}; }},
   {id:'tri',lv:2,w:2,look:'steps',gen(R){ const m=ri(R,3,6), a=ri(R,1,3), b=ri(R,0,2*m-1); const v=A(n=>Math.abs(mod(a*n+b,2*m)-m));
     return {v,html:`${Y} = | (${term(a,NN)} + ${b}) mod ${2*m} − ${m} |`,cap:'остаток, сложенный пополам: треугольная волна'}; }},
   {id:'lcg',lv:2,w:3,look:'steps',gen(R){ const m=rp(R,[7,8,9,10,11]), a=ri(R,2,m-1), c=ri(R,1,m-1); let x=ri(R,0,m-1); const x0=x; const v=A(()=>{ const r=x; x=(a*x+c)%m; return r; }); const P=periodOf(v,0);
@@ -480,13 +543,13 @@ const FAM=[
     const rh={alt:`σ<sub>${I('k')}</sub> = (−1)<sup>${I('k')}</sup>`,m3:`σ<sub>${I('k')}</sub> = −1, если ${I('k')} mod 3 = 2`,tm:`σ<sub>${I('k')}</sub> = (−1)<sup>s₂(${I('k')})</sup> (Туэ — Морс)`,pr:`σ<sub>${I('k')}</sub> = −1, если ${I('k')} простое`}[rule];
     const mh=move==='last'?`зеркало ${I('a')}<sub>${I('k')}+1</sub> — последняя нота отрезка`:`зеркало ${I('a')}<sub>${I('k')}</sub> = ${term(dl,I('k'))} mod ${mm}`;
     return {v,axes:ax,L,html:`${Y} = ${I('a')}<sub>${I('k')}</sub> + σ<sub>${I('k')}</sub>·(${mot.join(', ')})<sub>${I('j')}</sub>`,
-      sub:`${I('k')} = ⌊${NN}/${L}⌋, ${I('j')} = ${NN} mod ${L}; ${rh}; ${mh}`,cap:'σ = −1 переворачивает мотив в зеркале: верх становится низом, минор — мажором'}; }},
+      sub:`${I('k')} = [${NN}/${L}], ${I('j')} = ${NN} mod ${L}; ${rh}; ${mh}`,cap:'мотив повторяется кусками; где σ = −1, кусок отражён: верх становится низом'}; }},
   {id:'fib',lv:3,w:3,look:'steps',gen(R){ const m=rp(R,[5,6,7,8,9,10]), p=ri(R,1,2), q=ri(R,1,2); let a=ri(R,0,m-1), b=ri(R,1,m-1); const a0=a,b0=b; const v=A(()=>{ const r=a; [a,b]=[b,(p*b+q*a)%m]; return r; }); const P=periodOf(v,0);
     return {v,html:`${Y} = (${term(p,yk(NN+'−1'))} + ${term(q,yk(NN+'−2'))}) mod ${m}`,sub:`${yk(0)} = ${a0}, ${yk(1)} = ${b0}`,cap:p===1&&q===1?`Фибоначчи по модулю ${m}${P?': период Пизано '+P:''}`:`линейная рекуррента по модулю ${m}${P?', период '+P:''}`}; }},
   {id:'pow',lv:3,w:2,look:'steps',gen(R){ const m=rp(R,[5,7,9,10,11]), a=ri(R,2,m-1), c=ri(R,1,Math.min(3,m-1)); if(gcd(a,m)!==1||gcd(c,m)!==1) return null; let x=c%m; const v=A(()=>{ const r=x; x=x*a%m; return r; }); const P=periodOf(v,0);
     return {v,html:`${Y} = ${c>1?c+'·':''}${a}<sup>${NN}</sup> mod ${m}`,cap:`степени ${a} по модулю ${m} ходят по кругу длины ${P}`}; }},
   {id:'popc',lv:3,w:2,look:'steps',gen(R){ const c=ri(R,0,40), k=rp(R,[1,1,3,5]); const v=A(n=>popc(k*n+c));
-    return {v,html:`${Y} = s<sub>2</sub>(${term(k,NN)} + ${c})`,sub:'s₂(x) — число единиц в двоичной записи x',cap:'+1 добавляет единицу, а каждый перенос стирает одну'}; }},
+    return {v,html:`${Y} = S<sub>2</sub>(${term(k,NN)} + ${c})`,sub:'S₂(x) — сколько единиц в двоичной записи x',cap:'+1 добавляет единицу, а каждый перенос стирает одну'}; }},
   {id:'ruler',lv:3,w:1.5,look:'steps',gen(R){ const c=ri(R,1,24); const v=A(n=>nu2(n+c));
     return {v,html:`${Y} = ν<sub>2</sub>(${NN} + ${c})`,sub:'ν₂(x) — сколько раз x делится на 2',cap:'линейка: каждое второе — 0, каждое четвёртое — не меньше 2'}; }},
   {id:'digsum',lv:3,w:2,look:'steps',gen(R){ const a=ri(R,2,9), c=ri(R,0,30), m=rp(R,[0,7,9]); const v=A(n=>m?dsum(a*n+c)%m:dsum(a*n+c));
@@ -498,11 +561,11 @@ const FAM=[
   {id:'gcd',lv:3,w:1.5,look:'steps',gen(R){ const m=rp(R,[6,8,9,10]), c=ri(R,0,m-1); const v=A(n=>gcd(n+c,m));
     return {v,html:`${Y} = НОД(${NN} + ${c}, ${m})`,cap:`НОД с ${m} зависит только от остатка по модулю ${m}`}; }},
   {id:'sqfl',lv:3,w:1.5,look:'steps',gen(R){ const k=ri(R,2,6), m=rp(R,[5,7,8,9]), c=ri(R,0,9); const v=A(n=>Math.floor((n+c)*(n+c)/k)%m);
-    return {v,html:`${Y} = ⌊(${NN} + ${c})<sup>2</sup>/${k}⌋ mod ${m}`,cap:'парабола, разрезанная по модулю'}; }},
+    return {v,html:`${Y} = [(${NN} + ${c})<sup>2</sup>/${k}] mod ${m}`,sub:'[x] — целая часть x; mod — остаток от деления',cap:'парабола, разрезанная по модулю'}; }},
   {id:'ndiv',lv:4,w:1.5,look:'steps',gen(R){ const c=ri(R,1,30); const v=A(n=>ndiv(n+c));
     return {v,html:`${Y} = d(${NN} + ${c})`,sub:'d(x) — число делителей x',cap:'у простых ровно 2 делителя, у квадратов — нечётное число'}; }},
   {id:'beatty',lv:4,w:2,look:'steps',gen(R){ const k=rp(R,Object.keys(ALPHA)), a=ALPHA[k], m=rp(R,[5,6,7,8]), c=ri(R,1,9); const v=A(n=>Math.floor((n+c)*a)%m);
-    return {v,html:`${Y} = ⌊(${NN} + ${c})·${k}⌋ mod ${m}`,sub:`${k} ≈ ${a.toFixed(5)}`,cap:`последовательность Битти: шаги ⌊${I('n')}·${k}⌋ бывают только ${Math.floor(a)} и ${Math.floor(a)+1}`}; }},
+    return {v,html:`${Y} = [(${NN} + ${c})·${k}] mod ${m}`,sub:`${k} ≈ ${a.toFixed(5).replace('.',',')}; [x] — целая часть x`,cap:`последовательность Битти: шаги [${I('n')}·${k}] бывают только ${Math.floor(a)} и ${Math.floor(a)+1}`}; }},
   {id:'collatz',lv:4,w:1.5,look:'steps',gen(R){ const s0=rp(R,[7,9,11,15,19,25,27,31,41,47,54,73,97]), m=rp(R,[5,6,7,8]); let c=s0; const v=A(()=>{ const r=c; c=c%2?3*c+1:c/2; return r%m; });
     return {v,html:`${I('c')}<sub>${I('n')}+1</sub> = ${I('c')}<sub>${I('n')}</sub>/2 или 3${I('c')}<sub>${I('n')}</sub>+1, &nbsp;${Y} = ${I('c')}<sub>${I('n')}</sub> mod ${m}`,sub:`${I('c')}<sub>0</sub> = ${s0}`,cap:'Коллатц: чётное — пополам, нечётное — 3c + 1'}; }},
   {id:'prime',lv:4,w:1.5,look:'steps',gen(R){ const m=rp(R,[6,8,10]), c=ri(R,2,30); const v=A(n=>PRIMES[n+c]%m); const s=[...new Set(v)].sort((a,b)=>a-b);
@@ -517,7 +580,7 @@ const FAM=[
    printed as real maths. Not templates with swapped numbers — every tree is built from scratch.
    =================================================================================== */
 const XPREC={n:9,c:9,y1:9,y2:9,s2:9,ds:9,gcd:9,tri:9,abs:9,fl:9,ce:9,pw:9,max:9,min:9,sq:8,mul:7,alt:7,add:6,sub:6,xor:5,md:4,if:1};
-const XDEF={s2:'s₂(x) — число единиц в двоичной записи x',ds:'S(x) — сумма цифр x',gcd:'НОД — наибольший общий делитель',tri:'T(x) = x(x+1)/2',xor:'⊕ — побитовое исключающее «или»'};
+const XDEF={s2:'S₂(x) — сколько единиц в двоичной записи x',ds:'S(x) — сумма цифр x',gcd:'НОД — наибольший общий делитель',tri:'T(x) = x(x+1)/2 — треугольное число',xor:'xor — побитовое «исключающее или»'};
 function xgen(R,d,o){
   const leaf=()=>{ const r=R(); if(o.rec&&r<.5) return o.rec===2&&R()<.45?{k:'y2'}:{k:'y1'}; return r<.82?{k:'n'}:{k:'c',v:ri(R,2,9)}; };
   if(d<=0) return leaf();
@@ -561,10 +624,10 @@ function xh(x){
     case 'add': return `${w(x.a,6)} + ${w(x.b,6)}`; case 'sub': return `${w(x.a,6)} − ${w(x.b,7)}`;
     case 'mul': return atomVar(x.a)?`${x.c}${xh(x.a)}`:x.a.k==='alt'?`${x.c}·${xh(x.a)}`:`${x.c}·${w(x.a,8)}`;
     case 'sq': return `${w(x.a,9)}<sup>2</sup>`;
-    case 'fl': return `⌊${w(x.a,7)}/${x.c}⌋`; case 'ce': return `⌈${w(x.a,7)}/${x.c}⌉`; case 'pw': return `${x.c}<sup>${xh(x.a)}</sup>`; case 'abs': return `|${w(x.a,6)} − ${x.c}|`;
-    case 's2': return `s<sub>2</sub>(${w(x.a,2)})`; case 'ds': return `S(${w(x.a,2)})`; case 'gcd': return `НОД(${w(x.a,2)}, ${x.c})`; case 'tri': return `T(${w(x.a,2)})`;
+    case 'fl': return `[${w(x.a,7)}/${x.c}]`; case 'ce': return `⌈${w(x.a,7)}/${x.c}⌉`; case 'pw': return `${x.c}<sup>${xh(x.a)}</sup>`; case 'abs': return `|${w(x.a,6)} − ${x.c}|`;
+    case 's2': return `S<sub>2</sub>(${w(x.a,2)})`; case 'ds': return `S(${w(x.a,2)})`; case 'gcd': return `НОД(${w(x.a,2)}, ${x.c})`; case 'tri': return `T(${w(x.a,2)})`;
     case 'alt': return `(−1)<sup>${I('n')}</sup>·${w(x.a,7)}`; case 'md': return `${w(x.a,7)} mod ${x.c}`;
-    case 'xor': return `${w(x.a,9)} ⊕ ${w(x.b,9)}`; case 'max': case 'min': return `${x.k}(${w(x.a,2)}, ${w(x.b,2)})`;
+    case 'xor': return `${w(x.a,9)} xor ${w(x.b,9)}`; case 'max': case 'min': return `${x.k}(${w(x.a,2)}, ${w(x.b,2)})`;
     case 'if': { const v=x.on==='y1'?yk(I('n')+'−1'):I('n'), cond=x.m===2?`${v} ${x.r?'нечётно':'чётно'}`:`${v} mod ${x.m} = ${x.r}`;
       return `${xh(x.a)}, если ${cond}; иначе ${xh(x.b)}`; }
   }
@@ -591,7 +654,8 @@ function genFormula(R,c){
     if((z.k==='add'||z.k==='sub')&&lin(z.a)&&lin(z.b)&&varOf(z.a)===varOf(z.b)) trivial=true;
     if((z.k==='add'||z.k==='sub')&&((z.a.k==='c'&&hasC(z.b))||(z.b.k==='c'&&hasC(z.a)))) trivial=true;
     if(z.k==='abs'&&hasC(z.a)) trivial=true; if(z.k==='mul'&&z.a.k==='mul') trivial=true; if(z.k==='alt'&&z.a.k==='alt') trivial=true;
-    if(z.k==='md'&&z.a.k==='md') trivial=true; if(z.k==='sq'&&z.a.k==='sq') trivial=true; if((z.k==='fl'||z.k==='ce')&&z.a.k==='mul'&&z.a.c%z.c===0) trivial=true; });
+    if(z.k==='md'&&z.a.k==='md') trivial=true; if(z.k==='sq'&&z.a.k==='sq') trivial=true; if((z.k==='fl'||z.k==='ce')&&z.a.k==='mul'&&z.a.c%z.c===0) trivial=true;
+    if((z.k==='fl'||z.k==='ce')&&(z.a.k==='fl'||z.a.k==='ce')) trivial=true; if((z.k==='ds'||z.k==='s2')&&(z.a.k==='ds'||z.a.k==='s2')) trivial=true; });
   if(x.k==='md') trivial=true;   /* (… mod 6) mod 7: the outer mod would be decoration */
   /* readable: a case split only at the top of the formula, and no (−1)ⁿ cancelling another (−1)ⁿ */
   const deep=(z,d)=>{ if(z.k==='if'&&d>(x.k==='add'||x.k==='sub'?1:0)) trivial=true; if(z.k==='alt'){ let q=z.a; while(q&&(q.k==='mul'||q.k==='sq')) q=q.a; if(q&&q.k==='alt') trivial=true; } ['a','b'].forEach(c=>z[c]&&typeof z[c]==='object'&&deep(z[c],d+1)); };
@@ -604,7 +668,7 @@ function genFormula(R,c){
   if(!NONLIN.some(k=>kinds.has(k))&&rec!==2) trivial=true;   /* purely linear ones are the arithmetic family's job */
   if(size<Math.max(2,Math.round(D*.35))) trivial=true;
   if(trivial||size<2||size>Math.min(13,Math.round(3+D*.7))||!(hasN||hasY)||(rec&&!hasY)) return null;
-  const m=ri(R,5,10), fold=!rec&&x.k!=='abs'&&R()<.18, y0=ri(R,0,m-1), y1=ri(R,0,m-1), lim=D<5?800:D<9?3000:D<13?20000:300000, W=c.N+c.M+2;
+  const m=ri(R,5,10), fold=!rec&&x.k!=='abs'&&R()<.08, y0=ri(R,0,m-1), y1=ri(R,0,m-1), lim=D<5?800:D<9?3000:D<13?20000:300000, W=c.N+c.M+2;
   const seq=(t,len)=>{ const v=[]; let big=0;
     for(let n=0;n<len;n++){ if(rec&&n<rec){ v.push(n?y1:y0); continue; }
       const raw=xev(t,{n,y1:v[n-1],y2:v[n-2]}); if(!Number.isFinite(raw)) return null; if(n<W) big=Math.max(big,Math.abs(raw));
@@ -618,7 +682,7 @@ function genFormula(R,c){
   const test=(node,set)=>{ for(const ch of ['a','b']){ if(!node[ch]||redundant) continue; const keep=node[ch]; set(keep); const w=seq(x,W); set(node); if(w&&w.join(',')===key) redundant=true; } };
   const visit=(node,set)=>{ if(redundant) return; if(node.a&&node.b&&JSON.stringify(node.a)===JSON.stringify(node.b)) redundant=true;
     test(node,set); ['a','b'].forEach(ch=>{ if(node[ch]) visit(node[ch],z=>{ node[ch]=z; }); }); };
-  let root=x; visit(x,z=>{ root=z; x=z; }); x=root; if(redundant) return null;
+  let root=x; visit(x,z=>{ root=z; x=z; }); x=root; if(redundant||x.k==='md') return null;
   const body=XPREC[x.k]>=9?xh(x):`(${xh(x)})`;
   const html=fold?`${Y} = | ${body} mod ${2*m} − ${m} |`:`${Y} = ${body} mod ${m}`;
   const defs=[...kinds].filter(k=>XDEF[k]).map(k=>XDEF[k]);
@@ -807,7 +871,8 @@ function ksData(f,sr){ const key=Math.round(f*8)+':'+sr; if(KSC[key]) return KSC
    audiobox-aesthetics model (enjoyment CE / production quality PQ): stereo space +0.08/+0.03, air +0.02/+0.03,
    saw doubling in the live answer +0.06/+0.01, layers that grow with the streak +0.11/+0.04, re-weighted presets +0.12/+0.07.
    Base 6.38/7.97, everything on ≈6.75/8.15; the reference video scores 6.46/7.73. */
-const FX={space:1,air:1,mid:1,streak:1,pick:1};
+const FX={space:1,air:1,mid:1,streak:1,pick:1,vary:0,evolve:1};   /* evolve: neutral for the model (ΔCE 0.00 on 52 looping riffs), kept against loop fatigue;
+   vary (a ding that climbs with the streak) measured ΔCE −0.04 — it brightens the answer — so it stays off */
 function makeEngine(ctx,song){
   const sr=ctx.sampleRate, BT=60/song.bpm, S=BT/4;
   const g=(v=0)=>{ const n=ctx.createGain(); n.gain.value=v; return n; };
@@ -850,8 +915,8 @@ function makeEngine(ctx,song){
   function cowbell(t,amp,f){ const m=g(.5), a=g(0); [1,1.48].forEach(r=>{ const o=osc('square',f*r,t); o.connect(m); o.start(t); o.stop(t+.45); }); env(a,t,amp,.001,.28); ch(m,bq('bandpass',f*2.2,1.6),a); a.connect(bellBus); }
   function riser(t,dur,amp){ const n=nz(), f=bq('bandpass',400,2.5), a=g(0); f.frequency.setValueAtTime(400,t); f.frequency.exponentialRampToValueAtTime(7000,t+dur);
     a.gain.setValueAtTime(0,t); a.gain.linearRampToValueAtTime(amp,t+dur*.97); a.gain.linearRampToValueAtTime(0,t+dur); ch(n,f,a,out); a.connect(verb); n.start(t); n.stop(t+dur+.02); }
-  function impact(t){ kick(t,.75); const n=nz(), a=g(0); env(a,t,.3,.002,.9); ch(n,bq('lowpass',3500),a,out); a.connect(verb); n.start(t); n.stop(t+1.3);
-    const o=osc('sine',hz(12),t), b=g(0); o.frequency.exponentialRampToValueAtTime(hz(0),t+.5); env(b,t,.45,.003,1.1); ch(o,shaper(tanhCurve(3)),b,out); o.start(t); o.stop(t+1.5); }
+  function impact(t,root=0){ kick(t,.75); const n=nz(), a=g(0); env(a,t,.3,.002,.9); ch(n,bq('lowpass',3500),a,out); a.connect(verb); n.start(t); n.stop(t+1.3);
+    const o=osc('sine',hz(12+root),t), b=g(0); o.frequency.exponentialRampToValueAtTime(hz(root),t+.5); env(b,t,.45,.003,1.1); ch(o,shaper(tanhCurve(3)),b,out); o.start(t); o.stop(t+1.5); }
   function chime(t,st){ [0,4,7].forEach((d,i)=>bell('glass',t+i*.035,.4,hz(48+degSemi(st,d)),.55));
     const n=nz(), a=g(0); a.gain.setValueAtTime(0,t); a.gain.linearRampToValueAtTime(.05,t+.12); a.gain.setTargetAtTime(0,t+.15,.35); ch(n,bq('highpass',6500),a,out); a.connect(verb); n.start(t); n.stop(t+1.8); }
   function clk(t,amp,f){ const o=osc('sine',f,t), a=g(0); env(a,t,amp,.001,.03); ch(o,a,drums); o.start(t); o.stop(t+.06); }
@@ -867,7 +932,7 @@ function makeEngine(ctx,song){
   function subHit(t,s,amp=.22){ const o=osc('sine',hz(s),t), a=g(0); env(a,t,amp,.004,.5); ch(o,a,out); o.start(t); o.stop(t+.8); }
 
   /* ---- question lead: the formula as a melody ---- */
-  function lead(type,t,dur,f,o={}){ const P=song.leadP[type]||leadParams(Math.random,'square'), end=t+dur, a=g(0), pk=P.lv*1.7, open=o.open||1;
+  function lead(type,t,dur,f,o={}){ const P=song.leadP[type]||leadParams(Math.random,'square'), end=t+dur, a=g(0), pk=P.lv*1.7*(o.vel||1), open=o.open||1;
     a.gain.setValueAtTime(0,t); a.gain.linearRampToValueAtTime(pk*1.15,t+.004); a.gain.setTargetAtTime(pk*.72,t+.01,.09); a.gain.setTargetAtTime(0,Math.max(t+.02,end-.008),.014);
     let tail;
     if(type==='fm'){ const c=osc('sine',f,t), m=osc('sine',f*P.ratio,t), mg=g(0); mg.gain.setValueAtTime(f*P.index,t); mg.gain.setTargetAtTime(f*P.index*.25,t,.12); m.connect(mg); mg.connect(c.frequency); m.start(t); m.stop(end+.12); c.start(t); c.stop(end+.12); tail=c; }
@@ -927,7 +992,11 @@ function makeEngine(ctx,song){
     if(sh.qEnd==='swell') swell(tr-2*BT,2*BT);
     if(lv>=1) for(let b=0;b<qBars;b++) subHit(b*4*BT,degSemi(st,qRoot(b*4*BT)));
     if(sh.qPad!=='none'){ const half=qBars>=2?4*BT:2*BT; qChord(0,half,sh.rs.prog[0],sh); qChord(half,tr,sh.qTension,sh); }
-    pre.forEach((n,i)=>lead(sh.lead,n.tr,n.dur,hz(n.s),{open:.8+.5*n.tr/tr,echo:i===pre.length-1}));
+    /* a riff that loops (short period) gets a new layer on every pass: a parallel third, then an octave on top;
+       the melody itself, and so the graph, stay exactly the same */
+    const per=FX.evolve?(()=>{ for(let P=1;P<=6;P++){ if(pre.length<2*P) break; if(pre.every((n,i)=>i+P>=pre.length||n.p===pre[i+P].p)) return P; } return 0; })():0;
+    pre.forEach((n,i)=>{ lead(sh.lead,n.tr,n.dur,hz(n.s),{open:.8+.5*n.tr/tr,echo:i===pre.length-1});
+      if(per){ const c=Math.floor(i/per); if(c%2===1) lead(sh.lead,n.tr,n.dur*.9,hz(degSemi(st,n.p+2)),{open:.7,vel:.38}); else if(c>=2) lead(sh.lead,n.tr+.004,n.dur*.8,hz(n.s+12),{open:.9,vel:.22}); } });
     /* answer */
     const pb=sh.post/4;
     if(sh.out){ impact(tr);
@@ -943,8 +1012,11 @@ function makeEngine(ctx,song){
   }
   function countIn(beats){ for(let b=0;b<beats;b++){ kick(b*BT,.55+.12*b); hat(b*BT+BT/2,.1,false); } riser(0,beats*BT,.09); }
   function intro(){ riser(0,8*BT,.12); for(let b=0;b<4;b++) kick(b*BT,.6); for(let k=0;k<4;k++) kick(4*BT+k*BT/2,.55); for(let k=0;k<8;k++) kick(6*BT+k*BT/4,.35+k*.03); impact(8*BT); }
-  function ding(){ [4,7].forEach((d,i)=>bell('glass',i*.06,.3,hz(48+degSemi(MODES[0].st,d)),.7)); }
-  function bang(){ const n=nz(), a=g(0); env(a,0,.5,.002,.45); ch(n,bq('lowpass',1400),a,out); n.start(0); n.stop(.7); const o=osc('sine',90,0), b=g(0); o.frequency.exponentialRampToValueAtTime(40,.25); env(b,0,.5,.002,.35); ch(o,b,out); o.start(0); o.stop(.6); }
+  /* the right-answer ding climbs the scale with the streak (a reward that never sounds the same twice in a row);
+     the miss sound comes in three takes */
+  function ding(step=0){ const st=song.modes[0].st, T=[4,7,9,11,14,16,18], k=FX.vary?Math.min(step,5):0;   /* up the tonic chord, two neighbouring chord tones: always consonant */
+    [T[k],T[k+1]].forEach((d,i)=>bell('glass',i*.06,.3,hz(48+degSemi(st,d)),.7)); }
+  function bang(k=0){ const n=nz(), a=g(0); env(a,0,.5,.002,.45); ch(n,bq('lowpass',[1400,1100,1750][k%3]),a,out); n.start(0); n.stop(.7); const o=osc('sine',[90,82,100][k%3],0), b=g(0); o.frequency.exponentialRampToValueAtTime(40,.25); env(b,0,.5,.002,.35); ch(o,b,out); o.start(0); o.stop(.6); }
   return {cell,countIn,intro,ding,bang};
 }
 /* render speed is measured on every job; a slow phone drops to a lower internal rate and renders further ahead */
@@ -1012,6 +1084,9 @@ function prepSongAudio(song){
   o.intro=queueRender(sr,8*bt+2.5,song,E=>E.intro());
   o.ding=queueRender(sr,1.6,song,E=>E.ding()); o.bang=queueRender(sr,1,song,E=>E.bang());
   ['count','intro','ding','bang'].forEach(k=>o[k].then(b=>o[k+'B']=b).catch(()=>{}));
+  /* the climbing dings and the other miss takes render later, after the first shell is ready */
+  o.dings=[]; o.bangs=[];
+  setTimeout(()=>{ if(FX.vary) for(let k=0;k<8;k++) queueRender(sr,1.6,song,E=>E.ding(k)).then(b=>o.dings[k]=b).catch(()=>{}); for(let k=1;k<3;k++) queueRender(sr,1,song,E=>E.bang(k)).then(b=>o.bangs[k]=b).catch(()=>{}); },1500);
   return o;
 }
 
@@ -1094,6 +1169,7 @@ async function startRound(){
   const s0=G.shells[0]; if(s0.buf&&!s0.src) s0.src=playBuf(s0.buf,s0.start);
   prepShell(1);
   G.phase='play'; renderMag();
+  if(G.round===1) markStart();
 }
 function enterShell(i){
   G.cur=i; const sh=G.shells[i], seen=G.mag.slice(0,i), liveLeft=G.k-sum(seen), left=G.n-i;
@@ -1117,7 +1193,7 @@ function answer(choice){
   const bt=beat(), ph=(now-G.t0)/bt, dist=Math.abs(ph-Math.round(ph))*bt; sh.onbeat=dist<=.075;
   pickedUI(choice); if(sh.onbeat) judge('В ТАКТ','','var(--amber)',true);
   /* the verdict sound is booked now for the exact trigger beat: played from resolve() it would come late and lose its attack */
-  if(G.aud) sh.sfx=playBuf(choice===sh.out?G.aud.dingB:G.aud.bangB,sh.start+sh.tr,.8);
+  if(G.aud) sh.sfx=playBuf(choice===sh.out?(G.aud.dings[G.streak]||G.aud.dings[7]||G.aud.dingB):(G.aud.bangs[G.total%3]||G.aud.bangB),sh.start+sh.tr,.8);
 }
 function resolve(sh){
   sh.resolved=true; G.total++; const ok=sh.answer===sh.out;
@@ -1191,10 +1267,15 @@ const idxOf=(sh,j)=>sh.puz.idx?sh.puz.idx(j):j;
 function setFormula(sh,rev){
   const P=sh.puz, N=sh.N, a=idxOf(sh,N), b=idxOf(sh,N-1), vN=P.v[N], vP=P.v[N-1];
   $('fMain').innerHTML=rev&&P.htmlRev?P.htmlRev:P.html; fitFormula();
-  $('fSub1').innerHTML=P.sub||`на графике ${yk(0)} … ${yk(b)}; после спуска — ${yk(a)}`;
+  /* the notation is explained right under the formula: [x], ⌈x⌉, and in the first rounds what mod means */
+  const sub=P.sub||'', extra=[];
+  if(/ mod /.test(P.html)&&!/mod —/.test(sub)&&(G.round||1)<=3) extra.push('mod — остаток от деления');
+  if(P.html.includes('[')&&!sub.includes('[x]')) extra.push('[x] — целая часть x');
+  if(P.html.includes('⌈')&&!sub.includes('⌈x⌉')) extra.push('⌈x⌉ — x, округлённое вверх');
+  $('fSub1').innerHTML=[sub,...extra].filter(Boolean).join('; ')||`на графике ${yk(0)} … ${yk(b)}; после спуска — ${yk(a)}`;
   const s2=$('fSub2');
-  if(!rev){ s2.innerHTML=`${yk(a)} &lt; ${yk(b)} ⇒ <span class="dn">вниз, ${I('s')} = −2: ${I('f')}/4</span> &nbsp;·&nbsp; ${yk(a)} &gt; ${yk(b)} ⇒ <span class="up">вверх, ${I('s')} = +1: 2${I('f')}</span>`; s2.className='f-sub'; }
-  else { const lt=vN<vP; s2.innerHTML=`${yk(a)} = ${vN} ${lt?'&lt;':'&gt;'} ${vP} = ${yk(b)} ⇒ ${lt?`${I('s')} = −2: ${I('f')}/4 &nbsp;БОЕВОЙ (808)`:`${I('s')} = +1: 2${I('f')} &nbsp;ХОЛОСТОЙ (колокол)`}`; s2.className='f-sub '+(lt?'res-live':'res-blank'); }
+  if(!rev){ s2.innerHTML=`${yk(a)} меньше ${yk(b)} → <span class="dn">боевой ↓</span> &nbsp;·&nbsp; больше → <span class="up">холостой ↑</span>`; s2.className='f-sub'; }
+  else { const lt=vN<vP; s2.innerHTML=`${yk(a)} = ${vN} ${lt?'меньше':'больше'}, чем ${yk(b)} = ${vP} → ${lt?'БОЕВОЙ ↓':'ХОЛОСТОЙ ↑'}`; s2.className='f-sub '+(lt?'res-live':'res-blank'); }
   $('caption').innerHTML=P.cap;
 }
 /* long generated formulas shrink to at most two lines, so nothing below the graph jumps */
@@ -1214,7 +1295,7 @@ function setProg(p,late){ const f=$('progFill'); f.style.width=(p*100)+'%'; f.cl
    a live answer lands two octaves below, a blank one an octave above.
    =================================================================================== */
 const cv=$('scope'), X=cv.getContext('2d'); let dpr=1, W=0, H0=0;
-function resize(){ dpr=Math.min(2,window.devicePixelRatio||1); W=Math.round(cv.getBoundingClientRect().width)||cv.clientWidth||320; H0=Math.round(Math.min(window.innerWidth>=980?380:440,Math.max(W<330?340:300,W*.86))); cv.style.height=H0+'px'; cv.width=Math.round(W*dpr); cv.height=Math.round(H0*dpr); }
+function resize(){ dpr=Math.min(2,window.devicePixelRatio||1); W=Math.round(cv.getBoundingClientRect().width)||cv.clientWidth||320; const sh0=Math.round($('stage').getBoundingClientRect().height)||300; H0=Math.max(150,Math.min(sh0,Math.round(W*1.05))); cv.style.height=H0+'px'; cv.width=Math.round(W*dpr); cv.height=Math.round(H0*dpr); }
 const FONT=getComputedStyle(document.documentElement).getPropertyValue('--f-display').trim()||'sans-serif';
 const COL={grid:'#15241d',grid2:'#1c2e25',axis:'#8a9bb0',txt:'#6c8a7a',amber:'#ffc845',live:'#ff3d5e',blank:'#55c7ff',tick:'#3f6b50',mirror:'#c9d6cf'};
 const AX_P=14, AX_Y=AX_P, P_LO=AX_Y-17.5, P_HI=AX_Y+17.5;   /* the axis is the middle octave line, in the exact centre */
@@ -1300,7 +1381,7 @@ function drawShell(sh,now,countdown){
     const vis=post.filter(n=>n.tr<=tau);
     head=drawTrace(gm,post,tau,pc,mode,sh.th,base+shift)||head;
     /* the rule, on a dark tag right of the trigger, in the half the answer left empty (top for live, bottom for blank) */
-    { X.save(); X.font=`800 10px ${FONT}`; X.globalAlpha=u; const tx=sh.out?'f/4 · s = −2':'2f · s = +1', tw=X.measureText(tx).width, ly=sh.out?T+22:B-8, lx=xT+9;
+    { X.save(); X.font=`800 10px ${FONT}`; X.globalAlpha=u; const tx=sh.out?'боевой: на 2 октавы ниже':'холостой: на октаву выше', tw=X.measureText(tx).width, ly=sh.out?T+22:B-8, lx=xT+9;
       X.fillStyle='rgba(9,15,12,.88)'; X.fillRect(lx-4,ly-10,tw+8,14); X.fillStyle=pc; X.textAlign='left'; X.fillText(tx,lx,ly); X.restore(); }
     if(!sh.out) vis.forEach(n=>{ const age=now-(sh.start+n.tr); if(age<.6){ X.save(); X.strokeStyle=pc; X.globalAlpha=1-age/.6; X.lineWidth=1.2; X.beginPath(); X.arc(gm.x(n.tr),gm.y(n.p),3+age*18,0,7); X.stroke(); X.restore(); } });
     labels(post,Math.max(...post.map(n=>n.p)),pc);
@@ -1418,16 +1499,30 @@ async function ghLoad(){ const repo=repoOf(); let j=null;
   if(!j||!Array.isArray(j.scores)) throw new Error('bad table');
   LB.rows=j.scores.filter(r=>r&&(r.id||r.name)).map(r=>r.id?r:{...r,id:normNick(r.name)}).sort((a,b)=>b.best-a.best).slice(0,10); LB.players=j.players||{}; LB.acks=j.acks||{}; LB.updated=j.updated||null;
   const P=LB.pending; if(P&&LB.acks[P.nonce]) settle(P,LB.acks[P.nonce]); }
-const ACK_TEXT={ok:'Рекорд в общей таблице.',low:'Принято. Ваш лучший результат в таблице выше этого.',key:'Этот ник уже занят другим паролем. Войдите заново.',bad:'Сервер не принял результат.',bot:'Результат отклонён: ответы похожи на скрипт.',old:'Результат из старой или изменённой версии игры не принят: обновите страницу.'};
+const ACK_TEXT={ok:'Рекорд в общей таблице.',low:'Принято. Ваш лучший результат в таблице выше этого.',key:'Этот ник уже занят другим паролем. Войдите заново.',bad:'Сервер не принял результат.',bot:'Результат отклонён: ответы похожи на скрипт.',old:'Результат из старой или изменённой версии игры не принят: обновите страницу.',nostart:'Результат не принят: у игры нет отметки о начале (она началась без связи с GitHub).',time:'Результат не принят: время игры не сходится с её длиной.'};
 function settle(P,ack){ LB.pending=null; store.set('patronnik-outbox',null); LB.status=ACK_TEXT[ack]||'';
   if(ack==='key'){ store.set('patronnik-acct',null); }
   const sn=$('saveNote'); if(sn&&P.game===G.gameNo) sn.textContent=LB.status; renderLB(); }
 /* after a send, look for the verdict a few times; the workflow usually answers within a minute */
 let pollT=null;
 function pollAck(){ clearTimeout(pollT); let k=0; const step=()=>{ if(!LB.pending||k++>10) return; ghLoad().then(renderLB).catch(()=>{}).finally(()=>{ if(LB.pending) pollT=setTimeout(step,k<4?15000:30000); }); }; pollT=setTimeout(step,20000); }
+/* One game = one key. When the game starts the page posts a start mark with the public half of a fresh key (GitHub
+   stamps the time), and the final result is signed with the private half. The server takes a result only if its start
+   mark exists, is unused, and is older than the claimed game takes to play: a log cannot be written up in a second. */
+let GAME=null;
+async function markStart(){ GAME=null; if(LB.mode!=='gh'||!canSend()) return;
+  try{ const kp=await crypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},false,['sign','verify']);
+    const raw=new Uint8Array(await crypto.subtle.exportKey('raw',kp.publicKey)), g=hex(crypto.getRandomValues(new Uint8Array(12)));
+    GAME={g,key:kp.privateKey,no:G.gameNo};
+    await fetch(`https://api.github.com/repos/${repoOf()}/issues/${LB.cfg.issue}/comments`,{method:'POST',
+      headers:{Authorization:'Bearer '+deobf(LB.cfg.tok),Accept:'application/vnd.github+json','Content-Type':'application/json'},body:JSON.stringify({body:JSON.stringify({start:{g,gk:b64(raw)}})})});
+  }catch(e){} }
+async function gameSign(r){ if(!GAME||GAME.no!==G.gameNo) return;
+  r.g=GAME.g; const core=JSON.stringify({g:r.g,score:r.score,rounds:r.rounds,acc:r.acc,log:r.log});
+  r.gs=b64(new Uint8Array(await crypto.subtle.sign({name:'ECDSA',hash:'SHA-256'},GAME.key,new TextEncoder().encode(core)))); }
 async function sendResult(r){
   const a=acct(); if(!a||!canSend()) return false;
-  const p=JSON.stringify({v:3,nick:a.nick,score:r.score,rounds:r.rounds,acc:r.acc,log:r.log||'',session:r.session,nonce:r.nonce,t:r.t,code:CODE});
+  const p=JSON.stringify({v:3,nick:a.nick,score:r.score,rounds:r.rounds,acc:r.acc,log:r.log||'',session:r.session,nonce:r.nonce,t:r.t,code:CODE,g:r.g||'',gs:r.gs||''});
   const body=JSON.stringify({p,s:await signStr(a,p),k:pubOf(a)});
   const res=await fetch(`https://api.github.com/repos/${repoOf()}/issues/${LB.cfg.issue}/comments`,{method:'POST',
     headers:{Authorization:'Bearer '+deobf(LB.cfg.tok),Accept:'application/vnd.github+json','Content-Type':'application/json'},body:JSON.stringify({body})});
@@ -1495,6 +1590,7 @@ async function submitScore(acc){
     else if(!HOME) say('Общая таблица принимает результаты только со страницы kotyan31.github.io/patronnik.'); }
   if(LB.mode==='gh'&&G.score>0&&canSend()){
     const r={score:G.score,rounds:G.round,acc,log:G.log,session:(G.song&&G.song.seed||0).toString(16),nonce:hex(crypto.getRandomValues(new Uint8Array(12))),t:at,game:G.gameNo};
+    try{ await gameSign(r); }catch(e){}
     store.set('patronnik-outbox',JSON.stringify(r));
     if(acct()) flushOutbox();
     else { const slot=$('sendSlot'); if(slot){ slot.innerHTML=`<p class="small">Ник и пароль — и результат уйдёт в общую таблицу. Дальше всё будет уходить само.</p>${acctForm('acctOver','В таблицу')}`;
@@ -1527,7 +1623,12 @@ if(/[?&]debug/.test(location.search)&&/^(localhost|127\.0\.0\.1)$/.test(location
 function boot(){
   setVol(VOL); $('vol').addEventListener('input',e=>setVol(e.target.value/100)); $('vol').addEventListener('change',e=>e.target.blur()); $('volBtn').addEventListener('click',e=>{ setVol(VOL?0:VOL_LAST); e.currentTarget.blur(); });
   resize(); window.addEventListener('resize',resize);
-  if(typeof ResizeObserver==='function') new ResizeObserver(()=>{ const w=Math.round(cv.getBoundingClientRect().width); if(w&&w!==W) resize(); }).observe(cv);
+  if(typeof ResizeObserver==='function') new ResizeObserver(()=>{ const w=Math.round(cv.getBoundingClientRect().width), h=Math.round($('stage').getBoundingClientRect().height); if(w&&(w!==W||Math.min(h,Math.round(w*1.05))!==H0)) resize(); }).observe($('stage'));
+  /* phone sheets: one button opens the clues, the other the leaderboard; a tap outside closes them */
+  const sheet=k=>{ const on=!document.body.classList.contains('sheet-'+k); document.body.classList.remove('sheet-clues','sheet-top'); if(on) document.body.classList.add('sheet-'+k);
+    $('btnClues').setAttribute('aria-expanded',String(on&&k==='clues')); $('btnTop').setAttribute('aria-expanded',String(on&&k==='top')); };
+  $('btnClues').addEventListener('click',()=>sheet('clues')); $('btnTop').addEventListener('click',()=>sheet('top'));
+  document.addEventListener('pointerdown',e=>{ if(!/sheet-/.test(document.body.className)) return; if(e.target.closest('#side,.sheet-btn')) return; document.body.classList.remove('sheet-clues','sheet-top'); $('btnClues').setAttribute('aria-expanded','false'); $('btnTop').setAttribute('aria-expanded','false'); });
   G.mag=Array(8).fill(0); G.n=8; G.k=4; G.cands=combos(8,4); G.total0=G.cands.length;
   renderMag(); hud(); setChance(.5); renderCandCount();
   showOverlay(`
