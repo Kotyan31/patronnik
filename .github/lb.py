@@ -167,6 +167,27 @@ def ensure_config():
 SHELLS = lambda r: 6 if r == 1 else 7 if r == 2 else 8
 
 
+def code_print(path='index.html'):
+    """The fingerprint the page computes from its own script: SHA-256 of the text inside <script>…</script>, first 16 bytes.
+    A page whose code was changed (a cheat's patched copy) sends a different one."""
+    try:
+        with open(path, encoding='utf-8', newline='') as f:
+            s = f.read()
+        body = s[s.index('<script>') + len('<script>'):s.index('</script>')].replace('\r\n', '\n').replace('\r', '\n')   # as the HTML parser does
+        return hashlib.sha256(body.encode('utf-8')).hexdigest()[:32]
+    except (OSError, ValueError):
+        return None
+
+
+def scripted(whens):
+    """Human answer moments scatter: every formula takes its own time to read. A script that waits a fixed share of the
+    question lands in the same narrow spot again and again."""
+    if len(whens) < 15:
+        return False
+    best = max(whens.count(c) for c in set(whens))
+    return best >= .85 * len(whens)   # a steady player who answers on the same beat still spreads over neighbouring spots
+
+
 def replay(log, rounds):
     """Re-plays the game from its answer log and returns (score, correct, total, fast_right, fast_all) or None if impossible.
     Each shell is two base-36 characters: (answer*4 + shell*2 + on_beat) and the answer moment as a share of the question
@@ -174,6 +195,7 @@ def replay(log, rounds):
     if not isinstance(log, str) or len(log) % 2 or not re.fullmatch(r'[0-9a-z]*', log):
         return None
     lives, streak, score, correct, total, fast, fast_all, r, i, lv_in_round = 3, 0, 0, 0, 0, 0, 0, 1, 0, 0
+    whens = []
     for k in range(0, len(log), 2):
         if lives <= 0:
             return None                       # a shell after the last life
@@ -182,6 +204,8 @@ def replay(log, rounds):
         if a > 2 or (when == 'z') != (a == 2):
             return None
         ok = a == o
+        if a != 2:
+            whens.append(int(when, 36))
         if a != 2 and int(when, 36) <= 4:     # answered in the first ~12 % of the question
             fast_all += 1
             fast += ok
@@ -203,7 +227,7 @@ def replay(log, rounds):
             lives, r, i, lv_in_round = min(3, lives + 1), r + 1, 0, 0
     if lives > 0 or r != rounds:              # the run ends with the last life, in the round it reports
         return None
-    return score, correct, total, fast, fast_all
+    return score, correct, total, fast, fast_all, whens
 
 
 def handle(c, table, now):
@@ -225,7 +249,7 @@ def handle(c, table, now):
         score, rounds, acc = int(o['score']), int(o['rounds']), int(o['acc'])
     except (KeyError, ValueError, TypeError):
         return nonce, 'bad'
-    if o.get('v') != 2:
+    if o.get('v') != 3 or str(o.get('code')) not in table.get('code', []):
         return nonce, 'old'
     if not re.fullmatch(r'[\w\-. ]{2,20}', nick) or not (0 <= acc <= 100) or not (1 <= rounds <= 1000):
         return nonce, 'bad'
@@ -239,6 +263,8 @@ def handle(c, table, now):
     if not game or game[0] != score or round(100 * game[1] / max(1, game[2])) != acc:
         return nonce, 'bad'
     if game[3] >= 5 and game[3] > .85 * game[4]:   # snap answers before the graph can be read, and nearly all right: a script
+        return nonce, 'bot'
+    if scripted(game[5]):
         return nonce, 'bot'
     n = norm(nick)
     k64 = base64.b64encode(key).decode()
@@ -271,7 +297,11 @@ def process():
             r = {'id': norm(name), 'nick': name, 'best': int(r.get('best', 0)), 'rounds': int(r.get('rounds', 1)),
                  'acc': int(r.get('acc', 0)), 'at': str(r.get('at', ''))}
         rows.append(r)
-    table = {'updated': table.get('updated'), 'scores': rows, 'players': table.get('players', {}), 'acks': table.get('acks', {})}
+    code = [c for c in table.get('code', []) if isinstance(c, str)]
+    cur = code_print()
+    if cur and cur not in code:   # the last few versions stay valid, so a player with a cached page is not turned away
+        code = (code + [cur])[-4:]
+    table = {'updated': table.get('updated'), 'scores': rows, 'players': table.get('players', {}), 'acks': table.get('acks', {}), 'code': code}
     now = datetime.now(timezone.utc).isoformat(timespec='seconds')
     done, log = [], []
     for c in comments(cfg['issue']):
