@@ -1,5 +1,5 @@
 {
- "updated": "2026-10-17T13:09:32+00:00",
+ "updated": "2026-10-17T13:15:38+00:00",
  "scores": [
   {
    "id": "pro100kotyanlox",
@@ -130,6 +130,7 @@
   "989ef2393f785c24aa6d1c7a": "low",
   "9f741b439ec736105fe5d30e": "ok",
   "284c2442f9cd4229300170ac": "low",
-  "27ee39c77b3f8581aeaeb725": "low"
+  "27ee39c77b3f8581aeaeb725": "low",
+  "c66f9c66b236c2cfb2abfa9a": "old"
  }
 }
