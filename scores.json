@@ -1,63 +1,6 @@
 {
- "updated": "2026-10-17T13:19:10+00:00",
- "scores": [
-  {
-   "id": "pro100kotyanlox",
-   "nick": "Pro100KotyanLox",
-   "best": 961525,
-   "rounds": 306,
-   "acc": 99,
-   "at": "2026-10-17T11:08:22+00:00"
-  },
-  {
-   "id": "eldiavlos",
-   "nick": "ElDiavlos",
-   "best": 22425,
-   "rounds": 8,
-   "acc": 95,
-   "at": "2026-10-17T10:32:13+00:00"
-  },
-  {
-   "id": "ник фурри",
-   "nick": "ник фурри",
-   "best": 3800,
-   "rounds": 4,
-   "acc": 78,
-   "at": "2026-10-17T10:19:15+00:00"
-  },
-  {
-   "id": "kotyan31",
-   "nick": "Kotyan31",
-   "best": 2675,
-   "rounds": 3,
-   "acc": 79,
-   "at": "2026-10-17T10:12:47+00:00"
-  },
-  {
-   "id": "ketson",
-   "nick": "ketson",
-   "best": 1175,
-   "rounds": 2,
-   "acc": 69,
-   "at": "2026-10-17T13:02:01+00:00"
-  },
-  {
-   "id": "sekret0s",
-   "nick": "Sekret0s",
-   "best": 400,
-   "rounds": 2,
-   "acc": 50,
-   "at": "2026-10-17T10:55:06+00:00"
-  },
-  {
-   "id": "kumaq99",
-   "nick": "kumaq99",
-   "best": 125,
-   "rounds": 1,
-   "acc": 25,
-   "at": "2026-10-17T10:11:09+00:00"
-  }
- ],
+ "updated": "2026-10-17T13:13:24+00:00",
+ "scores": [],
  "players": {
   "kotyan31": {
    "nick": "Kotyan31",
@@ -95,44 +38,5 @@
    "since": "2026-10-17T12:58:25+00:00"
   }
  },
- "acks": {
-  "6ac1f8e65cb64372a80e1497": "low",
-  "d7ed13687ef2bf7c4e5f8e4a": "low",
-  "2af82eae70fb9257afaa8174": "ok",
-  "5b6e698dd38ec84442daa541": "ok",
-  "b3b931c8b422c77478bf2dd4": "ok",
-  "364f3180a6c72c6016adefca": "low",
-  "a04f92c2998e9e4e229eeb3e": "low",
-  "bfc4552ef20af3f9af6b2c87": "low",
-  "b41d3d20106e52d7bdc9be7f": "ok",
-  "8460d22025e705e9911507df": "low",
-  "47011a0ab2cc87c8175fba56": "ok",
-  "6012a2326e403d49b74f04dc": "ok",
-  "ca31472e2be10cbd4a68b822": "low",
-  "d7f5da53d5dab217835398ba": "low",
-  "0cac27b06a5b9e1f91fdac96": "ok",
-  "ffb107a1d7e74ea18e214d18": "ok",
-  "aa28a9ab1a7be44dc512e229": "low",
-  "c6957c835e95e2d71088285e": "low",
-  "aa025d80982fa329f7062a61": "low",
-  "c85ee0773ba02d157c87783a": "low",
-  "c3730df094cb4c9e785998aa": "low",
-  "d12e3bd7971d694db36eacb4": "low",
-  "95a04cecec0fc94df27cbdb0": "low",
-  "f88a1e41f903c6ef5581a88d": "low",
-  "3a8f7cc2432d528449823f23": "ok",
-  "17c847ba595081244e949db8": "ok",
-  "f258274ae0f5a7ba072c01fa": "low",
-  "9ee51cc361b6149012638ef4": "low",
-  "a2078dc280378915757586ee": "ok",
-  "b510b4ba8dc7aec56bbffb77": "low",
-  "f61d3f67ffe10538cda32051": "low",
-  "989ef2393f785c24aa6d1c7a": "low",
-  "9f741b439ec736105fe5d30e": "ok",
-  "284c2442f9cd4229300170ac": "low",
-  "27ee39c77b3f8581aeaeb725": "low",
-  "c66f9c66b236c2cfb2abfa9a": "old",
-  "ea51c2e48ce4af07e6fd5992": "old",
-  "c0c8982e72307b02328e2f61": "old"
- }
+ "acks": {}
 }
