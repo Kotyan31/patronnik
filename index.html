@@ -212,6 +212,27 @@ body{
 .card{background:color-mix(in srgb,var(--panel) 55%,transparent)}
 .card-h h3{font-weight:900}
 @media (prefers-reduced-motion:reduce){.stage.shake{animation:flashL .45s ease-out}.judge.show{animation-duration:1.6s}.shell{transition:none}}
+
+/* v2: puzzle graph + procedural song */
+.f-main b.q{color:var(--amber);font-style:normal;font-weight:700}
+.f-sub b{color:var(--fg);font-weight:400}
+.f-sub .dn{color:var(--live)} .f-sub .up{color:var(--blank)}
+.choice .arr{font-size:22px;line-height:1;margin-left:6px}
+.session{font:600 11px var(--f-mono);color:var(--dim);letter-spacing:.06em;text-align:center}
+.session b{color:var(--muted);font-weight:700}
+.overlay .rule{display:grid;grid-template-columns:auto 1fr;gap:6px 10px;text-align:left;font-size:14px;max-width:42ch;align-items:baseline}
+.overlay .rule .k{font:800 13px var(--f-display);letter-spacing:.03em}
+.overlay .rule .k.l{color:var(--live)} .overlay .rule .k.b{color:var(--blank)}
+.overlay .rule span{color:var(--muted)}
+.overlay .rule i{font-family:var(--f-math)}
+.go.wait span::after{content:"…"}
+.formula{min-height:212px;align-content:start}
+.f-main{max-width:100%}
+.overlay .small{font-size:12px;margin-top:6px}
+.go.send{display:inline-block;text-decoration:none;font-size:14px;padding:9px 18px}
+.lbname{display:flex;gap:10px;align-items:center;font-size:12px;color:var(--muted)}
+.lbname input{flex:1;min-width:0;background:var(--panel-2);border:1px solid var(--line-2);border-radius:7px;color:var(--fg);font:600 16px var(--f-body);padding:5px 9px}
+.lbname input:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
 </style>
 </head>
 <body>
@@ -237,7 +258,7 @@ body{
   </section>
 
   <div class="stage" id="stage">
-    <canvas id="scope" aria-label="Осциллограф: мелодия текущего патрона"></canvas>
+    <canvas id="scope" aria-label="График формулы текущего патрона"></canvas>
     <div class="judge" id="judge"></div>
     <div class="overlay" id="overlay"></div>
   </div>
@@ -262,13 +283,15 @@ body{
     <div class="card-h"><h3>Таблица рекордов</h3></div>
     <ol id="lb"></ol>
     <p class="note" id="lbNote">Загружаю рекорды…</p>
-    <div class="keys"><kbd>←</kbd> боевой · <kbd>→</kbd> холостой · <kbd>Пробел</kbd> дальше. Ответ точно в долю даёт +25 очков.</div>
+    <label class="lbname" id="lbNameWrap" hidden><span>Имя в таблице</span><input id="lbName" maxlength="24" autocomplete="nickname" spellcheck="false"></label>
+    <div class="keys"><kbd>←</kbd>/<kbd>↓</kbd> боевой · <kbd>→</kbd>/<kbd>↑</kbd> холостой · <kbd>Пробел</kbd> дальше. Ответ точно в долю даёт +25 очков.</div>
+    <div class="session" id="session"></div>
   </section>
   </aside>
 
   <div class="controls">
-    <button class="choice live" id="btnLive" type="button">БОЕВОЙ<small>← или A</small></button>
-    <button class="choice blank" id="btnBlank" type="button">ХОЛОСТОЙ<small>→ или D</small></button>
+    <button class="choice live" id="btnLive" type="button"><span>БОЕВОЙ<span class="arr">↓</span></span><small>← ↓ или A</small></button>
+    <button class="choice blank" id="btnBlank" type="button"><span>ХОЛОСТОЙ<span class="arr">↑</span></span><small>→ ↑ или D</small></button>
   </div>
 </div>
 <div class="flash" id="flash"></div>
@@ -282,209 +305,607 @@ const sum = s => s.reduce((x,y)=>x+y,0);
 function mulberry(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
 const ri=(R,a,b)=>a+Math.floor(R()*(b-a+1));
 const rp=(R,arr)=>arr[Math.floor(R()*arr.length)];
-const rw=(R,pairs)=>{ const tot=pairs.reduce((a,p)=>a+p[1],0); let x=R()*tot; for(const p of pairs){ x-=p[1]; if(x<=0) return p[0]; } return pairs[0][0]; };
-const rf=(R,a,b,d=2)=>+(a+R()*(b-a)).toFixed(d);
+const rw=(R,pairs)=>{ const tot=pairs.reduce((a,p)=>a+p[1],0); let x=R()*tot; for(const p of pairs){ x-=p[1]; if(x<=0) return p[0]; } return pairs[pairs.length-1][0]; };
+const rf=(R,a,b)=>a+R()*(b-a);
+const rshuf=(R,a)=>{ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(R()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; };
 const plural=(n,a,b,c)=>{ const m10=n%10,m100=n%100; return m10===1&&m100!==11?a:(m10>=2&&m10<=4&&(m100<10||m100>=20)?b:c); };
 const I=s=>`<i>${s}</i>`;
 const gcd=(a,b)=>b?gcd(b,a%b):a;
 const mod=(a,m)=>((a%m)+m)%m;
-const newSeed=()=>(Math.random()*4294967296)>>>0;
+const newSeed=()=>{ try{ return crypto.getRandomValues(new Uint32Array(1))[0]; }catch(e){ return (Math.random()*4294967296)>>>0; } };
+const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 
-/* ================= one key, one tempo: everything fits together ================= */
-const F1=43.6535, hz=s=>F1*Math.pow(2,s/12);          // s = semitones above F1
-const NOTE=['F','G♭','G','A♭','A','B♭','B','C','D♭','D','E♭','E'];
-const BPM=120, BEAT=60/BPM, S16=BEAT/4;
-const MODES={
-  tense:  [['фригийский',[0,1,3,5,7,8,10]],['локрийский',[0,1,3,5,6,8,10]],['гарм. минор',[0,2,3,5,7,8,11]]],
-  neutral:[['фригийский',[0,1,3,5,7,8,10]],['минор',[0,2,3,5,7,8,10]],['дорийский',[0,2,3,5,7,9,10]]],
-  relaxed:[['дорийский',[0,2,3,5,7,9,10]],['мажорная пентатоника',[0,2,4,7,9]],['миксолидийский',[0,2,4,5,7,9,10]],['лидийский',[0,2,4,6,7,9,11]]],
-};
-const degSemi=(st,d)=>st[mod(d,st.length)]+12*Math.floor(d/st.length);
-const moodOf=m=>m<-.3?'tense':m>.3?'relaxed':'neutral';
-
-/* ================= melody: math families (values + a fact computed from them) ================= */
-const NL=256, A=f=>Array.from({length:NL},(_,n)=>f(n));
-function periodOf(v,from=0){ for(let P=1;P<=128;P++){ let ok=true; for(let i=from;i+P<NL;i++) if(v[i]!==v[i+P]){ok=false;break;} if(ok) return P; } return 0; }
-function perFact(v){ const P=periodOf(v); if(P) return `повторяется каждые ${P} ${plural(P,'шаг','шага','шагов')}`; const Q=periodOf(v,40); if(Q) return `после разгона ходит по кругу длины ${Q}`; return `за ${NL} шагов ни разу не повторилась`; }
-function setFact(v,m){ const s=[...new Set(v)].sort((a,b)=>a-b); return s.length<m?`по модулю ${m} бывает только ${s.join(', ')}`:`обходит все ${m} остатков`; }
-const term=(k,x)=>k===0?'':k===1?x:k+x;
-const CONST={'π':'314159265358979323846264338327950288419716939937','e':'271828182845904523536028747135266249775724709369',
-  'φ':'161803398874989484820458683436563811772030917980','√2':'141421356237309504880168872420969807856967187537'};
-const ALPHA={'φ':(1+Math.sqrt(5))/2,'√2':Math.SQRT2,'√3':Math.sqrt(3),'e':Math.E,'π':Math.PI};
-const PRIMES=(()=>{ const p=[]; for(let n=2;p.length<NL;n++){ if(p.every(q=>q*q>n||n%q)) p.push(n); } return p; })();
-const popc=n=>{let c=0;while(n){c+=n&1;n>>=1;}return c;};
-const tz=n=>{let c=0;while(n%2===0){n/=2;c++;}return c;};
-const MELS=[
-  {w:4,tag:'any',f(R){ const plain=R()<.35, m=plain?8:rp(R,[5,7,8,9]), a=plain?1:ri(R,1,3), b=plain?0:ri(R,0,m-1), c=plain?0:ri(R,0,m-1); const v=A(n=>(a*n*n+b*n+c)%m);
-    const terms=[term(a,I('n')+'<sup>2</sup>'),term(b,I('n')),c?String(c):''].filter(Boolean), set=[...new Set(v)].sort((x,y)=>x-y);
-    return {v,html:`${I('d<sub>n</sub>')} = ${terms.length>1?'('+terms.join(' + ')+')':terms[0]} mod ${m}${set.length<m?' ∈ {'+set.join(', ')+'}':''}`,cap:(b===0&&c===0?`квадрат ${setFact(v,m)}`:`этот многочлен ${setFact(v,m)}`)}; }},
-  {w:3,tag:'any',f(R){ const m=rp(R,[7,8,9]); const a=ri(R,2,m-1), c=ri(R,1,m-1); let x=ri(R,0,m-1); const v=A(()=>(x=(a*x+c)%m)); const P=periodOf(v,40);
-    return {v,run:true,html:`${I('x')}<sub>${I('n')}+1</sub> = (${a}${I('x<sub>n</sub>')} + ${c}) mod ${m}`,cap:P===m?`так компьютер тасует: каждая нота ровно один раз за круг из ${m}`:`генератор застревает в цикле длины ${P}`}; }},
-  {w:2,tag:'any',f(R){ const m=rp(R,[7,9]); let a=ri(R,2,m-1); while(gcd(a,m)!==1) a=ri(R,2,m-1); let x=1; const v=A(()=>{const r=x; x=x*a%m; return r;});
-    return {v,html:`${I('p<sub>n</sub>')} = ${a}<sup>${I('n')}</sup> mod ${m}`,cap:`степени ${a} по модулю ${m} ${perFact(v)}`}; }},
-  {w:3,tag:'glide',f(R){ const T=rp(R,[['треугольные','<i>n</i>(<i>n</i>+1)/2',n=>n*(n+1)/2],['пятиугольные','<i>n</i>(3<i>n</i>−1)/2',n=>n*(3*n-1)/2],['шестиугольные','<i>n</i>(2<i>n</i>−1)',n=>n*(2*n-1)],['тетраэдрические','<i>n</i>(<i>n</i>+1)(<i>n</i>+2)/6',n=>n*(n+1)*(n+2)/6]]);
-    const m=rp(R,[5,7,8,9]); const v=A(n=>T[2](n)%m); const P=periodOf(v); let pal=false; if(P){ const s=v.slice(0,P); pal=s.every((x,i)=>x===s[P-1-i]); }
-    return {v,html:`${I('T<sub>n</sub>')} = ${T[1]} mod ${m}`,cap:`${T[0]} числа mod ${m} ${pal?'читаются одинаково с конца':perFact(v)}`}; }},
-  {w:3,tag:'any',f(R){ const m=rp(R,[5,7,8,9]), p=ri(R,1,2), q=ri(R,1,2); let a=ri(R,0,m-1), b=ri(R,1,m-1); const v=A(()=>{ const r=a; [a,b]=[b,(p*b+q*a)%m]; return r; });
-    return {v,html:`${I('x<sub>n</sub>')} = (${term(p,I('x')+'<sub>'+I('n')+'−1</sub>')} + ${term(q,I('x')+'<sub>'+I('n')+'−2</sub>')}) mod ${m}`,cap:`${p===1&&q===1?'Фибоначчи':'рекуррента'} по модулю ${m} ${perFact(v)}`}; }},
-  {w:2,tag:'any',f(R){ const k=rp(R,Object.keys(CONST)), m=rp(R,[8,9,10]); const d=CONST[k].split('').map(Number); const v=A(n=>d[n%d.length]%m);
-    return {v,html:`${I(k)}<sub>${I('n')}</sub>${m<10?' mod '+m:''}`,cap:m===10?`это просто цифры числа ${k}`:`цифры числа ${k} по модулю ${m}`}; }},
-  {w:2,tag:'any',f(R){ const k=rp(R,Object.keys(ALPHA)), a=ALPHA[k], m=rp(R,[5,7,8]); const v=A(n=>Math.floor((n+1)*a)%m);
-    const ds=[...new Set(A(n=>Math.floor((n+2)*a)-Math.floor((n+1)*a)))].sort((x,y)=>x-y);
-    return {v,html:`⌊${I('n')}·${k}⌋ mod ${m}`,cap:`шаги ⌊${I('n')}·${k}⌋ бывают только ${ds.join(' и ')}`}; }},
-  {w:2,tag:'any',f(R){ const s0=rp(R,[7,9,15,19,25,27,31,41,47,54,73,97]), m=rp(R,[5,7,8]); let c=s0, steps=0, hit=false; const v=A(()=>{ const r=c; if(!hit&&c===1) hit=true; if(!hit) steps++; c=c%2?3*c+1:c/2; return r%m; });
-    return {v,html:`${I('c')}<sub>${I('n')}+1</sub> = ${I('c<sub>n</sub>')}/2 или 3${I('c<sub>n</sub>')}+1, mod ${m}`,cap:`Коллатц из ${s0}: падает до 1 за ${steps} ${plural(steps,'шаг','шага','шагов')}`}; }},
-  {w:1,tag:'any',f(){ return {v:A(n=>tz(n+1)),html:`ν<sub>2</sub>(${I('n')}+1)`,cap:'линейка: каждая вторая нота — 0, каждая четвёртая — выше'}; }},
-  {w:1,tag:'any',f(){ return {v:A(n=>(n^(n>>1))%8),html:`${I('g<sub>n</sub>')} = (${I('n')} xor ⌊${I('n')}/2⌋) mod 8`,cap:'код Грея: соседние ноты отличаются одним битом'}; }},
-  {w:1,tag:'any',f(R){ const hi=ri(R,2,4); return {v:A(n=>popc(n)%2?hi:0),lab:v=>v?1:0,html:`${I('t<sub>n</sub>')} = (единиц в ${I('n')}) mod 2`,cap:'Туэ — Морс: ни один кусок не повторяется трижды подряд'}; }},
-  {w:2,tag:'glide',f(R){ const Am=ri(R,2,4), P=rp(R,[6,8,8,12,16]); const v=A(n=>Math.round(Am*Math.sin(2*Math.PI*n/P)));
-    return {v,html:`round(${Am} sin(2π${I('n')}/${P}))`,cap:`синус, округлённый до ступеней: период ${P}`}; }},
-  {w:1,tag:'any',f(R){ const m=rp(R,[7,8]); const seen=new Set([0]); let a=0; const v=A(n=>{ if(n>0){ const b=a-n; a=(b>0&&!seen.has(b))?b:a+n; seen.add(a);} return a%m; });
-    return {v,html:`${I('a<sub>n</sub>')} = ${I('a')}<sub>${I('n')}−1</sub> ∓ ${I('n')}, mod ${m}`,cap:'Рекаман: шаг назад, если там ещё не были, иначе вперёд'}; }},
-  {w:1,tag:'any',f(R){ const m=rp(R,[6,8]); const v=A(n=>PRIMES[n]%m); const s=[...new Set(v.slice(1))].sort((a,b)=>a-b);
-    return {v,html:`${I('p<sub>n</sub>')} mod ${m}, &nbsp;${I('p')} — простые`,cap:`после двойки простые mod ${m} — только ${s.join(', ')}`}; }},
-  {w:2,tag:'any',f(R){ const m=rp(R,[7,8,9]); let k=ri(R,2,m-1); while(gcd(k,m)!==1) k=ri(R,2,m-1);
-    return {v:A(n=>k*n%m),run:true,html:`${k}${I('n')} mod ${m}`,cap:`НОД(${k}, ${m}) = 1, поэтому обходит все ${m} нот`}; }},
-  {w:2,tag:'glide',f(R){ const m=ri(R,3,5), k=ri(R,1,2); return {v:A(n=>Math.abs((k*n)%(2*m)-m)),html:`|(${term(k,I('n'))} mod ${2*m}) − ${m}|`,cap:'остатки, сложенные пополам, рисуют треугольную волну'}; }},
+/* ===================================================================================
+   SONG: one per session. Key, tempo, mode pair, drum kit, timbres, groove.
+   Everything that follows is drawn from it, so a whole session sounds like one track.
+   =================================================================================== */
+const PC=['C','D♭','D','E♭','E','F','G♭','G','A♭','A','B♭','B'];
+const MODES=[
+  {name:'фригийский',st:[0,1,3,5,7,8,10],w:3},
+  {name:'минор',st:[0,2,3,5,7,8,10],w:2.5},
+  {name:'гармонический минор',st:[0,2,3,5,7,8,11],w:2},
+  {name:'фригийский доминантовый',st:[0,1,4,5,7,8,10],w:1.5},
+  {name:'дорийский',st:[0,2,3,5,7,9,10],w:1.2},
+  {name:'венгерский минор',st:[0,2,3,6,7,8,11],w:1},
+  {name:'локрийский',st:[0,1,3,5,6,8,10],w:.6},
 ];
-const MW=t=>MELS.filter(m=>!t||m.tag===t||t==='any');
-function pickMel(R,tag){ const pool=tag==='glide'?MELS.filter(m=>m.tag==='glide'):MELS; for(let i=0;i<12;i++){ const tot=pool.reduce((a,m)=>a+m.w,0); let x=R()*tot, F=pool[0]; for(const m of pool){ x-=m.w; if(x<=0){F=m;break;} } const mel=F.f(R); if(new Set(mel.v.slice(0,16)).size>=3||i===11) return mel; } }
+const degSemi=(st,d)=>st[mod(d,7)]+12*Math.floor(d/7);
+/* bar roots of the 4-bar cell (question, question, answer, answer), as scale degrees */
+const PROGS=[[0,0,0,1],[0,0,5,6],[0,3,0,1],[0,0,5,4],[0,6,5,6],[0,1,0,1],[0,0,3,4],[0,5,3,4],[0,0,6,5],[0,2,0,1]];
+/* note rhythms inside one bar, in sixteenths (each sums to 16); one onset = one term of the sequence */
+const RHY={'8':[2,2,2,2,2,2,2,2],'tres':[3,3,2,3,3,2],'dot':[3,3,3,3,2,2],'gal':[2,1,1,2,1,1,2,1,1,2,2],'q8':[4,2,2,4,2,2],'push':[2,2,3,3,2,2,2]};
+const KP={four:[0,4,8,12],trap:[0,7,10],bounce:[0,3,8,11]};
+const LEADS=[['square',4],['pulse',2.5],['saw',2],['chip',1.5],['fm',1.5],['acid',1.5],['fold',1.2]];
+const BELLS=[['glass',4],['musicbox',2.5],['vibes',2],['pluck',1.5],['cowbell',1.2]];
 
-/* ================= sound-design concepts: each shell is one idea, explained by math ================= */
-const OFFS=[-.11,-.063,-.0195,0,.02,.062,.107];               // seven-voice supersaw spread
-const CONCEPTS=[
-  {id:'pulse',w:5,mood:{},make(R){ const mel=pickMel(R); return {mel,html:mel.html,cap:mel.cap,rh:mel.run?'run':rp(R,['8','8','8','run','tres','dot']),voice:'lead',look:'steps',plainSub:true}; }},
-  {id:'hills',w:2,mood:{tense:.5,relaxed:2},make(R){ const mel=pickMel(R,'glide'); return {mel,html:mel.html,cap:mel.cap,rh:'8',voice:'glide',look:'smooth',plainSub:true}; }},
-  {id:'reese',w:2,mood:{tense:2,relaxed:.5},make(R){ const seq=rp(R,[[0,0,2,-1],[0,3,0,-2],[0,1,-2,0],[0,-1,2,3]]); const a=ri(R,1,3), b=a+ri(R,3,5);
-    return {mel:{v:A(n=>seq[n%seq.length])},p:{df:[a,b]},rh:'long',voice:'reese',look:'steps',live:'reese',noLabels:true,
-      html:`${I('y')} = saw(${I('ft')}) + saw((${I('f')} + Δ${I('f')})${I('t')})`,sub:`Δ${I('f')} = ${a} → ${b} Гц: пилы то сходятся, то расходятся по фазе`,cap:'две пилы в паре герц друг от друга — это риз-бас'}; }},
-  {id:'mirror',w:2,mood:{},make(R){ const ch=rp(R,[[3,7,10],[3,7,12],[4,7,11],[5,7,10]]), up=[0,...ch];
-    return {mel:{v:A(n=>{ const i=n%8; return i<4?up[i]:-up[i-4]; }),lab:x=>x>0?'+'+x:x<0?'−'+(-x):'0'},kind:'semi',rh:'8',voice:'lead',look:'mirror',
-      html:`${I('y')}<sub>такт 2</sub>(${I('t')}) = −${I('y')}<sub>такт 1</sub>(${I('t')})`,sub:`(+${ch.join(', +')}) → (−${ch.join(', −')})`,cap:'переверни арпеджио вниз головой — минор становится мажором'}; }},
-  {id:'poly',w:2,mood:{tense:1.5},make(R){ const p=rp(R,[3,3,5]), seq=rp(R,[[0,0,12,1],[0,0,7,12],[0,5,0,12]]);
-    return {mel:{v:A(n=>seq[n%seq.length])},kind:'semi',rh:'p'+p,voice:'blip',look:'steps',bracket:p,
-      html:`удар, если ${I('k')} mod ${p} = 0, &nbsp;нота = (${seq.join(', ')})<sub>${I('j')} mod 4</sub>`,sub:`4 ноты × ${p} шестнадцатых = петля на ${p} ${plural(p,'долю','доли','долей')} в такте на 4`,cap:`каждая ${p===3?'третья':'пятая'} шестнадцатая: риф на ${p} поверх 4`}; }},
-  {id:'shep',w:1.5,mood:{},make(R){ const dir=R()<.5?-1:1;
-    return {mel:{v:A(n=>dir*n)},kind:'shep',rh:'8',voice:'shep',look:'shep',blank:'shep',noLabels:true,
-      html:`${I('y<sub>k</sub>')} = ${I('y')}<sub>0</sub> ${dir<0?'−':'+'} ${I('t')}/${I('T')} + ${I('k')} (mod 4), &nbsp;громкость = ${I('e')}<sup>−${I('y')}²</sup>`,sub:'4 копии через октаву: сверху проявляются, снизу тают',cap:dir<0?'тон Шепарда: падает вечно, но ниже не становится':'тон Шепарда: растёт вечно, но выше не становится'}; }},
-  {id:'fm',w:3,mood:{tense:.5,relaxed:2},make(R){ const mel=pickMel(R), r=rp(R,[1.4,1.4,2,3.5,1,3]), Ix=ri(R,3,9), tau=rf(R,.15,.5);
-    const bellish=r%1!==0;
-    return {mel,p:{r,I:Ix,tau},rh:rp(R,['8','4','off','8','tres']),voice:'fm',look:'decay',blank:'fm',
-      html:`${I('y')} = sin(2π${I('ft')} + ${Ix}${I('e')}<sup>−${I('t')}/${tau}</sup> sin(2π·${r}${I('ft')}))`,cap:bellish?`дробное отношение 1 : ${r} даёт негармонические обертоны — колокол`:`целое отношение 1 : ${r} даёт гармонический тембр — электропиано`}; }},
-  {id:'ks',w:3,mood:{tense:.5,relaxed:2},make(R){ const mel=pickMel(R), damp=rf(R,.493,.4985,4);
-    return {mel,p:{damp},rh:rp(R,['8','run','off','tres','dot']),voice:'ks',look:'decay',blank:'ks',
-      html:`${I('y')}[${I('n')}] = ${damp}·(${I('y')}[${I('n')}−${I('N')}] + ${I('y')}[${I('n')}−${I('N')}−1]), &nbsp;${I('N')} = ${I('f<sub>s</sub>')}/${I('f')}`,cap:'шум, прогнанный по короткой петле задержки, сам становится струной'}; }},
-  {id:'supersaw',w:2.5,mood:{tense:1.3},make(R){ const mel=pickMel(R), d=rf(R,.12,.35);
-    return {mel,p:{det:d},kind:'chord',rh:rp(R,['off','8','4','off']),voice:'supersaw',look:'thick',live:'wall',
-      html:`${I('y')} = Σ<sub>${I('k')}=1…7</sub> saw((1 + δ<sub>${I('k')}</sub>)${I('ft')}), &nbsp;δ ∈ ±${d} пт`,cap:'семь расстроенных пил на каждую ноту аккорда — суперсо, звук транса'}; }},
-  {id:'crush',w:2,mood:{tense:2,relaxed:.3},make(R){ const mel=pickMel(R), b0=rp(R,[8,6]), b1=rp(R,[2,3]);
-    return {mel,p:{b0,b1},rh:mel.run?'run':rp(R,['8','run']),voice:'crush',look:'crush',
-      html:`${I('x<sub>q</sub>')} = round(${I('x')}·2<sup>${I('b')}</sup>) / 2<sup>${I('b')}</sup>, &nbsp;${I('b')}: ${b0} → ${b1} бит`,cap:'чем меньше бит, тем крупнее ступени: шум квантования становится тембром'}; }},
-  {id:'fold',w:2,mood:{tense:1.5,relaxed:.5},make(R){ const mel=pickMel(R), gmax=ri(R,3,7);
-    return {mel,p:{gmax},rh:rp(R,['8','8','run']),voice:'fold',look:'fold',
-      html:`${I('y')} = sin(${I('g')}·${I('x')}), &nbsp;${I('g')}: 1 → ${gmax}`,cap:'волна складывается сама в себя и рождает обертоны без всякого фильтра'}; }},
-  {id:'ring',w:2,mood:{tense:2,relaxed:.3},make(R){ const mel=pickMel(R), rm=rp(R,[1.5,2.01,.5,2.76,1.41]);
-    return {mel,p:{rm},rh:rp(R,['8','off','run','tres']),voice:'ring',look:'ring',
-      html:`${I('y')} = ${I('x')}(${I('t')})·sin(2π·${rm}${I('f')}${I('t')})`,cap:'кольцевая модуляция: суммы и разности частот — металлический звон'}; }},
-  {id:'pump',w:2,mood:{relaxed:1.5},make(R){ const mel=pickMel(R), tau=rf(R,.06,.16);
-    return {mel,p:{tau},rh:'8',voice:'pump',look:'pump',
-      html:`${I('a')}(${I('t')}) = 1 − ${I('e')}<sup>−${I('t')}/${tau}</sup>`,cap:'сайдчейн: громкость проваливается на каждой доле — так дышит танцевальная музыка'}; }},
-  {id:'echo',w:2,mood:{relaxed:2,tense:.7},make(R){ const mel=pickMel(R), g=rf(R,.4,.6,2), D=rp(R,[3,3,6]);
-    return {mel,p:{g,D},rh:'sparse',voice:'echo',look:'echo',
-      html:`${I('y')}(${I('t')}) = Σ ${g}<sup>${I('k')}</sup>·${I('x')}(${I('t')} − ${I('k')}·${D}/16)`,cap:`эхо — геометрическая прогрессия: каждый повтор в ${(1/g).toFixed(1).replace('.',',')} раза тише`}; }},
-  {id:'arp',w:2,mood:{},make(R){ const mel=pickMel(R), shape=rp(R,[[0,2,4,7],[0,4,2,7],[0,2,4,2],[7,4,2,0]]);
-    return {mel,p:{shape},kind:'arp',rh:'4',voice:'chip',look:'steps',
-      html:`аккорд(${I('d<sub>n</sub>')}) → ступени (${shape.join(', ')}) по шестнадцатым`,cap:'8-битные приставки играли аккорд одной нотой, быстро перебирая его'}; }},
-  {id:'harm',w:1.5,mood:{relaxed:1.5,tense:.5},make(R){ const set=[1,2,3,4,5,6,7,8], shape=rp(R,['up','updown']); const base=shape==='up'?set:set.concat(set.slice(1,-1).reverse());
-    return {mel:{v:A(n=>base[n%base.length]),lab:x=>'n'+x},kind:'harm',rh:'8',voice:'organ',look:'fan',
-      html:`${I('f<sub>n</sub>')} = ${I('n')}·${I('f')}<sub>0</sub>, &nbsp;${I('n')} = 1…8`,cap:'натуральный звукоряд: 7-й обертон не попадает в клавиши пианино'}; }},
-  {id:'acid',w:2,mood:{tense:2,relaxed:.3},make(R){ const mel=pickMel(R), q=ri(R,9,18), env=rf(R,1.5,3,1);
-    return {mel,p:{q,env},rh:rp(R,['8','run','dot','tres']),voice:'acid',look:'acid',
-      html:`${I('f<sub>c</sub>')}(${I('t')}) = ${I('f')}<sub>0</sub>·2<sup>${env}${I('e')}<sup>−${I('t')}/τ</sup></sup>, &nbsp;${I('Q')} = ${q}`,cap:'резонансный фильтр с огибающей: «чавкающий» эсид-бас'}; }},
-  {id:'pwm',w:1.5,mood:{},make(R){ const mel=pickMel(R), a=rf(R,.2,.4), r=rf(R,.5,2,1);
-    return {mel,p:{a,r},rh:rp(R,['8','dot','4','tres']),voice:'pwm',look:'pwm',
-      html:`${I('d')}(${I('t')}) = ½ + ${a}·sin(2π·${r}${I('t')})`,cap:'ширина импульса гуляет, и тембр дышит без единого фильтра'}; }},
-  {id:'vib',w:1.5,mood:{relaxed:2,tense:.5},make(R){ const mel=pickMel(R,'glide'), dep=rf(R,.2,.6), rate=rf(R,4,7,1);
-    return {mel,p:{dep,rate},rh:rp(R,['8','4']),voice:'vib',look:'vib',
-      html:`${I('f')}(${I('t')}) = ${I('f')}·2<sup>${dep}·sin(2π·${rate}${I('t')})/12</sup>`,cap:'вибрато — это синус, вложенный в частоту'}; }},
-  {id:'stab',w:1.5,mood:{},make(R){ const mel=pickMel(R); let a='1', b='10'; while(b.length<40){ const c=b+a; a=b; b=c; }
-    return {mel,p:{word:b},kind:'chord',rh:'fib',voice:'stab',look:'thick',live:'wall',
-      html:`${I('S<sub>n</sub>')} = ${I('S')}<sub>${I('n')}−1</sub>${I('S')}<sub>${I('n')}−2</sub> → ${b.slice(0,13)}…`,cap:'слово Фибоначчи: ритм, который никогда не повторяется'}; }},
-  {id:'toms',w:1.5,mood:{tense:1.3},make(R){ const mel=pickMel(R), k=rp(R,[5,7,9,11]), rot=ri(R,0,15);
-    return {mel,p:{k,rot},rh:'euclid',voice:'tom',look:'stems',
-      html:`удар, если ⌊${k}${I('i')}/16⌋ ≠ ⌊${k}(${I('i')}−1)/16⌋`,cap:`E(${k}, 16): алгоритм Евклида раскладывает ${k} ударов как можно ровнее`}; }},
-];
-function magazineConcept(bits){ return {mel:{v:bits.map(b=>b?0:4),lab:x=>x?0:1},kind:'mag',bits,rh:'8',voice:'lead',look:'mag',live:'wall',noLabels:true,
-  html:`${bits.join(' ')} = магазин этого раунда`,sub:'1 = низкий удар, 0 = высокая нота',cap:'финальный патрон играет магазин: боевой = 1'}; }
-let recent=[];
-function pickConcept(R,mood){
-  for(let tries=0;tries<20;tries++){
-    const pool=CONCEPTS.map(c=>[c,c.w*(c.mood[mood]||1)]); const c=rw(R,pool);
-    if(!recent.includes(c.id)||tries>15){ recent=[c.id,...recent].slice(0,5); return c; }
+function leadParams(R,type){
+  const b={wave:'square',cut:2600,env:2,q:.8,fdec:.06,drive:0,det:0,swoop:1.012,lv:.12};
+  switch(type){
+    case 'square': return {...b,cut:rf(R,1800,3600),lv:.11};
+    case 'pulse': return {...b,wave:'p25',cut:rf(R,2200,4200),lv:.12};
+    case 'chip': return {...b,wave:'p12',cut:12000,env:1,q:.5,lv:.13,swoop:1};
+    case 'saw': return {...b,wave:'sawtooth',cut:rf(R,1200,2200),env:3,q:1.4,det:rf(R,6,14),lv:.1};
+    case 'acid': return {...b,wave:'sawtooth',cut:rf(R,380,620),env:rf(R,5,9),q:rf(R,9,15),fdec:.09,drive:2.5,lv:.095,swoop:1};
+    case 'fm': return {lv:.15,ratio:rp(R,[1,2,3]),index:rf(R,1.5,4)};
+    case 'fold': return {lv:.13,fold:rf(R,1.6,3.2)};
   }
-  return CONCEPTS[0];
+  return b;
+}
+function makeSong(seed){
+  const R=mulberry(seed^0x5bd1e995);
+  const pc=rp(R,[4,5,5,6,7,8,9]), hz1=440*Math.pow(2,(24+pc-69)/12);
+  const pickMode=()=>rw(R,MODES.map(m=>[m,m.w]));
+  const m1=pickMode(); let m2=pickMode(); for(let i=0;i<12&&m2===m1;i++) m2=pickMode();
+  const pickN=(pool,n)=>{ const out=[]; for(let i=0;i<40&&out.length<n;i++){ const x=rw(R,pool); if(!out.includes(x)) out.push(x); } return out; };
+  const leads=pickN(LEADS,R()<.5?2:3), bells=pickN(BELLS,2);
+  const leadP={}; leads.forEach(l=>leadP[l]=leadParams(R,l));
+  const others=rshuf(R,['tres','dot','gal','q8','push']);
+  return {
+    seed, pc, name:PC[pc], hz1, bpm:rp(R,[112,116,120,120,124,128]), modes:[m1,m2],
+    progs:rshuf(R,PROGS).slice(0,3), rhythms:[['8',3],[others[0],1.6],[others[1],1]],
+    leads, leadP, bells,
+    kit:{ kick:{f0:rf(R,110,170),f1:rf(R,42,52),pd:rf(R,.02,.04),dec:rf(R,.25,.42),click:rf(R,.05,.15),drive:rf(R,1,1.6)},
+      sn:rw(R,[['clap',3],['snare',2],['both',2]]), clapF:rf(R,1000,1800), snTone:rf(R,170,240), snDec:rf(R,.12,.24),
+      hp:rf(R,6500,9500), hdec:rf(R,.022,.05), open:R()<.55 },
+    hatStyle:rw(R,[['16',3],['trap',3],['8sw',1.5]]), kickPat:rw(R,[['four',3],['trap',2],['bounce',1.5]]), perc:rw(R,[['none',3],['cowbell',2]]),
+    swing:rp(R,[0,0,0,.1,.18]),
+    l808:{drive:rf(R,4,12),pre:rf(R,1.2,2.2),tone:rf(R,2500,6000),glide:R()<.6,knock:rf(R,.03,.06),lvl:.2,sub:.2},
+    pad:rp(R,['saw','choir','sub']),
+    verb:{dec:rf(R,1.4,2.6),wet:rf(R,.16,.3)}, delay:{beats:rp(R,[.75,.5,1.5]),fb:rf(R,.28,.45)},
+    qDrums:pickN([['four',3],['heart',2],['clock',2],['half',2]],2), qPads:pickN([['sus',3],['fifth',2],['stab',2],['arp',1.2],['none',1.5]],2), qPadWave:rp(R,['triangle','sawtooth']),
+  };
+}
+/* a round keeps the song but turns the knobs: mode, bar roots, which lead and which bell */
+function roundStyle(song,round){
+  const R=mulberry((song.seed^Math.imul(round,0x9E3779B1))>>>0);
+  return {round, mode:(round>1&&R()<.45)?song.modes[1]:song.modes[0], prog:rp(R,song.progs),
+    lead:song.leads[(round-1)%song.leads.length], lead2:song.leads[round%song.leads.length], bell:song.bells[(round-1)%song.bells.length]};
 }
 
-/* ================= rhythm ================= */
-const euclid=(k,N,rot)=>Array.from({length:N},(_,j)=>{ const i=mod(j+rot,N); return Math.floor(k*i/N)!==Math.floor(k*(i-1)/N)?1:0; });
-function hitsFor(c,total){ const h=[], rh=c.rh;
-  let eu=null; if(rh==='euclid') eu=euclid(c.p.k,16,c.p.rot);
-  for(let k=0;k<total;k++){
-    if(rh==='8'&&k%2===0) h.push([k,2,1]);
-    else if(rh==='run'&&k%8<5) h.push([k,1,1]);
-    else if(rh==='long'&&k%8===0) h.push([k,8,.9]);
-    else if(rh==='4'&&k%4===0) h.push([k,4,.9]);
-    else if(rh==='tres'&&(k%8===0||k%8===3||k%8===6)) h.push([k,k%8===6?2:3,.9]);
-    else if(rh==='dot'&&(k%4===0||k%4===3)) h.push([k,k%4===0?3:1,.9]);
-    else if(rh==='off'&&k%4===2) h.push([k,2,.6]);
-    else if(rh==='p3'&&k%3===0) h.push([k,1,.55]);
-    else if(rh==='p5'&&k%5===0) h.push([k,1,.55]);
-    else if(rh==='sparse'&&(k%16===0||k%16===10)) h.push([k,2,.7]);
-    else if(rh==='fib'&&k%2===0&&c.p.word[(k/2)%c.p.word.length]==='1') h.push([k,2,.5]);
-    else if(rh==='euclid'&&eu[k%16]) h.push([k,1,.6]);
-  } return h; }
+/* ===================================================================================
+   PUZZLES: every shell is a sequence y_n. The graph shows y_0 … y_{N-1}.
+   The shell is LIVE if y_N < y_{N-1} (the graph goes down, f/4), BLANK if y_N > y_{N-1} (up, 2f).
+   Each family has free parameters, so the supply is endless; a family is accepted only when
+   its next term goes the way the magazine needs.
+   =================================================================================== */
+const NV=80, A=f=>Array.from({length:NV},(_,n)=>f(n));
+const Y=`${I('y')}<sub>${I('n')}</sub>`, NN=I('n');
+const yk=k=>`${I('y')}<sub>${k}</sub>`;
+const term=(k,x)=>k===0?'':k===1?x:k+x;
+const ALPHA={'φ':(1+Math.sqrt(5))/2,'√2':Math.SQRT2,'√3':Math.sqrt(3),'e':Math.E,'π':Math.PI};
+const PRIMES=(()=>{ const p=[]; for(let n=2;p.length<160;n++){ if(p.every(q=>q*q>n||n%q)) p.push(n); } return p; })();
+const isPrime=n=>n>1&&PRIMES.includes(n);
+const popc=n=>{let c=0;while(n){c+=n&1;n>>=1;}return c;};
+const nu2=n=>{let c=0;while(n>0&&n%2===0){n/=2;c++;}return c;};
+const dsum=n=>String(n).split('').reduce((a,c)=>a+(+c),0);
+const ndiv=n=>{let c=0; for(let d=1;d*d<=n;d++) if(n%d===0) c+=d*d===n?1:2; return c;};
+function periodOf(v,from=6){ for(let P=1;P<=40;P++){ let ok=true; for(let i=from;i+P<NV;i++) if(v[i]!==v[i+P]){ok=false;break;} if(ok) return P; } return 0; }
+function setFact(v,m){ const s=[...new Set(v.slice(0,48))].sort((a,b)=>a-b); return s.length<m?`по модулю ${m} бывают только ${s.join(', ')}`:`обходит все ${m} остатков`; }
+const SHAPES=[[0,2,4],[0,2,4,7],[0,1,3],[0,2,3,5],[0,3,2,5],[0,1,2,4],[0,4,2,6],[0,2,4,5,7],[0,3,5,7,8]];
 
-/* ================= lead patch, shaped by the mood ================= */
-function makePatch(R,mood){
-  const pool={tense:[['sawtooth',3],['square',3]],neutral:[['square',5],['p25',2],['sawtooth',1]],relaxed:[['triangle',4],['square',1],['p25',1]]}[mood];
-  const wave=rw(R,pool);
-  return {wave,cut:{tense:3200+R()*1800,neutral:2600+R()*1400,relaxed:1300+R()*700}[mood],q:.8+R()*1.5,drive:mood==='tense'?4+R()*6:0,
-    glide:.06,swoop:mood==='relaxed'?1.5:2,level:{square:.055,sawtooth:.05,p25:.05,triangle:.13}[wave]};
+const FAM=[
+  {id:'arith',lv:1,w:3,look:'steps',gen(R){ const m=ri(R,5,9), a=ri(R,1,m-1), b=ri(R,0,m-1), neg=R()<.35; const v=A(n=>mod(b+(neg?-a:a)*n,m));
+    return {v,html:`${Y} = (${b} ${neg?'−':'+'} ${term(a,NN)}) mod ${m}`,cap:a===1?`по ${neg?'−':'+'}1 за шаг, по кругу из ${m}: пила со сбросом`:`шаг ${neg?'−':'+'}${a} по кругу из ${m} остатков`}; }},
+  {id:'sine',lv:1,w:4.5,look:'smooth',gen(R,c){ const Am=ri(R,2,4), P=rp(R,[5,6,7,8,9,10,11,12]), ph=ri(R,0,P-1), hide=c.lv>=3&&R()<.6;
+    const f=x=>Am*Math.sin(2*Math.PI*(x+ph)/P);
+    for(let n=0;n<P;n++){ const fr=Math.abs(f(n))%1; if(Math.abs(fr-.5)<.04) return null; }
+    const v=A(n=>Math.round(f(n))+Am), Ph=hide?'<b class="q">P</b>':P;
+    return {v,curve:x=>Am+f(x),html:`${Y} = ${Am} + round(${Am}·sin(2π(${NN} + ${ph})/${Ph}))`,htmlRev:hide?`${Y} = ${Am} + round(${Am}·sin(2π(${NN} + ${ph})/${P}))`:null,
+      sub:hide?`период ${I('P')} прочитайте по графику`:null,cap:`синус с периодом ${hide?I('P'):P}, округлённый до целых`}; }},
+  {id:'saw2',lv:2,w:2,look:'steps',gen(R){ const a=ri(R,2,5); let b=ri(R,2,6); if(b===a) return null; const v=A(n=>n%a+n%b), L=a*b/gcd(a,b);
+    return {v,html:`${Y} = (${NN} mod ${a}) + (${NN} mod ${b})`,cap:`две пилы длины ${a} и ${b}: узор повторяется через НОК = ${L}`}; }},
+  {id:'quad',lv:2,w:3,look:'steps',gen(R){ const m=rp(R,[5,7,8,9,10]), a=ri(R,1,2), b=ri(R,0,m-1), c=ri(R,0,m-1); const v=A(n=>mod(a*n*n+b*n+c,m));
+    const t=[term(a,NN+'<sup>2</sup>'),b?term(b,NN):'',c?String(c):''].filter(Boolean);
+    return {v,html:`${Y} = (${t.join(' + ')}) mod ${m}`,cap:(b===0&&c===0?'квадрат ':'многочлен ')+setFact(v,m)}; }},
+  {id:'tri',lv:2,w:2,look:'steps',gen(R){ const m=ri(R,3,6), a=ri(R,1,3), b=ri(R,0,2*m-1); const v=A(n=>Math.abs(mod(a*n+b,2*m)-m));
+    return {v,html:`${Y} = | (${term(a,NN)} + ${b}) mod ${2*m} − ${m} |`,cap:'остаток, сложенный пополам: треугольная волна'}; }},
+  {id:'lcg',lv:2,w:3,look:'steps',gen(R){ const m=rp(R,[7,8,9,10,11]), a=ri(R,2,m-1), c=ri(R,1,m-1); let x=ri(R,0,m-1); const x0=x; const v=A(()=>{ const r=x; x=(a*x+c)%m; return r; }); const P=periodOf(v,0);
+    return {v,html:`${I('y')}<sub>${I('n')}+1</sub> = (${a}${Y} + ${c}) mod ${m}`,sub:`${yk(0)} = ${x0}`,cap:P===m?'генератор полного периода: каждое число ровно раз за круг':`генератор застревает в цикле длины ${P}`}; }},
+  {id:'figur',lv:2,w:2,look:'steps',gen(R){ const T=rp(R,[['треугольные',`${NN}(${NN}+1)/2`,n=>n*(n+1)/2],['квадраты',`${NN}<sup>2</sup>`,n=>n*n],['пятиугольные',`${NN}(3${NN}−1)/2`,n=>n*(3*n-1)/2],['тетраэдрические',`${NN}(${NN}+1)(${NN}+2)/6`,n=>n*(n+1)*(n+2)/6]]);
+    const m=rp(R,[5,6,7,8,9]); const v=A(n=>T[2](n)%m); const P=periodOf(v,0); let pal=false; if(P){ const s=v.slice(0,P); pal=s.every((x,i)=>x===s[P-1-i]); }
+    return {v,html:`${Y} = ${T[1]} mod ${m}`,cap:`${T[0]} числа mod ${m}: ${pal?'период читается одинаково с конца':P?'период '+P:'без короткого периода'}`}; }},
+  {id:'mirror',lv:2,w:3,look:'mirror',gen(R,c){
+    const shp=SHAPES.filter(s=>c.N%s.length!==0); if(!shp.length) return null;
+    const mot=rp(R,shp), L=mot.length;
+    const rules=[['alt',2],['m3',3],['tm',4],['pr',5]].filter(r=>r[1]<=c.lv), rule=rp(R,rules)[0];
+    const sg=k=>rule==='alt'?(k%2?-1:1):rule==='m3'?(k%3===2?-1:1):rule==='tm'?(popc(k)%2?-1:1):(isPrime(k)?-1:1);
+    const move=rule==='alt'&&R()<.5?'last':'cyc', dl=ri(R,1,3), mm=ri(R,3,5);
+    const ax=[], v=[]; for(let k=0,a=0;v.length<NV;k++){ if(move==='cyc') a=dl*k%mm; ax.push(a); const s=sg(k); for(let j=0;j<L;j++) v.push(a+s*mot[j]); if(move==='last') a=a+s*mot[L-1]; } v.length=NV;
+    const rh={alt:`σ<sub>${I('k')}</sub> = (−1)<sup>${I('k')}</sup>`,m3:`σ<sub>${I('k')}</sub> = −1, если ${I('k')} mod 3 = 2`,tm:`σ<sub>${I('k')}</sub> = (−1)<sup>s₂(${I('k')})</sup> (Туэ — Морс)`,pr:`σ<sub>${I('k')}</sub> = −1, если ${I('k')} простое`}[rule];
+    const mh=move==='last'?`зеркало ${I('a')}<sub>${I('k')}+1</sub> — последняя нота отрезка`:`зеркало ${I('a')}<sub>${I('k')}</sub> = ${term(dl,I('k'))} mod ${mm}`;
+    return {v,axes:ax,L,html:`${Y} = ${I('a')}<sub>${I('k')}</sub> + σ<sub>${I('k')}</sub>·(${mot.join(', ')})<sub>${I('j')}</sub>`,
+      sub:`${I('k')} = ⌊${NN}/${L}⌋, ${I('j')} = ${NN} mod ${L}; ${rh}; ${mh}`,cap:'σ = −1 переворачивает мотив в зеркале: верх становится низом, минор — мажором'}; }},
+  {id:'fib',lv:3,w:3,look:'steps',gen(R){ const m=rp(R,[5,6,7,8,9,10]), p=ri(R,1,2), q=ri(R,1,2); let a=ri(R,0,m-1), b=ri(R,1,m-1); const a0=a,b0=b; const v=A(()=>{ const r=a; [a,b]=[b,(p*b+q*a)%m]; return r; }); const P=periodOf(v,0);
+    return {v,html:`${Y} = (${term(p,yk(NN+'−1'))} + ${term(q,yk(NN+'−2'))}) mod ${m}`,sub:`${yk(0)} = ${a0}, ${yk(1)} = ${b0}`,cap:p===1&&q===1?`Фибоначчи по модулю ${m}${P?': период Пизано '+P:''}`:`линейная рекуррента по модулю ${m}${P?', период '+P:''}`}; }},
+  {id:'pow',lv:3,w:2,look:'stems',gen(R){ const m=rp(R,[5,7,9,10,11]), a=ri(R,2,m-1), c=ri(R,1,Math.min(3,m-1)); if(gcd(a,m)!==1||gcd(c,m)!==1) return null; let x=c%m; const v=A(()=>{ const r=x; x=x*a%m; return r; }); const P=periodOf(v,0);
+    return {v,html:`${Y} = ${c>1?c+'·':''}${a}<sup>${NN}</sup> mod ${m}`,cap:`степени ${a} по модулю ${m} ходят по кругу длины ${P}`}; }},
+  {id:'popc',lv:3,w:2,look:'stems',gen(R){ const c=ri(R,0,40), k=rp(R,[1,1,3,5]); const v=A(n=>popc(k*n+c));
+    return {v,html:`${Y} = s<sub>2</sub>(${term(k,NN)} + ${c})`,sub:'s₂(x) — число единиц в двоичной записи x',cap:'+1 добавляет единицу, а каждый перенос стирает одну'}; }},
+  {id:'ruler',lv:3,w:1.5,look:'stems',gen(R){ const c=ri(R,1,24); const v=A(n=>nu2(n+c));
+    return {v,html:`${Y} = ν<sub>2</sub>(${NN} + ${c})`,sub:'ν₂(x) — сколько раз x делится на 2',cap:'линейка: каждое второе — 0, каждое четвёртое — не меньше 2'}; }},
+  {id:'digsum',lv:3,w:2,look:'steps',gen(R){ const a=ri(R,2,9), c=ri(R,0,30), m=rp(R,[0,7,9]); const v=A(n=>m?dsum(a*n+c)%m:dsum(a*n+c));
+    return {v,html:`${Y} = S(${a}${NN} + ${c})${m?' mod '+m:''}`,sub:'S(x) — сумма десятичных цифр x',cap:m===9?'по модулю 9 сумма цифр равна остатку самого числа':'сумма цифр проваливается на каждом переносе'}; }},
+  {id:'gcd',lv:3,w:1.5,look:'stems',gen(R){ const m=rp(R,[6,8,9,10]), c=ri(R,0,m-1); const v=A(n=>gcd(n+c,m));
+    return {v,html:`${Y} = НОД(${NN} + ${c}, ${m})`,cap:`НОД с ${m} зависит только от остатка по модулю ${m}`}; }},
+  {id:'sqfl',lv:3,w:1.5,look:'steps',gen(R){ const k=ri(R,2,6), m=rp(R,[5,7,8,9]), c=ri(R,0,9); const v=A(n=>Math.floor((n+c)*(n+c)/k)%m);
+    return {v,html:`${Y} = ⌊(${NN} + ${c})<sup>2</sup>/${k}⌋ mod ${m}`,cap:'парабола, разрезанная по модулю'}; }},
+  {id:'ndiv',lv:4,w:1.5,look:'stems',gen(R){ const c=ri(R,1,30); const v=A(n=>ndiv(n+c));
+    return {v,html:`${Y} = d(${NN} + ${c})`,sub:'d(x) — число делителей x',cap:'у простых ровно 2 делителя, у квадратов — нечётное число'}; }},
+  {id:'beatty',lv:4,w:2,look:'steps',gen(R){ const k=rp(R,Object.keys(ALPHA)), a=ALPHA[k], m=rp(R,[5,6,7,8]), c=ri(R,1,9); const v=A(n=>Math.floor((n+c)*a)%m);
+    return {v,html:`${Y} = ⌊(${NN} + ${c})·${k}⌋ mod ${m}`,sub:`${k} ≈ ${a.toFixed(5)}`,cap:`последовательность Битти: шаги ⌊${I('n')}·${k}⌋ бывают только ${Math.floor(a)} и ${Math.floor(a)+1}`}; }},
+  {id:'collatz',lv:4,w:1.5,look:'steps',gen(R){ const s0=rp(R,[7,9,11,15,19,25,27,31,41,47,54,73,97]), m=rp(R,[5,6,7,8]); let c=s0; const v=A(()=>{ const r=c; c=c%2?3*c+1:c/2; return r%m; });
+    return {v,html:`${I('c')}<sub>${I('n')}+1</sub> = ${I('c')}<sub>${I('n')}</sub>/2 или 3${I('c')}<sub>${I('n')}</sub>+1, &nbsp;${Y} = ${I('c')}<sub>${I('n')}</sub> mod ${m}`,sub:`${I('c')}<sub>0</sub> = ${s0}`,cap:'Коллатц: чётное — пополам, нечётное — 3c + 1'}; }},
+  {id:'prime',lv:4,w:1.5,look:'stems',gen(R){ const m=rp(R,[6,8,10]), c=ri(R,2,30); const v=A(n=>PRIMES[n+c]%m); const s=[...new Set(v)].sort((a,b)=>a-b);
+    return {v,html:`${Y} = ${I('p')}<sub>${I('n')}+${c}</sub> mod ${m}`,sub:`${I('p')}<sub>${I('k')}</sub> — простые: ${I('p')}<sub>0</sub> = 2, ${I('p')}<sub>1</sub> = 3, 5, 7, 11, …`,cap:`большие простые mod ${m} бывают только ${s.join(', ')}`}; }},
+  {id:'gap',lv:4,w:1,look:'stems',gen(R){ const c=ri(R,2,50); const v=A(n=>(PRIMES[n+c+1]-PRIMES[n+c])/2);
+    return {v,html:`${Y} = (${I('p')}<sub>${I('n')}+${c+1}</sub> − ${I('p')}<sub>${I('n')}+${c}</sub>) / 2`,sub:`${I('p')}<sub>${I('k')}</sub> — простые: ${I('p')}<sub>0</sub> = 2, ${I('p')}<sub>1</sub> = 3, 5, 7, …`,cap:'половина промежутка между соседними простыми'}; }},
+  {id:'recaman',lv:5,w:1,look:'steps',gen(R){ const m=rp(R,[6,7,8,9]); const seen=new Set([0]); let a=0; const v=A(n=>{ if(n>0){ const b=a-n; a=(b>0&&!seen.has(b))?b:a+n; seen.add(a); } return a%m; });
+    return {v,html:`${I('a')}<sub>${I('n')}</sub> = ${I('a')}<sub>${I('n')}−1</sub> − ${NN}, если там ещё не были, иначе + ${NN}; &nbsp;${Y} = ${I('a')}<sub>${I('n')}</sub> mod ${m}`,sub:`${I('a')}<sub>0</sub> = 0`,cap:'Рекаман: шаг назад, если можно, иначе вперёд'}; }},
+];
+/* ===================================================================================
+   GENERATED FORMULAS: random expression trees in n (or recurrences in y_{n-1}, y_{n-2}),
+   printed as real maths. Not templates with swapped numbers — every tree is built from scratch.
+   =================================================================================== */
+const XPREC={n:9,c:9,y1:9,y2:9,s2:9,ds:9,gcd:9,tri:9,abs:9,fl:9,max:9,min:9,sq:8,mul:7,alt:7,add:6,sub:6,xor:5,md:4,if:1};
+const XDEF={s2:'s₂(x) — число единиц в двоичной записи x',ds:'S(x) — сумма цифр x',gcd:'НОД — наибольший общий делитель',tri:'T(x) = x(x+1)/2',xor:'⊕ — побитовое исключающее «или»'};
+function xgen(R,d,o){
+  const leaf=()=>{ const r=R(); if(o.rec&&r<.5) return o.rec===2&&R()<.45?{k:'y2'}:{k:'y1'}; return r<.82?{k:'n'}:{k:'c',v:ri(R,2,9)}; };
+  if(d<=0) return leaf();
+  const k=rw(R,[['add',4],['sub',2.5],['mul',3],['sq',1.5],['fl',2],['abs',1.3],['s2',1.2],['ds',1],['gcd',1],['tri',.9],['alt',.7],['if',1.4],['xor',.9],['max',.6],['min',.6],['md',.8],['leaf',1.6]]);
+  const X=()=>xgen(R,d-1,o), C=(a,b)=>({k:'c',v:ri(R,a,b)});
+  switch(k){
+    case 'leaf': return leaf();
+    case 'add': case 'sub': case 'xor': case 'max': case 'min': { const a=X(), b=R()<.45?C(1,9):X(); return {k,a,b}; }
+    case 'mul': return {k,c:ri(R,2,7),a:X()};
+    case 'sq': case 's2': case 'ds': case 'tri': case 'alt': return {k,a:X()};
+    case 'fl': return {k,a:X(),c:ri(R,2,5)};
+    case 'abs': return {k,a:X(),c:ri(R,2,12)};
+    case 'gcd': return {k,a:X(),c:rp(R,[4,6,8,9,10,12])};
+    case 'md': return {k,a:X(),c:ri(R,3,6)};
+    case 'if': { const m=ri(R,2,4); return {k,m,r:ri(R,0,m-1),a:X(),b:X()}; }
+  }
+  return leaf();
+}
+function xev(x,e){
+  switch(x.k){
+    case 'n': return e.n; case 'c': return x.v; case 'y1': return e.y1; case 'y2': return e.y2;
+    case 'add': return xev(x.a,e)+xev(x.b,e); case 'sub': return xev(x.a,e)-xev(x.b,e); case 'mul': return x.c*xev(x.a,e);
+    case 'sq': { const v=xev(x.a,e); return v*v; }
+    case 'fl': return Math.floor(xev(x.a,e)/x.c); case 'abs': return Math.abs(xev(x.a,e)-x.c);
+    case 's2': { const v=xev(x.a,e); return v<0||v>2e9?NaN:popc(v); } case 'ds': { const v=xev(x.a,e); return v<0?NaN:dsum(v); }
+    case 'gcd': return gcd(Math.abs(xev(x.a,e)),x.c); case 'tri': { const v=xev(x.a,e); return v*(v+1)/2; }
+    case 'alt': return (e.n%2?-1:1)*xev(x.a,e); case 'md': return mod(xev(x.a,e),x.c);
+    case 'if': return mod(e.n,x.m)===x.r?xev(x.a,e):xev(x.b,e);
+    case 'xor': { const a=xev(x.a,e), b=xev(x.b,e); return a<0||b<0||a>2e9||b>2e9?NaN:(a^b); }
+    case 'max': return Math.max(xev(x.a,e),xev(x.b,e)); case 'min': return Math.min(xev(x.a,e),xev(x.b,e));
+  }
+  return NaN;
+}
+function xh(x){
+  const w=(c,min)=>XPREC[c.k]<min?`(${xh(c)})`:xh(c), atomVar=c=>c.k==='n'||c.k==='y1'||c.k==='y2';
+  switch(x.k){
+    case 'n': return I('n'); case 'c': return String(x.v); case 'y1': return yk(I('n')+'−1'); case 'y2': return yk(I('n')+'−2');
+    case 'add': return `${w(x.a,6)} + ${w(x.b,6)}`; case 'sub': return `${w(x.a,6)} − ${w(x.b,7)}`;
+    case 'mul': return atomVar(x.a)?`${x.c}${xh(x.a)}`:`${x.c}·${w(x.a,8)}`;
+    case 'sq': return `${w(x.a,9)}<sup>2</sup>`;
+    case 'fl': return `⌊${w(x.a,7)}/${x.c}⌋`; case 'abs': return `|${w(x.a,2)} − ${x.c}|`;
+    case 's2': return `s<sub>2</sub>(${w(x.a,2)})`; case 'ds': return `S(${w(x.a,2)})`; case 'gcd': return `НОД(${w(x.a,2)}, ${x.c})`; case 'tri': return `T(${w(x.a,2)})`;
+    case 'alt': return `(−1)<sup>${I('n')}</sup>·${w(x.a,8)}`; case 'md': return `${w(x.a,6)} mod ${x.c}`;
+    case 'xor': return `${w(x.a,9)} ⊕ ${w(x.b,9)}`; case 'max': case 'min': return `${x.k}(${w(x.a,2)}, ${w(x.b,2)})`;
+    case 'if': return `${xh(x.a)}, если ${I('n')} mod ${x.m} = ${x.r}; иначе ${xh(x.b)}`;
+  }
+  return '?';
+}
+const xwalk=(x,f)=>{ f(x); ['a','b'].forEach(c=>x[c]&&xwalk(x[c],f)); };
+function genFormula(R,c){
+  const lv=c.lv, rec=R()<(lv>=3?.3:.15)?(R()<.35?2:1):0;
+  let x=xgen(R,lv<=2?2:lv===3?3:4,{rec,lv});
+  let size=0, hasN=false, hasY=false, trivial=false; const kinds=new Set();
+  /* reject what a person would simplify at a glance: n + n, 3n − n, |n + 9 − 12|, 2·(3·n), (−1)ⁿ·(−1)ⁿ… */
+  const isVar=z=>z.k==='n'||z.k==='y1'||z.k==='y2', lin=z=>isVar(z)||(z.k==='mul'&&isVar(z.a)), varOf=z=>z.k==='mul'?z.a.k:z.k;
+  const hasC=z=>(z.k==='add'||z.k==='sub')&&(z.a.k==='c'||z.b.k==='c');
+  xwalk(x,z=>{ size++; kinds.add(z.k); if(z.k==='n') hasN=true; if(z.k==='y1'||z.k==='y2') hasY=true;
+    if(z.a&&z.b&&z.a.k==='c'&&z.b.k==='c') trivial=true; if(z.a&&!z.b&&z.a.k==='c') trivial=true;
+    if((z.k==='add'||z.k==='sub')&&lin(z.a)&&lin(z.b)&&varOf(z.a)===varOf(z.b)) trivial=true;
+    if((z.k==='add'||z.k==='sub')&&((z.a.k==='c'&&hasC(z.b))||(z.b.k==='c'&&hasC(z.a)))) trivial=true;
+    if(z.k==='abs'&&hasC(z.a)) trivial=true; if(z.k==='mul'&&z.a.k==='mul') trivial=true; if(z.k==='alt'&&z.a.k==='alt') trivial=true;
+    if(z.k==='md'&&z.a.k==='md') trivial=true; if(z.k==='sq'&&z.a.k==='sq') trivial=true; if(z.k==='fl'&&z.a.k==='mul'&&z.a.c%z.c===0) trivial=true; });
+  if(x.k==='md') trivial=true;   /* (… mod 6) mod 7: the outer mod would be decoration */
+  const NONLIN=['sq','fl','abs','s2','ds','gcd','tri','alt','if','xor','max','min','md'];
+  if(!NONLIN.some(k=>kinds.has(k))&&rec!==2) trivial=true;   /* purely linear ones are the arithmetic family's job */
+  if(size<[0,3,4,5,6,6][lv]) trivial=true;
+  if(trivial||size<3||size>[0,4,6,8,10,12][lv]||!(hasN||hasY)||(rec&&!hasY)) return null;
+  const m=ri(R,5,10), fold=!rec&&R()<.18, y0=ri(R,0,m-1), y1=ri(R,0,m-1), lim=[0,800,3000,20000,90000,300000][lv], W=c.N+c.M+2;
+  const seq=(t,len)=>{ const v=[]; let big=0;
+    for(let n=0;n<len;n++){ if(rec&&n<rec){ v.push(n?y1:y0); continue; }
+      const raw=xev(t,{n,y1:v[n-1],y2:v[n-2]}); if(!Number.isFinite(raw)) return null; if(n<W) big=Math.max(big,Math.abs(raw));
+      v.push(fold?Math.abs(mod(raw,2*m)-m):mod(raw,m)); }
+    v.big=big; return v; };
+  const v=seq(x,NV); if(!v||v.big>lim) return null;
+  /* every piece must matter: if a node can be swapped for one of its own parts without changing
+     the visible sequence (n + n, min(x, 8) where x < 8, equal if-branches, a mod inside a bigger mod…), drop the formula */
+  const same=(a,b)=>a&&b&&a.every((q,i)=>q===b[i]), key=v.slice(0,W).join(',');
+  let redundant=false;
+  const test=(node,set)=>{ for(const ch of ['a','b']){ if(!node[ch]||redundant) continue; const keep=node[ch]; set(keep); const w=seq(x,W); set(node); if(w&&w.join(',')===key) redundant=true; } };
+  const visit=(node,set)=>{ if(redundant) return; if(node.a&&node.b&&JSON.stringify(node.a)===JSON.stringify(node.b)) redundant=true;
+    test(node,set); ['a','b'].forEach(ch=>{ if(node[ch]) visit(node[ch],z=>{ node[ch]=z; }); }); };
+  let root=x; visit(x,z=>{ root=z; x=z; }); x=root; if(redundant) return null;
+  const body=XPREC[x.k]>=9?xh(x):`(${xh(x)})`;
+  const html=fold?`${Y} = | ${body} mod ${2*m} − ${m} |`:`${Y} = ${body} mod ${m}`;
+  const defs=[...kinds].filter(k=>XDEF[k]).map(k=>XDEF[k]);
+  if(rec) defs.unshift(rec===2?`${yk(0)} = ${y0}, ${yk(1)} = ${y1}`:`${yk(0)} = ${y0}`);
+  const P=periodOf(v,0), vals=[...new Set(v.slice(0,40))].sort((a,b)=>a-b);
+  const cap=(P?`узор повторяется каждые ${P} ${plural(P,'шаг','шага','шагов')}`:`за ${NV} шагов узор не повторился`)+(vals.length<(fold?m+1:m)?`; бывают только ${vals.join(', ')}`:'');
+  return {v,html,sub:defs.join('; ')||null,cap,gen:true,size,look:'theme'};
 }
 
-/* ================= a shell = concept + melody + rhythm + sound, all in F ================= */
-function makeShell(seed,mood,fixed){
-  const R=mulberry(seed);
-  const def=fixed?null:pickConcept(R,mood);
-  const c=fixed||def.make(R);
-  c.id=fixed?'mag':def.id; c.p=c.p||{};
-  return {seed,mood,mode:rp(R,MODES[mood]),c,P:makePatch(R,mood)};
+/* ===================================================================================
+   THEME: everything musical and visual that belongs to one formula grows from its hash.
+   Synth patches are built from continuous random spectra and ratios, so no two are alike.
+   =================================================================================== */
+function hashStr(s){ let h=0x811c9dc5; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); } return h>>>0; }
+const euclid=(k,N,rot)=>Array.from({length:N},(_,i)=>{ const j=mod(i+rot,N); return Math.floor(k*j/N)!==Math.floor(k*(j-1)/N)?1:0; });
+function hitsFrom0(R,k){ const h=euclid(k,16,ri(R,0,15)), f=h.indexOf(1); return h.slice(f).concat(h.slice(0,f)); }
+/* note rhythm of a bar: 4–8 onsets (Euclid), so a graph is never a blur and never a crawl */
+function genRhythm(R){
+  const h=hitsFrom0(R,rw(R,[[4,.8],[5,2],[6,3],[7,2.2],[8,2.5]])), on=[]; h.forEach((x,i)=>x&&on.push(i));
+  const durs=on.map((s,i)=>(i+1<on.length?on[i+1]:16)-s);
+  if(durs.length<8&&R()<.22){ const i=durs.findIndex(d=>d===2); if(i>=0) durs.splice(i,1,1,1); }
+  return durs;
 }
-function pitchOf(S,v){
-  const st=S.mode[1], k=S.c.kind;
-  if(k==='semi') return 24+v;
-  if(S.c.voice==='reese') return 24+degSemi(st,v);
-  if(k==='shep') return 24+degSemi(st,mod(v,st.length));
-  if(k==='harm') return 12+12*Math.log2(v);
-  let s=24+degSemi(st,v); while(s>40) s-=12; while(s<14) s+=12; return s;
+function makeLeadPatch(R){
+  const arch=rw(R,[['spec',3],['fm',3],['dual',2.2],['shape',2]]);
+  const L={id:newSeed(),arch,att:rf(R,.002,.025),dec:rf(R,.06,.35),sus:rf(R,.35,.85),rel:rf(R,.02,.07),swoop:R()<.5?1:1+rf(R,.004,.02),
+    vib:{rate:rf(R,4.5,6.5),depth:R()<.55?rf(R,4,14):0,delay:rf(R,.05,.2)},uni:R()<.4?2:1,det:rf(R,4,14)};
+  if(arch==='spec'){ const tilt=rf(R,.6,1.6), oddOnly=R()<.35, f0=rf(R,2,9), fw=rf(R,.8,3), fg=rf(R,0,2.2);
+    L.h=[0]; for(let k=1;k<28;k++){ let a=Math.pow(R(),.6)*Math.pow(k,-tilt)*(1+fg*Math.exp(-Math.pow((k-f0)/fw,2))); if(oddOnly&&k%2===0) a*=rf(R,0,.25); L.h.push(a); }
+    L.kt=rf(R,4,12); L.q=rf(R,.5,3.5); L.env=rf(R,1,2.6); L.lv=.2; }
+  else if(arch==='fm'){ L.cw=rp(R,['sine','sine','triangle']); L.ratio=R()<.7?rp(R,[.5,1,1,1.5,2,2,3,4,5,7]):ri(R,1,4)/ri(R,1,3); L.index=rf(R,.8,5); L.isus=rf(R,.1,.6); L.idec=rf(R,.05,.4);
+    L.m2=R()<.35?{ratio:rp(R,[2,3,4,7,11])/rp(R,[1,2]),index:rf(R,.3,1.5)}:null; L.lv=.24; }
+  else if(arch==='dual'){ const W=['sawtooth','square','triangle','p25','p12']; L.w1=rp(R,W); L.w2=rp(R,W); L.iv=rp(R,[0,0,12,7,19,-12,5]); L.l2=rf(R,.3,.7);
+    L.ft=R()<.75?'lowpass':'bandpass'; L.kt=rf(R,3,10); L.q=rf(R,.7,7); L.env=rf(R,1.2,3.5); L.drive=R()<.35?rf(R,1.5,4):0; L.lv=.18; }
+  else { L.cheb=[1]; for(let k=2;k<=7;k++) L.cheb.push(R()<.6?rf(R,-.7,.7)/Math.sqrt(k-1):0); L.d0=rf(R,.7,1); L.d1=rf(R,.25,.7); L.wave=R()<.7?'sine':'triangle'; L.lv=.2; }
+  return L;
 }
-function buildShell(S,start,pre,post,out){
-  const total=(pre+post)*4, notes=[], c=S.c, st=S.mode[1], mel=c.mel;
-  hitsFor(c,total).forEach(([k,d,leg],j)=>{
-    const v=mel.v[j%mel.v.length], isPost=k>=pre*4;
-    const push=(kk,dd,ll,vv,s)=>{ let sp=isPost?(out?s-24:s+12):s; if(isPost){ while(sp<2) sp+=12; while(sp>53) sp-=12; }
-      const nt={t:start+kk*S16,dur:dd*S16*ll,slot:dd*S16,v:vv,x:mel.lab?mel.lab(vv):vv,s,sp,post:isPost,k:kk}; notes.push(nt); return nt; };
-    if(c.kind==='arp'){ const sh=c.p.shape; for(let i=0;i<4;i++){ const dv=v+sh[i], s=pitchOf(S,dv); push(k+i,1,.9,dv,s); } return; }
-    const s=pitchOf(S,v), nt=push(k,d,leg,v,s);
-    const u=Math.max(0,Math.min(1,k/(pre*4)));
-    if(c.id==='crush') nt.bits=Math.round(c.p.b0+(c.p.b1-c.p.b0)*u);
-    if(c.id==='fold') nt.g=1+(c.p.gmax-1)*u;
-    if(c.id==='pwm') nt.duty=.5+c.p.a*Math.sin(2*Math.PI*c.p.r*k*S16);
-    if(c.id==='acid') nt.acc=mod(v,2)===0?1:.6;
-    if(c.kind==='chord'){ const base=v; nt.ch=[0,2,4].map(x=>{ let p=24+degSemi(st,base+x); while(p>40) p-=12; return p; }).sort((a,b)=>a-b); nt.chp=nt.ch.map(p=>p+(nt.sp-nt.s)); }
-    if(c.kind==='shep'){ nt.cp=[-1,0,1,2].map(cc=>{ const cs=s+12*cc, y=(cs-30)/14; return {s:cs,a:Math.exp(-y*y)}; }); }
-  });
-  return {S,start,trig:start+pre*BEAT,end:start+(pre+post)*BEAT,pre,post,out,notes,answer:null,at:0,onbeat:false,resolved:false,pNaive:0,pExact:0};
+function makeBellPatch(R){
+  const kind=rw(R,[['partials',3],['fm',2],['pluck',1]]), B={id:newSeed(),kind};
+  if(kind==='partials'){ const pool=[2,2.756,3,3.5,4.07,5.4,6.8,8.9,11.3], n=ri(R,3,6), base=rf(R,.8,2.2), sl=rf(R,.3,.8);
+    B.p=[{r:1,a:1,d:base}]; for(let i=1;i<n;i++){ const r=(R()<.7?rp(R,pool):rf(R,1.5,9.5))*(1+rf(R,-.02,.02)); B.p.push({r,a:rf(R,.15,.6)/Math.sqrt(i+1),d:base/Math.pow(r,sl)}); }
+    const tot=B.p.reduce((s,q)=>s+q.a,0); B.p.forEach(q=>q.a/=tot); B.lv=.42; }
+  else if(kind==='fm'){ B.ratio=rf(R,2.4,4.6); B.index=rf(R,1,3.2); B.idec=rf(R,.12,.4); B.dec=rf(R,.9,2); B.lv=.32; }
+  else { B.damp=rf(R,.4935,.4985); B.bright=rf(R,2500,8000); B.lv=.75; }
+  return B;
+}
+function makeTheme(h,song){
+  const R=mulberry(h^0x2545F491), V=[[0,1,4],[0,3,4],[0,4,7],[0,1,4,8],[0,4,6]];
+  return {id:h, lead:makeLeadPatch(R), bell:makeBellPatch(R), leg:rf(R,.5,.95), accEvery:ri(R,2,4), accAmt:rf(R,.55,.85),
+    l808:{glide:R()<.6,drive:song.l808.drive*rf(R,.75,1.35),tone:song.l808.tone*rf(R,.8,1.25),knock:rf(R,.025,.06)},
+    drums:{kick:hitsFrom0(R,rw(R,[[2,2],[3,3],[4,3],[5,1.5]])),hat:euclid(rp(R,[4,6,8,8,10,12]),16,ri(R,0,15)),hatAmp:rf(R,.07,.12),
+      perc:R()<.6?{steps:euclid(rp(R,[3,5,7]),16,ri(R,0,15)),snd:rp(R,['tick','rim','shaker']),f:rf(R,900,2600)}:null},
+    acc:(()=>{ const type=rw(R,[['pad',3],['stab',2],['arp',2],['bass',2.5],['none',1]]);
+      return {type,voice:rp(R,V),wave:rp(R,['triangle','sawtooth','square']),cut0:rf(R,400,800),open:rf(R,1.6,3),steps:hitsFrom0(R,rp(R,[3,4,5,6])),
+        dec:rf(R,.08,.22),rate:R()<.6?2:1,drive:rf(R,1,3),pat:rp(R,['formula','up','updown'])}; })(),
+    look:{trace:rw(R,[['steps',3],['dots',2],['spline',2],['bars',1.5],['area',1.5],['pulse',1.5],['stems',1]]),marker:rp(R,['none','circle','diamond','square','ring']),width:rf(R,1.7,2.7),glow:rf(R,.6,1.1),dash:R()<.3}};
+}
+const LVL_W=(f,lv)=>f.lv>lv?0:f.w*(f.lv===lv?1.7:1);
+/* last shell of a round: the walk of the whole magazine. live = step down, blank = step up */
+function walkPuzzle(bits,N,M){
+  const n=bits.length, k=sum(bits), w=[0]; bits.forEach(b=>w.push(w[w.length-1]+(b?-1:1)));
+  const v=new Array(NV).fill(0);
+  for(let j=0;j<NV;j++){ if(j<N) v[j]=w[Math.floor(j*n/N)]; else if(j===N) v[j]=w[n]; else v[j]=w[Math.floor((j-N-1)*(n+1)/Math.max(1,M-1))%(n+1)]; }
+  return {fam:'walk',look:'walk',v,target:n-2*k,idx:j=>j<N?Math.floor(j*n/N):n,
+    html:`${yk(I('k'))} = Σ<sub>${I('i')} ≤ ${I('k')}</sub> (1 − 2${I('b')}<sub>${I('i')}</sub>)`,
+    sub:`в магазине ${k} ${plural(k,'боевой','боевых','боевых')} из ${n} ⇒ ${yk(n)} = ${n} − 2·${k} = ${n-2*k}`,cap:'финал: магазин — это блуждание, боевой = шаг вниз. Где оно обязано закончиться?'};
+}
+const SEEN=new Set();   /* formulas already shown this page load: a generated one never comes back */
+function puzzleOk(P,want,c,minDistinct,minTurns){
+  const v=P.v, N=c.N, win=v.slice(0,N+c.M), pre=v.slice(0,N);
+  const lo=Math.min(...win), hi=Math.max(...win); if(hi-lo>9) return false;
+  if(new Set(pre).size<minDistinct) return false;
+  const d=v[N]-v[N-1]; if(d===0||(want?d>0:d<0)) return false;
+  const ds=[]; for(let i=1;i<N;i++){ const q=Math.sign(pre[i]-pre[i-1]); if(q) ds.push(q); } let turns=0; for(let i=1;i<ds.length;i++) if(ds[i]!==ds[i-1]) turns++;
+  return turns>=minTurns;
+}
+function pickPuzzle(R,want,c,recent){
+  /* most shells get a freshly grown formula; the named families stay in the mix for their famous facts */
+  const pGen=[0,.4,.6,.7,.75,.8][c.lv]||.7;
+  if(R()<pGen) for(let tries=0;tries<1500;tries++){ const P=genFormula(R,c); if(!P||SEEN.has(P.html)||!puzzleOk(P,want,c,c.lv>=2?4:3,2)) continue;
+    SEEN.add(P.html); P.fam='gen'; P.lv=c.lv; return P; }
+  for(let tries=0;tries<900;tries++){
+    const F=rw(R,FAM.map(f=>[f,LVL_W(f,c.lv)*(recent.includes(f.id)?.12:1)])); if(!F) continue;
+    const P=F.gen(R,c); if(!P||!puzzleOk(P,want,c,3,1)) continue;
+    P.fam=F.id; P.look=P.look||F.look; if(P.look==='steps') P.look='theme'; P.lv=F.lv; return P;
+  }
+  const m=7, a=want?6:1; return {fam:'arith',look:'theme',v:A(n=>mod(a*n,m)),html:`${Y} = ${a}${NN} mod ${m}`,cap:'шаг по кругу'};
+}
+
+/* ===================================================================================
+   SHELL = puzzle + notes + theme. Same object drives the music render and the graph.
+   =================================================================================== */
+function buildShell(o){
+  const {song,rs,seed,want,pre,post,lv,level,crit,final,bits,recent}=o;
+  const R=mulberry(seed), bt=60/song.bpm, s16=bt/4;
+  const pat=final?RHY['8']:genRhythm(R), tot16=(pre+post)*4;
+  const notes=[]; let k16=0, j=0;
+  while(k16<tot16){ for(const d of pat){ if(k16>=tot16) break; notes.push({j:j++,k:k16,d,post:k16>=pre*4}); k16+=d; } }
+  const N=notes.filter(n=>!n.post).length, M=notes.length-N;
+  const puz=final?walkPuzzle(bits,N,M):pickPuzzle(R,want,{lv,N,M},recent||[]);
+  const th=makeTheme(hashStr(puz.html+'|'+puz.v.slice(0,24).join(',')),song);
+  const win=puz.v.slice(0,N+M), lo=Math.min(...win), st=rs.mode.st;
+  notes.forEach(n=>{ const y=puz.v[n.j], d0=14+(y-lo); n.y=y; n.p=n.post?d0+(want?-14:7):d0; n.s=degSemi(st,n.p); n.tr=n.k*s16; n.slot=n.d*s16; n.dur=n.slot*(final?.9:th.leg); n.lab=String(y); n.vel=n.j%th.accEvery===0?1:th.accAmt; });
+  return {seed,song,rs,rhythm:pat.join(''),notes,N,M,puz,th,lo,out:want,pre,post,bt,s16,len:(pre+post)*bt,tr:pre*bt,level,crit:!!crit,final:!!final,
+    qEnd:rw(R,[['riser',2],['stop',2],['roll',1.5],['swell',2]]),qTension:rp(R,[4,4,1,5,3,6]),
+    start:0,answer:null,at:0,onbeat:false,resolved:false,pNaive:0,pExact:0};
+}
+
+/* ===================================================================================
+   MUSIC RENDER. Each shell is rendered offline into one AudioBuffer before it is needed,
+   so the live audio thread only ever plays a couple of buffers: no node storms on phones.
+   =================================================================================== */
+const CURV={};
+function tanhCurve(k){ const key='t'+k.toFixed(2); if(CURV[key]) return CURV[key]; const N=2048,c=new Float32Array(N),d=Math.tanh(k); for(let i=0;i<N;i++){ const x=i/(N-1)*2-1; c[i]=Math.tanh(k*x)/d; } return CURV[key]=c; }
+function foldCurve(){ if(CURV.fold) return CURV.fold; const N=4096,c=new Float32Array(N); for(let i=0;i<N;i++){ const x=i/(N-1)*2-1; c[i]=Math.sin(4*x*Math.PI/2); } return CURV.fold=c; }
+const NOISE={}, IRC={}, KSC={};
+function noiseData(sr){ if(NOISE[sr]) return NOISE[sr]; const R=mulberry(12345), d=new Float32Array(sr); for(let i=0;i<sr;i++) d[i]=R()*2-1; return NOISE[sr]=d; }
+function irData(song,sr){ const key=song.seed+':'+sr; if(IRC[key]) return IRC[key]; const R=mulberry(song.seed^0xabcdef), len=Math.floor(sr*song.verb.dec), out=[];
+  for(let c=0;c<2;c++){ const d=new Float32Array(len); let lp=0; for(let i=0;i<len;i++){ const u=i/len, w=(R()*2-1)*Math.pow(1-u,2.4)*Math.exp(-u*1.6); lp+=(w-lp)*(1-.45*u); d[i]=lp; }
+    for(let e=0;e<7;e++){ const at=Math.floor(sr*(.006+R()*.05)); if(at<len) d[at]+=(R()<.5?-1:1)*(.45-e*.05); } out.push(d); }
+  return IRC[key]=out; }
+function ksData(f,sr,damp=.4985){ const key=Math.round(f*8)+':'+sr+':'+damp; if(KSC[key]) return KSC[key]; const R=mulberry(Math.round(f*100)), len=Math.floor(sr*1.4), P=Math.max(2,Math.round(sr/f)), d=new Float32Array(len);
+  for(let i=0;i<P;i++) d[i]=R()*2-1; for(let i=P;i<len;i++) d[i]=damp*(d[i-P]+d[i-P+1]); return KSC[key]=d; }
+
+function makeEngine(ctx,song){
+  const sr=ctx.sampleRate, BT=60/song.bpm, S=BT/4;
+  const g=(v=0)=>{ const n=ctx.createGain(); n.gain.value=v; return n; };
+  const bq=(type,f,q=.707)=>{ const b=ctx.createBiquadFilter(); b.type=type; b.frequency.value=f; b.Q.value=q; return b; };
+  const pws={}; const pw=d=>{ if(pws[d]) return pws[d]; const N=40,re=new Float32Array(N),im=new Float32Array(N); for(let n=1;n<N;n++) re[n]=2/(n*Math.PI)*Math.sin(n*Math.PI*d); return pws[d]=ctx.createPeriodicWave(re,im); };
+  const osc=(type,f,t)=>{ const o=ctx.createOscillator(); if(type==='p25') o.setPeriodicWave(pw(.25)); else if(type==='p12') o.setPeriodicWave(pw(.125)); else o.type=type; o.frequency.setValueAtTime(f,t); return o; };
+  const shaper=(c,os)=>{ const w=ctx.createWaveShaper(); w.curve=c; w.oversample=os||'none'; return w; };
+  const ch=(...ns)=>{ for(let i=0;i<ns.length-1;i++) ns[i].connect(ns[i+1]); return ns[ns.length-1]; };
+  const nbuf=ctx.createBuffer(1,sr,sr); nbuf.getChannelData(0).set(noiseData(sr));
+  const nz=()=>{ const s=ctx.createBufferSource(); s.buffer=nbuf; s.loop=true; return s; };
+  const hz=s=>song.hz1*Math.pow(2,s/12);
+  const env=(a,t,peak,att,dec)=>{ a.gain.setValueAtTime(0,t); a.gain.linearRampToValueAtTime(peak,t+att); a.gain.setTargetAtTime(0,t+att,dec/4); return t+att+dec*1.3; };
+  /* buses: everything -> soft clip; sends to a seeded room and a tempo delay */
+  const out=g(.6), clip=shaper(tanhCurve(1.3),'2x'); out.connect(clip); clip.connect(ctx.destination);
+  const conv=ctx.createConvolver(), ir=irData(song,sr), irb=ctx.createBuffer(2,ir[0].length,sr); irb.getChannelData(0).set(ir[0]); irb.getChannelData(1).set(ir[1]); conv.buffer=irb;
+  const verb=g(1); ch(verb,bq('highpass',180),bq('lowpass',7000),conv,g(song.verb.wet*2.2),out);
+  const dly=g(1), dl=ctx.createDelay(2); dl.delayTime.value=song.delay.beats*BT; const dlp=bq('lowpass',3800), fb=g(song.delay.fb), dret=g(.55);
+  ch(dly,dl,dlp,fb,dl); dlp.connect(dret); dret.connect(out); dret.connect(verb);
+  const drums=g(1); drums.connect(out); const dverb=g(.28); dverb.connect(verb);
+  const leadBus=g(1); leadBus.connect(out); const lsend=g(.22); leadBus.connect(lsend); lsend.connect(verb);
+  const bellBus=g(1); bellBus.connect(out); const bs1=g(.38), bs2=g(.5); bellBus.connect(bs1); bs1.connect(dly); bellBus.connect(bs2); bs2.connect(verb);
+  const panned=(node,p)=>{ if(!ctx.createStereoPanner) return node; const s=ctx.createStereoPanner(); s.pan.value=p; node.connect(s); return s; };
+
+  /* ---- drums ---- */
+  const K=song.kit;
+  function kick(t,amp){ const k=K.kick, o=osc('sine',k.f0,t), a=g(0); o.frequency.exponentialRampToValueAtTime(k.f1,t+k.pd); o.frequency.exponentialRampToValueAtTime(k.f1*.92,t+k.dec);
+    a.gain.setValueAtTime(0,t); a.gain.linearRampToValueAtTime(amp,t+.002); a.gain.setTargetAtTime(amp*.6,t+.01,.05); a.gain.setTargetAtTime(0,t+.06,k.dec/4);
+    ch(o,shaper(tanhCurve(k.drive)),a,drums); o.start(t); o.stop(t+k.dec*1.4+.1);
+    const n=nz(), b=g(0); env(b,t,amp*k.click,.001,.012); ch(n,bq('highpass',1800),b,drums); n.start(t); n.stop(t+.05); }
+  function clap(t,amp){ const n=nz(), a=g(0); a.gain.setValueAtTime(0,t); [0,.011,.022].forEach(d=>{ a.gain.setValueAtTime(amp,t+d); a.gain.setTargetAtTime(amp*.15,t+d+.001,.004); });
+    a.gain.setValueAtTime(amp*.9,t+.033); a.gain.setTargetAtTime(0,t+.034,K.snDec/4); ch(n,bq('bandpass',K.clapF,1.3),a,drums); a.connect(dverb); n.start(t); n.stop(t+.04+K.snDec*1.4); }
+  function snare(t,amp){ const o=osc('triangle',K.snTone*1.6,t), a=g(0); o.frequency.exponentialRampToValueAtTime(K.snTone,t+.03); env(a,t,amp*.7,.001,.09); ch(o,a,drums); o.start(t); o.stop(t+.16);
+    const n=nz(), b=g(0); env(b,t,amp,.001,K.snDec); ch(n,bq('highpass',1400),b,drums); b.connect(dverb); n.start(t); n.stop(t+K.snDec*1.4+.01); }
+  const back=(t,amp)=>{ if(K.sn==='clap') clap(t,amp); else if(K.sn==='snare') snare(t,amp); else { clap(t,amp*.8); snare(t,amp*.55); } };
+  function hat(t,amp,open){ const n=nz(), f2=bq('peaking',K.hp*1.3,1), a=g(0); f2.gain.value=6; const dec=open?.22:K.hdec; env(a,t,amp,.001,dec); ch(n,bq('highpass',K.hp),f2,a,drums); n.start(t); n.stop(t+dec*1.4+.02); }
+  function cowbell(t,amp,f){ const m=g(.5), a=g(0); [1,1.48].forEach(r=>{ const o=osc('square',f*r,t); o.connect(m); o.start(t); o.stop(t+.45); }); env(a,t,amp,.001,.28); ch(m,bq('bandpass',f*2.2,1.6),a); a.connect(bellBus); }
+  function riser(t,dur,amp){ const n=nz(), f=bq('bandpass',400,2.5), a=g(0); f.frequency.setValueAtTime(400,t); f.frequency.exponentialRampToValueAtTime(7000,t+dur);
+    a.gain.setValueAtTime(0,t); a.gain.linearRampToValueAtTime(amp,t+dur*.97); a.gain.linearRampToValueAtTime(0,t+dur); ch(n,f,a,out); a.connect(verb); n.start(t); n.stop(t+dur+.02); }
+  function impact(t){ kick(t,.75); const n=nz(), a=g(0); env(a,t,.3,.002,.9); ch(n,bq('lowpass',3500),a,out); a.connect(verb); n.start(t); n.stop(t+1.3);
+    const o=osc('sine',hz(12),t), b=g(0); o.frequency.exponentialRampToValueAtTime(hz(0),t+.5); env(b,t,.45,.003,1.1); ch(o,shaper(tanhCurve(3)),b,out); o.start(t); o.stop(t+1.5); }
+  function chime(t,st,airOnly){ if(!airOnly) [0,4,7].forEach((d,i)=>bell('glass',t+i*.035,.4,hz(48+degSemi(st,d)),.55));
+    const n=nz(), a=g(0); a.gain.setValueAtTime(0,t); a.gain.linearRampToValueAtTime(.05,t+.12); a.gain.setTargetAtTime(0,t+.15,.35); ch(n,bq('highpass',6500),a,out); a.connect(verb); n.start(t); n.stop(t+1.8); }
+  function clk(t,amp,f){ const o=osc('sine',f,t), a=g(0); env(a,t,amp,.001,.03); ch(o,a,drums); o.start(t); o.stop(t+.06); }
+  function swell(t,dur){ const n=nz(), a=g(0); a.gain.setValueAtTime(.0005,t); a.gain.exponentialRampToValueAtTime(.11,t+dur-.01); a.gain.linearRampToValueAtTime(0,t+dur); ch(n,bq('highpass',3500),a,out); a.connect(verb); n.start(t); n.stop(t+dur+.02); }
+  /* a suspended chord under the question: sus2/sus4 or an open fifth never settles, so the bar sounds like it is asking */
+  function qChord(t0,t1,deg,sh){ if(t1-t0<.05) return; const st=sh.rs.mode.st, type=sh.qPad;
+    const tones=type==='fifth'?[0,4,7]:[0,sh.qSus,4], pitch=x=>{ let p=12+degSemi(st,deg+x); while(p>30) p-=12; return p; };
+    if(type==='sus'||type==='fifth'){ const m=g(0), lpf=bq('lowpass',520,.8); m.gain.setValueAtTime(0,t0); m.gain.linearRampToValueAtTime(1,t0+Math.min(.5,(t1-t0)*.4)); m.gain.setValueAtTime(1,Math.max(t0+.05,t1-.08)); m.gain.linearRampToValueAtTime(0,t1+.06);
+      lpf.frequency.setValueAtTime(520,t0); lpf.frequency.linearRampToValueAtTime(1300,t1); ch(m,lpf,out); const vs=g(.35); lpf.connect(vs); vs.connect(verb);
+      tones.forEach((x,i)=>[-6,6].forEach(d=>{ const o=osc(song.qPadWave,hz(pitch(x)),t0), a=g(song.qPadWave==='sawtooth'?.012:.03); o.detune.value=d+i; ch(o,a,m); o.start(t0); o.stop(t1+.12); })); }
+    else if(type==='stab'){ for(let k=2;k*S<t1-t0;k+=4){ const t=t0+k*S, m=g(0), lpf=bq('lowpass',1500,1); env(m,t,.045,.002,.14); tones.forEach(x=>{ const o=osc('sawtooth',hz(pitch(x)+12),t); o.connect(m); o.start(t); o.stop(t+.25); }); ch(m,lpf,out); m.connect(dverb); } }
+    else if(type==='arp'){ let j=0; for(let k=0;k*S<t1-t0;k++){ if(k%4<2) continue; const t=t0+k*S, o=osc('triangle',hz(pitch(tones[j++%3])+24),t), a=g(0); env(a,t,.03,.002,.09); ch(o,bq('lowpass',3000),a,out); a.connect(dly); o.start(t); o.stop(t+.15); } } }
+  function subHit(t,s,amp=.22){ const o=osc('sine',hz(s),t), a=g(0); env(a,t,amp,.004,.5); ch(o,a,out); o.start(t); o.stop(t+.8); }
+
+  /* ---- question lead: the formula as a melody ---- */
+  function lead(type,t,dur,f,o={}){ const P=song.leadP[type]||leadParams(Math.random,'square'), end=t+dur, a=g(0), pk=P.lv*1.7, open=o.open||1;
+    a.gain.setValueAtTime(0,t); a.gain.linearRampToValueAtTime(pk*1.15,t+.004); a.gain.setTargetAtTime(pk*.72,t+.01,.09); a.gain.setTargetAtTime(0,Math.max(t+.02,end-.008),.014);
+    let tail;
+    if(type==='fm'){ const c=osc('sine',f,t), m=osc('sine',f*P.ratio,t), mg=g(0); mg.gain.setValueAtTime(f*P.index,t); mg.gain.setTargetAtTime(f*P.index*.25,t,.12); m.connect(mg); mg.connect(c.frequency); m.start(t); m.stop(end+.12); c.start(t); c.stop(end+.12); tail=c; }
+    else if(type==='fold'){ const o=osc('sine',f,t), pre=g(0); pre.gain.setValueAtTime(P.fold/4,t); pre.gain.setTargetAtTime(P.fold/8,t,.15); tail=ch(o,pre,shaper(foldCurve()),bq('lowpass',6000)); o.start(t); o.stop(end+.12); }
+    else { const o=osc(P.wave,f,t); if(P.swoop>1){ o.frequency.setValueAtTime(f*P.swoop,t); o.frequency.setTargetAtTime(f,t,.012); }
+      const cut=P.cut*open, fl=bq('lowpass',cut,P.q); fl.frequency.setValueAtTime(Math.min(16000,cut*P.env),t); fl.frequency.setTargetAtTime(cut,t+.005,P.fdec);
+      o.connect(fl); o.start(t); o.stop(end+.12);
+      if(P.det){ const o2=osc(P.wave,f,t); o2.detune.value=P.det; o2.connect(fl); o2.start(t); o2.stop(end+.12); }
+      tail=fl; if(P.drive){ const s=shaper(tanhCurve(P.drive)); fl.connect(s); tail=s; } }
+    tail.connect(a); a.connect(leadBus); if(o.echo){ const e=g(.55); a.connect(e); e.connect(dly); } }
+  /* ---- live: the continuation two octaves down on a distorted 808 ---- */
+  function e808(t,dur,f,prevF,LL){ const L=LL||song.l808, o=osc('sine',f,t), a=g(0), end=t+dur;
+    if(prevF&&L.glide){ o.frequency.setValueAtTime(prevF,t); o.frequency.exponentialRampToValueAtTime(f,t+.07); } else { o.frequency.setValueAtTime(f*2.6,t); o.frequency.exponentialRampToValueAtTime(f,t+L.knock); }
+    a.gain.setValueAtTime(0,t); a.gain.linearRampToValueAtTime(1,t+.003); a.gain.setTargetAtTime(.6,t+.02,.3); a.gain.setTargetAtTime(0,end-.01,.025);
+    ch(o,a,g(L.pre),shaper(tanhCurve(L.drive),'2x'),bq('lowpass',L.tone,.9),g(L.lvl),out); const sb=g(L.sub); a.connect(sb); sb.connect(out); o.start(t); o.stop(end+.15); }
+  function wall(t,dur,f){ const m=g(.33), end=t+dur, a=g(0); [-14,0,14].forEach(d=>{ const o=osc('sawtooth',f,t); o.detune.value=d; o.connect(m); o.start(t); o.stop(end+.1); });
+    a.gain.setValueAtTime(0,t); a.gain.linearRampToValueAtTime(.08,t+.006); a.gain.setTargetAtTime(.055,t+.02,.1); a.gain.setTargetAtTime(0,end-.01,.02); ch(m,shaper(tanhCurve(2.5)),bq('lowpass',2400,.8),a,out); }
+  /* ---- blank: the continuation an octave up on a bell ---- */
+  function bell(type,t,dur,f,amp=1){ amp*=type==='cowbell'?4.6:2.5;
+    if(type==='glass'){ const c=osc('sine',f,t), m=osc('sine',f*3.5,t), mg=g(0), a=g(0); mg.gain.setValueAtTime(f*2.2,t); mg.gain.setTargetAtTime(0,t,.25); m.connect(mg); mg.connect(c.frequency); env(a,t,.13*amp,.002,1.4); ch(c,a,bellBus); c.start(t); m.start(t); c.stop(t+2); m.stop(t+2);
+      const o2=osc('sine',f*2,t), b=g(0); env(b,t,.03*amp,.002,.6); ch(o2,b,bellBus); o2.start(t); o2.stop(t+.9); }
+    else if(type==='musicbox'){ [[1,.12,1],[3,.03,.35],[5.4,.016,.18],[8.9,.008,.1]].forEach(([r,p,d])=>{ const o=osc('sine',f*r,t), a=g(0); env(a,t,p*amp,.002,d); ch(o,a,bellBus); o.start(t); o.stop(t+d*1.4+.05); }); }
+    else if(type==='vibes'){ const o=osc('sine',f,t), o2=osc('sine',f*4,t), a=g(0), b=g(0), tr=osc('sine',5.5,t), tg=g(.3), tm=g(1); env(a,t,.12*amp,.003,1.6); env(b,t,.03*amp,.002,.3); tr.connect(tg); tg.connect(tm.gain); ch(o,a,tm,bellBus); ch(o2,b,bellBus); [o,o2,tr].forEach(x=>{ x.start(t); x.stop(t+2.2); }); }
+    else if(type==='pluck'){ const s=ctx.createBufferSource(), kb=ctx.createBuffer(1,Math.floor(sr*1.4),sr); kb.getChannelData(0).set(ksData(f,sr)); s.buffer=kb; const a=g(.42*amp); a.gain.setTargetAtTime(0,t+Math.max(.2,dur*2),.1); ch(s,bq('lowpass',6000),a,bellBus); s.start(t); s.stop(t+1.4); }
+    else cowbell(t,.16*amp,f); }
+  function pad(t0,t1,s){ const f=hz(s), a=g(0); a.gain.setValueAtTime(0,t0); a.gain.linearRampToValueAtTime(1,t0+.25); a.gain.setValueAtTime(1,Math.max(t0+.26,t1-.12)); a.gain.linearRampToValueAtTime(0,t1+.25); a.connect(out); const vs=g(.3); a.connect(vs); vs.connect(verb);
+    const src=[]; const sub=osc('sine',f,t0), sg=g(.12); ch(sub,sg,a); src.push(sub);
+    if(song.pad==='saw'){ const lpf=bq('lowpass',420,.9), m=g(.025); [-10,0,10].forEach(d=>{ const o=osc('sawtooth',f*2,t0); o.detune.value=d; o.connect(m); src.push(o); }); ch(m,lpf,a); }
+    else if(song.pad==='choir'){ const lpf=bq('lowpass',1500,.7), m=g(.018); [4,6,8].forEach(r=>{ const o=osc('triangle',f*r,t0); o.connect(m); src.push(o); }); ch(m,lpf,a); }
+    else { const o=osc('triangle',f*2,t0), m=g(.03); ch(o,m,a); src.push(o); }
+    src.forEach(o=>{ o.start(t0); o.stop(t1+.4); }); }
+
+  /* ---- theme voices: patches generated per formula ---- */
+  const pwSpec=new Map(), chebC=new Map();
+  const specWave=L=>{ let w=pwSpec.get(L); if(!w){ w=ctx.createPeriodicWave(new Float32Array(L.h.length),Float32Array.from(L.h)); pwSpec.set(L,w); } return w; };
+  const chebCurve=L=>{ let c=chebC.get(L); if(!c){ const N=2048; c=new Float32Array(N); let mx=0; for(let i=0;i<N;i++){ const x=i/(N-1)*2-1; let t0=1,t1=x,y=L.cheb[0]*x; for(let k=2;k<=L.cheb.length;k++){ const t2=2*x*t1-t0; y+=L.cheb[k-1]*t2; t0=t1; t1=t2; } c[i]=y; mx=Math.max(mx,Math.abs(y)); } for(let i=0;i<N;i++) c[i]/=mx||1; chebC.set(L,c); } return c; };
+  function voiceOsc(wave,f,t,L,srcs,vibG){ const o=ctx.createOscillator();
+    if(wave==='spec') o.setPeriodicWave(specWave(L)); else if(wave==='p25'||wave==='p12') o.setPeriodicWave(pw(wave==='p25'?.25:.125)); else o.type=wave;
+    if(L.swoop>1){ o.frequency.setValueAtTime(f*L.swoop,t); o.frequency.setTargetAtTime(f,t,.012); } else o.frequency.setValueAtTime(f,t);
+    if(vibG) vibG.connect(o.detune); srcs.push(o); return o; }
+  function leadGen(L,t,dur,f,o={}){
+    const end=t+dur, a=g(0), pk=L.lv*(o.vel||1), open=o.open||1, srcs=[], stopAt=end+L.rel*3+.05;
+    a.gain.setValueAtTime(0,t); a.gain.linearRampToValueAtTime(pk,t+L.att); a.gain.setTargetAtTime(pk*L.sus,t+L.att,L.dec/3); a.gain.setTargetAtTime(0,Math.max(t+L.att+.01,end-.01),L.rel/3);
+    let vibG=null; if(L.vib.depth>0){ const lf=osc('sine',L.vib.rate,t); vibG=g(0); vibG.gain.setValueAtTime(0,t+L.vib.delay); vibG.gain.linearRampToValueAtTime(L.vib.depth,t+L.vib.delay+.2); lf.connect(vibG); srcs.push(lf); }
+    let tail;
+    if(L.arch==='spec'||L.arch==='dual'){ const fl=bq(L.ft||'lowpass',1000,L.q), cut=clamp(f*L.kt*open,350,12000); fl.frequency.setValueAtTime(Math.min(16000,cut*L.env),t); fl.frequency.setTargetAtTime(cut,t+.004,.07);
+      if(L.arch==='spec') for(let u=0;u<L.uni;u++){ const o2=voiceOsc('spec',f,t,L,srcs,vibG); if(u) o2.detune.value=L.det; o2.connect(fl); }
+      else { voiceOsc(L.w1,f,t,L,srcs,vibG).connect(fl); const o2=voiceOsc(L.w2,f*Math.pow(2,L.iv/12),t,L,srcs,vibG), l2=g(L.l2); if(L.iv===0) o2.detune.value=L.det; o2.connect(l2); l2.connect(fl); }
+      tail=fl; if(L.drive){ const s=shaper(tanhCurve(L.drive)); fl.connect(s); tail=s; } }
+    else if(L.arch==='fm'){ const c=voiceOsc(L.cw,f,t,L,srcs,vibG), m=osc('sine',f*L.ratio,t), mg=g(0); srcs.push(m);
+      mg.gain.setValueAtTime(f*L.index,t); mg.gain.setTargetAtTime(f*L.index*L.isus,t,L.idec); m.connect(mg); mg.connect(c.frequency);
+      if(L.m2){ const m2=osc('sine',f*L.m2.ratio,t), g2=g(f*L.m2.index); m2.connect(g2); g2.connect(m.frequency); srcs.push(m2); }
+      tail=ch(c,bq('lowpass',9000)); }
+    else { const s=voiceOsc(L.wave,f,t,L,srcs,vibG), dr=g(0); dr.gain.setValueAtTime(L.d0,t); dr.gain.setTargetAtTime(L.d1,t,.12); tail=ch(s,dr,shaper(chebCurve(L)),bq('lowpass',8000)); }
+    tail.connect(a); a.connect(leadBus); if(o.echo){ const e=g(.55); a.connect(e); e.connect(dly); }
+    srcs.forEach(x=>{ x.start(t); x.stop(stopAt); }); }
+  function bellGen(B,t,dur,f,amp=1){ const lv=B.lv*amp;
+    if(B.kind==='partials') B.p.forEach(q=>{ if(f*q.r>sr*.45) return; const o=osc('sine',f*q.r,t), a=g(0); const e=env(a,t,lv*q.a,.002,q.d); ch(o,a,bellBus); o.start(t); o.stop(e+.05); });
+    else if(B.kind==='fm'){ const c=osc('sine',f,t), m=osc('sine',f*B.ratio,t), mg=g(0), a=g(0); mg.gain.setValueAtTime(f*B.index,t); mg.gain.setTargetAtTime(0,t,B.idec); m.connect(mg); mg.connect(c.frequency); const e=env(a,t,lv,.002,B.dec); ch(c,a,bellBus); c.start(t); m.start(t); c.stop(e+.05); m.stop(e+.05); }
+    else { const s=ctx.createBufferSource(), kb=ctx.createBuffer(1,Math.floor(sr*1.4),sr); kb.getChannelData(0).set(ksData(f,sr,B.damp)); s.buffer=kb; const a=g(lv); a.gain.setTargetAtTime(0,t+Math.max(.25,dur*2),.12); ch(s,bq('lowpass',B.bright),a,bellBus); s.start(t); s.stop(t+1.4); } }
+  function perc(t,p,amp){ if(p.snd==='tick'){ const o=osc('sine',p.f,t), a=g(0); env(a,t,amp,.001,.03); ch(o,a,drums); o.start(t); o.stop(t+.06); }
+    else { const n=nz(), a=g(0); env(a,t,amp*(p.snd==='rim'?1.2:.8),.001,p.snd==='rim'?.035:.06); ch(n,bq(p.snd==='rim'?'bandpass':'highpass',p.snd==='rim'?p.f*1.3:6000,p.snd==='rim'?4:.7),a,drums); n.start(t); n.stop(t+.1); } }
+  /* question accompaniment of the theme: pad / stabs / an arpeggio that reads the formula / a bass ostinato */
+  function accomp(sh,t0,t1,deg){ if(t1-t0<.05) return; const A2=sh.th.acc, st=sh.rs.mode.st; if(A2.type==='none') return;
+    const pitch=(x,base=12)=>{ let p=base+degSemi(st,deg+x); while(p>base+18) p-=12; return p; };
+    if(A2.type==='pad'){ const m=g(0), lpf=bq('lowpass',A2.cut0,.8); m.gain.setValueAtTime(0,t0); m.gain.linearRampToValueAtTime(1,t0+Math.min(.5,(t1-t0)*.4)); m.gain.setValueAtTime(1,Math.max(t0+.05,t1-.08)); m.gain.linearRampToValueAtTime(0,t1+.06);
+      lpf.frequency.setValueAtTime(A2.cut0,t0); lpf.frequency.linearRampToValueAtTime(A2.cut0*A2.open,t1); ch(m,lpf,out); const vs=g(.35); lpf.connect(vs); vs.connect(verb);
+      const lvl={sawtooth:.011,square:.009,triangle:.028}[A2.wave];
+      A2.voice.forEach((x,i)=>[-6,6].forEach(d=>{ const o=osc(A2.wave,hz(pitch(x)),t0), a=g(lvl); o.detune.value=d+i; ch(o,a,m); o.start(t0); o.stop(t1+.12); })); }
+    else if(A2.type==='stab'){ for(let b=t0;b<t1-.01;b+=4*BT) A2.steps.forEach((h,k)=>{ const t=b+k*S; if(!h||t>=t1) return; const m=g(0); env(m,t,.04,.002,A2.dec); A2.voice.forEach(x=>{ const o=osc(A2.wave==='triangle'?'sawtooth':A2.wave,hz(pitch(x)+12),t); o.connect(m); o.start(t); o.stop(t+A2.dec*1.4+.05); }); ch(m,bq('lowpass',1500,1),out); m.connect(dverb); }); }
+    else if(A2.type==='arp'){ let j=0; const ys=sh.puz.v; for(let k=0;k*S<t1-t0;k+=A2.rate){ if(A2.rate===1&&k%4<2) continue; const t=t0+k*S, vi=A2.pat==='formula'?mod(ys[j%ys.length],A2.voice.length):A2.pat==='up'?j%A2.voice.length:[0,1,2,1][j%4]%A2.voice.length; j++;
+        const o=osc('triangle',hz(pitch(A2.voice[vi])+24),t), a=g(0); env(a,t,.028,.002,.09); ch(o,bq('lowpass',3000),a,out); a.connect(dly); o.start(t); o.stop(t+.15); } }
+    else { for(let b=t0;b<t1-.01;b+=4*BT){ let j=0; A2.steps.forEach((h,k)=>{ const t=b+k*S; if(!h||t>=t1) return; const s=pitch(j++%3===2?4:0,0)+12, o=osc('triangle',hz(s),t), a=g(0); env(a,t,.16,.004,Math.min(.35,A2.dec*2)); ch(o,shaper(tanhCurve(A2.drive)),bq('lowpass',900),a,out); o.start(t); o.stop(t+.5); }); } } }
+  /* ---- arrangement of one 4-bar cell ---- */
+  function hatsLive(t0,beats,lv){ const n16=beats*4;
+    for(let k=0;k<n16;k++){ const t=t0+k*S+(k%2?song.swing*S:0), inBeat=k%4;
+      if(song.hatStyle==='16') hat(t,inBeat===0?.2:inBeat===2?.15:.09,false);
+      else if(song.hatStyle==='8sw'){ if(k%2===0) hat(t0+k*S+(k%4===2?.2*S:0),inBeat===0?.2:.13,false); }
+      else { const lastBeat=(Math.floor(k/4)%4)===3; if(lastBeat&&lv>=1){ const r=inBeat<2?2:3; for(let q=0;q<r;q++) hat(t0+k*S+q*S/r,.08+.04*q,false); } else if(k%2===0) hat(t,inBeat===0?.2:.13,false); } }
+    if(K.open&&lv>=2) for(let b=0;b<beats;b+=2) hat(t0+(b+.5)*BT,.1,true); }
+  function cell(sh){
+    const pre=sh.notes.filter(n=>!n.post), post=sh.notes.filter(n=>n.post), tr=sh.tr, lv=sh.level, st=sh.rs.mode.st, th=sh.th, D=th.drums;
+    const bars=(sh.pre+sh.post)/4, barRoot=b=>degSemi(st,sh.rs.prog[bars===2?b*2:b]);
+    /* question: the theme's own groove (Euclidean kick, hats, a percussion voice), an unresolved harmony, and a last beat that hangs */
+    const qBars=sh.pre/4, stopAt=sh.qEnd==='stop'?tr-BT/2:1e9, qk=(t,a)=>{ if(t<stopAt) kick(t,a); };
+    const qRoot=t=>(qBars>=2?t>=4*BT:t>=2*BT)?sh.qTension:sh.rs.prog[0];
+    const lastBar=Math.max(0,sh.pre-4);
+    for(let k=0;k<sh.pre*4;k++){ const st16=k%16, t=k*S+(k%2?song.swing*S:0); if(t>=stopAt) continue;
+      if(D.kick[st16]) qk(k*S,st16===0?.62:.5);
+      if(k>=lastBar*4) hat(t,.05+.13*(k-lastBar*4)/16,false); else if(D.hat[st16]) hat(t,D.hatAmp*(st16%4===0?1.2:1),false);
+      if(D.perc&&D.perc.steps[st16]) perc(t,D.perc,.07); }
+    if(lv>=1||sh.crit||sh.qEnd==='riser') riser(lastBar*BT,4*BT,.04+.025*lv+(sh.crit?.04:0));
+    if(lv>=2||sh.qEnd==='roll') for(let k=0;k<4;k++) back(tr-BT+k*S,(lv>=2?.1:.06)+.07*k);
+    if(sh.qEnd==='swell') swell(tr-2*BT,2*BT);
+    if(lv>=1) for(let b=0;b<qBars;b++) subHit(b*4*BT,degSemi(st,qRoot(b*4*BT)));
+    { const half=qBars>=2?4*BT:2*BT; accomp(sh,0,half,sh.rs.prog[0]); accomp(sh,half,tr,sh.qTension); }
+    pre.forEach((n,i)=>leadGen(th.lead,n.tr,n.dur,hz(n.s),{open:.8+.5*n.tr/tr,echo:i===pre.length-1,vel:n.vel}));
+    /* answer: live = the same continuation two octaves down on the theme's 808; blank = an octave up on the theme's bell */
+    const pb=sh.post/4;
+    if(sh.out){ impact(tr);
+      for(let b=0;b<pb;b++){ const t0=tr+b*4*BT; KP[song.kickPat].forEach(k=>{ if(b===0&&k===0) return; kick(t0+k*S,.6); }); back(t0+BT,.55); back(t0+3*BT,.55);
+        if(song.perc==='cowbell'&&lv>=1) [3,6,10,13].forEach(k=>cowbell(t0+k*S,.07,hz(48))); }
+      hatsLive(tr,sh.post,lv);
+      const L8={...song.l808,...th.l808};
+      let prev=null; post.forEach(n=>{ const f=hz(n.s); e808(n.tr,n.dur,f,prev,L8); prev=f; if(lv>=2||sh.final) wall(n.tr,n.dur,f*4); });
+    } else { [0,4,7].forEach((d,i)=>bellGen(th.bell,tr+i*.035,.4,hz(48+degSemi(st,d)),.45)); chime(tr,st,true);
+      for(let b=0;b<pb;b++){ const t0=tr+b*4*BT; pad(t0,t0+4*BT,barRoot(sh.pre/4+b)); if(lv>=2) for(let q=0;q<8;q++) if(q%2) hat(t0+q*BT/2,.05,false); if(lv>=3) back(t0+2*BT,.12); }
+      post.forEach(n=>bellGen(th.bell,n.tr,n.dur,hz(n.s),n.vel));
+      if(sh.final) post.forEach(n=>bellGen(th.bell,n.tr+.002,n.dur,hz(n.s+12),.45));
+    }
+  }
+  function countIn(beats){ for(let b=0;b<beats;b++){ kick(b*BT,.55+.12*b); hat(b*BT+BT/2,.1,false); } riser(0,beats*BT,.09); }
+  function intro(){ riser(0,8*BT,.12); for(let b=0;b<4;b++) kick(b*BT,.6); for(let k=0;k<4;k++) kick(4*BT+k*BT/2,.55); for(let k=0;k<8;k++) kick(6*BT+k*BT/4,.35+k*.03); impact(8*BT); }
+  function ding(){ [4,7].forEach((d,i)=>bell('glass',i*.06,.3,hz(48+degSemi(MODES[0].st,d)),.7)); }
+  function bang(){ const n=nz(), a=g(0); env(a,0,.5,.002,.45); ch(n,bq('lowpass',1400),a,out); n.start(0); n.stop(.7); const o=osc('sine',90,0), b=g(0); o.frequency.exponentialRampToValueAtTime(40,.25); env(b,0,.5,.002,.35); ch(o,b,out); o.start(0); o.stop(.6); }
+  return {cell,countIn,intro,ding,bang};
+}
+/* render speed is measured on every job; a slow phone drops to a lower internal rate and renders further ahead */
+const PERF={ratio:0,low:false};
+function renderWith(sr,seconds,song,fn){
+  const C=window.OfflineAudioContext||window.webkitOfflineAudioContext;
+  const ctx=new C(2,Math.max(1,Math.ceil(sr*seconds)),sr), t0=performance.now();
+  fn(makeEngine(ctx,song));
+  return new Promise((res,rej)=>{ let done=false; const fin=b=>{ if(done) return; done=true; PERF.ratio=(performance.now()-t0)/1000/seconds; if(PERF.ratio>.28) PERF.low=true; res(b); };
+    ctx.oncomplete=e=>fin(e.renderedBuffer); const p=ctx.startRendering(); if(p&&p.then) p.then(fin,rej); });
+}
+const renderRate=()=>PERF.low?Math.min(24000,AC.sampleRate):AC.sampleRate;
+let renderChain=Promise.resolve();
+function queueRender(sr,seconds,song,fn){ const p=renderChain.then(()=>renderWith(sr,seconds,song,fn)); renderChain=p.catch(()=>{}); return p; }
+const TAIL=2.6;
+/* per-shell leveller: the question is pulled toward one loudness, the answer toward the live or blank loudness (±4 dB at most),
+   with a soft knee on peaks. The question gain is measured on the question alone, so it says nothing about the answer. */
+const LVL={q:-15.5,live:-11,blank:-15};
+function levelShell(buf,sh){
+  const sr=buf.sampleRate, chs=[]; for(let c=0;c<buf.numberOfChannels;c++) chs.push(buf.getChannelData(c));
+  const it=Math.min(buf.length,Math.floor(sh.tr*sr)), ie=Math.min(buf.length,Math.floor(sh.len*sr)), xf=Math.floor(.01*sr);
+  const rms=(a,b)=>{ let s2=0,n=0; for(const d of chs) for(let i=a;i<b;i+=2){ s2+=d[i]*d[i]; n++; } return 10*Math.log10(s2/Math.max(1,n)+1e-12); };
+  const gq=Math.pow(10,clamp(LVL.q-rms(0,it),-4,4)/20), ga=Math.pow(10,clamp((sh.out?LVL.live:LVL.blank)-rms(it,ie),-4,4)/20);
+  for(const d of chs) for(let i=0;i<d.length;i++){ const u=clamp((i-(it-2*xf))/(2*xf),0,1); let x=d[i]*(gq+(ga-gq)*u); const ax=x<0?-x:x; if(ax>.92) x=(x<0?-1:1)*(.92+.08*Math.tanh((ax-.92)/.08)); d[i]=x; }
+  sh.gain=[gq,ga]; return buf;
+}
+const renderShell=(sh,sr)=>queueRender(sr,sh.len+TAIL,sh.song,E=>E.cell(sh)).then(b=>levelShell(b,sh));
+
+/* ===================================================================================
+   LIVE AUDIO: one context, a master bus, and buffers. Visual time follows what is heard.
+   =================================================================================== */
+let AC=null, master=null; const playing=new Set();
+function initAudio(){
+  if(AC){ if(AC.state!=='running') AC.resume(); return; }
+  const C=window.AudioContext||window.webkitAudioContext;
+  try{ AC=new C({latencyHint:'playback'}); }catch(e){ AC=new C(); }
+  try{ if(navigator.audioSession) navigator.audioSession.type='playback'; }catch(e){}
+  const comp=AC.createDynamicsCompressor(); comp.threshold.value=-8; comp.knee.value=6; comp.ratio.value=4; comp.attack.value=.003; comp.release.value=.2;
+  master=AC.createGain(); master.gain.value=/[?&]mute/.test(location.search)?0:.95; master.connect(comp); comp.connect(AC.destination);
+  const b=AC.createBuffer(1,1,AC.sampleRate), s=AC.createBufferSource(); s.buffer=b; s.connect(AC.destination); s.start(0);
+  if(AC.resume) AC.resume();
+}
+function audioNow(){
+  if(!AC) return 0;
+  if(AC.getOutputTimestamp){ try{ const ts=AC.getOutputTimestamp(); if(ts&&ts.contextTime>0&&ts.performanceTime>0){ const t=ts.contextTime+(performance.now()-ts.performanceTime)/1000; if(t<=AC.currentTime+.01&&t>AC.currentTime-1) return t; } }catch(e){} }
+  return AC.currentTime-(AC.outputLatency||0);
+}
+function playBuf(buf,when,vol=1){
+  if(!AC||!buf) return null; const s=AC.createBufferSource(), g=AC.createGain(); s.buffer=buf; g.gain.value=vol; s.connect(g); g.connect(master);
+  const now=AC.currentTime; if(when>=now) s.start(when); else { const off=now-when+.03; if(off>=buf.duration) return null; s.start(now+.03,off); }
+  const h={s,g}; playing.add(h); s.onended=()=>{ playing.delete(h); try{ g.disconnect(); }catch(e){} }; return h;
+}
+function stopAll(fade=.12){ if(!AC) return; const t=AC.currentTime; playing.forEach(h=>{ try{ h.g.gain.setTargetAtTime(0,t,fade); h.s.stop(t+fade*6); }catch(e){} }); }
+let SFX=null;
+function prepSongAudio(song){
+  const sr=AC.sampleRate, bt=60/song.bpm, o={song};
+  o.count=queueRender(sr,4*bt+1.5,song,E=>E.countIn(4));
+  o.intro=queueRender(sr,8*bt+2.5,song,E=>E.intro());
+  o.ding=queueRender(sr,1.6,song,E=>E.ding()); o.bang=queueRender(sr,1,song,E=>E.bang());
+  ['count','intro','ding','bang'].forEach(k=>o[k].then(b=>o[k+'B']=b).catch(()=>{}));
+  return o;
 }
 
 /* ================= logic: candidates & clues ================= */
@@ -495,7 +916,7 @@ function cluePool(b){
   const d3=val(b)%3===0; P.push({t:`Это число <b>${d3?'делится':'не делится'}</b> на 3`,f:s=>(val(s)%3===0)===d3});
   const a=adj(b); P.push({t:a?'Где-то <b>два боевых идут подряд</b>':'Два боевых <b>подряд не идут нигде</b>',f:s=>adj(s)===a});
   if(pal(b)) P.push({t:'Магазин — <b>палиндром</b>, с конца читается так же',f:pal});
-  const h=Math.floor(n/2), ch=sum(b.slice(0,h)); P.push({t:`Среди первых ${h} патронов боевых: <b>${ch}</b>`,f:s=>sum(s.slice(0,h))===ch});
+  const h=Math.floor(n/2), chh=sum(b.slice(0,h)); P.push({t:`Среди первых ${h} патронов боевых: <b>${chh}</b>`,f:s=>sum(s.slice(0,h))===chh});
   const ev=s=>s.reduce((acc,x,i)=>acc+(i%2===1?x:0),0), ce=ev(b); P.push({t:`На чётных местах (#2, #4, …) боевых: <b>${ce}</b>`,f:s=>ev(s)===ce});
   const ps=s=>s.reduce((acc,x,i)=>acc+(x?i+1:0),0), sp=ps(b); P.push({t:`Сумма номеров боевых: <b>${sp}</b>`,f:s=>ps(s)===sp});
   for(let r=0;r<2;r++){ const i=rnd(0,n-2), j=rnd(i+1,n-1), same=b[i]===b[j]; P.push({t:`#${i+1} и #${j+1} — <b>${same?'одинаковые':'разные'}</b>`,f:s=>(s[i]===s[j])===same}); }
@@ -508,200 +929,67 @@ function pickClues(b,k,want,minRemain){
   return {chosen,cands};
 }
 
-/* ================= audio engine ================= */
-let AC=null, master=null, bus=null, verbIn=null, noiseBuf=null; const curveCache={}, waveCache={}, ksCache={};
-function initAudio(){
-  if(AC){ if(AC.state!=='running') AC.resume(); return; }
-  AC=new (window.AudioContext||window.webkitAudioContext)();
-  const comp=AC.createDynamicsCompressor(); comp.threshold.value=-14; comp.ratio.value=3; comp.attack.value=.003; comp.release.value=.12;
-  master=AC.createGain(); master.gain.value=.85;
-  const hp=lp(28,.7,'highpass'); master.connect(hp); hp.connect(comp); comp.connect(AC.destination);
-  verbIn=makeVerb(comp);
-  noiseBuf=AC.createBuffer(1,AC.sampleRate*2,AC.sampleRate); const d=noiseBuf.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
-}
-function makeVerb(dest){
-  const verb=AC.createConvolver(), wet=AC.createGain(); wet.gain.value=.35;
-  const ir=AC.createBuffer(2,AC.sampleRate*2,AC.sampleRate);
-  for(let c=0;c<2;c++){ const d=ir.getChannelData(c); for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,3.2); }
-  verb.buffer=ir; const inp=AC.createGain(); inp.connect(lp(5000)).connect(verb); verb.connect(wet); wet.connect(dest); return inp;
-}
-function curve(k){ k=Math.round(k); const key='d'+k; if(curveCache[key]) return curveCache[key]; const c=new Float32Array(1024); for(let i=0;i<1024;i++){ const x=i/511.5-1; c[i]=(1+k)*x/(1+k*Math.abs(x)); } return curveCache[key]=c; }
-function crushCurve(b){ const key='c'+b; if(curveCache[key]) return curveCache[key]; const L=Math.pow(2,b-1), c=new Float32Array(2048); for(let i=0;i<2048;i++){ const x=i/1023.5-1; c[i]=Math.round(x*L)/L; } return curveCache[key]=c; }
-function foldCurve(g){ g=Math.round(g*2)/2; const key='f'+g; if(curveCache[key]) return curveCache[key]; const c=new Float32Array(2048); for(let i=0;i<2048;i++){ const x=i/1023.5-1; c[i]=Math.sin(g*x*Math.PI/2); } return curveCache[key]=c; }
-function pw(duty){ duty=Math.round(duty*20)/20; const k='p'+duty; if(waveCache[k]&&waveCache[k].ctx===AC) return waveCache[k].w; const N=48, re=new Float32Array(N), im=new Float32Array(N); for(let n=1;n<N;n++) re[n]=2/(n*Math.PI)*Math.sin(n*Math.PI*duty); const w=AC.createPeriodicWave(re,im); waveCache[k]={w,ctx:AC}; return w; }
-function osc(type,f,t){ const o=AC.createOscillator(); if(type==='p25') o.setPeriodicWave(pw(.25)); else if(type==='p12') o.setPeriodicWave(pw(.125)); else o.type=type; o.frequency.setValueAtTime(f,t); return o; }
-function lp(f,q=1,type='lowpass'){ const b=AC.createBiquadFilter(); b.type=type; b.frequency.value=f; b.Q.value=q; return b; }
-function gainN(v=0){ const g=AC.createGain(); g.gain.value=v; return g; }
-function perc(g,t,peak,dec,att=.003){ g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(peak,t+att); g.gain.exponentialRampToValueAtTime(.0005,t+att+dec); return t+att+dec; }
-function chain(nodes,out){ for(let i=0;i<nodes.length-1;i++) nodes[i].connect(nodes[i+1]); nodes[nodes.length-1].connect(out); }
-function noise(out,t,type,freq,peak,dec,q=1){ const s=AC.createBufferSource(); s.buffer=noiseBuf; const f=lp(freq,q,type), g=gainN(); const e=perc(g,t,peak,dec); chain([s,f,g],out); s.start(t); s.stop(e+.05); }
-function ksBuf(f,damp){ const key=Math.round(f*4)+':'+damp+':'+AC.sampleRate; if(ksCache[key]) return ksCache[key]; const sr=AC.sampleRate, len=Math.floor(sr*1.3), N=Math.max(2,Math.round(sr/f)); const b=AC.createBuffer(1,len,sr), d=b.getChannelData(0); for(let i=0;i<N;i++) d[i]=Math.random()*2-1; for(let i=N;i<len;i++) d[i]=damp*(d[i-N]+d[i-N+1]); return ksCache[key]=b; }
-/* held-note envelope used by most lead voices: attack, quick dip, hold, short release */
-function leadEnv(g,t,end,lvl){ g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(lvl*1.25,t+.004); g.gain.setTargetAtTime(lvl*.62,t+.01,.09); g.gain.setTargetAtTime(0,Math.max(t+.02,end-.006),.012); }
-
-/* --- the pulse: a sine kick whose pitch leaps up and falls exponentially, plus a filtered click --- */
-function kick(out,t,amp,dirt){
-  const o=osc('sine',88,t), g=gainN(); o.frequency.setValueAtTime(160,t); o.frequency.exponentialRampToValueAtTime(88,t+.014); o.frequency.exponentialRampToValueAtTime(50,t+.42);
-  g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(amp,t+.003); g.gain.setTargetAtTime(amp*.55,t+.02,.06); g.gain.exponentialRampToValueAtTime(.0008,t+.47);
-  if(dirt){ const sh=AC.createWaveShaper(); sh.curve=curve(dirt); chain([o,sh,g],out); } else chain([o,g],out);
-  o.start(t); o.stop(t+.5); noise(out,t,'lowpass',3500,amp*.12,.01);
-}
-const hat=(out,t,a)=>noise(out,t,'highpass',8000,a,.03);
-function riser(out,t0,dur,amp=.12){
-  const s=AC.createBufferSource(); s.buffer=noiseBuf; s.loop=true; const f=lp(300,4,'bandpass'), g=gainN();
-  f.frequency.setValueAtTime(300,t0); f.frequency.exponentialRampToValueAtTime(5000,t0+dur);
-  g.gain.setValueAtTime(0,t0); g.gain.linearRampToValueAtTime(amp,t0+dur*.95); g.gain.linearRampToValueAtTime(0,t0+dur);
-  chain([s,f,g],out); s.start(t0); s.stop(t0+dur+.05);
-}
-function impact(out,t){ kick(out,t,.6,8); noise(out,t,'lowpass',2500,.35,.6); const o=osc('sine',hz(12),t), g=gainN(), sh=AC.createWaveShaper(); sh.curve=curve(20); o.frequency.exponentialRampToValueAtTime(hz(0),t+.3); const e=perc(g,t,.25,.9); chain([o,sh,lp(900),g],out); o.start(t); o.stop(e+.05); }
-
-/* --- voices: one per concept --- */
-const V={
-  lead(out,n,S,key){ const P=S.P, f=hz(n[key]), t=n.t, end=n.t+n.dur, o=osc(P.wave,f,t), fl=lp(P.cut,P.q), g=gainN();
-    o.frequency.setValueAtTime(f*P.swoop,t); o.frequency.setTargetAtTime(f,t,.016);
-    fl.frequency.setValueAtTime(Math.min(12000,P.cut*2.4),t); fl.frequency.setTargetAtTime(P.cut,t,.05);
-    leadEnv(g,t,end,P.level); let nodes=[o,fl]; if(P.drive){ const sh=AC.createWaveShaper(); sh.curve=curve(P.drive); nodes=[o,sh,fl]; }
-    chain([...nodes,g],out); o.start(t); o.stop(end+.12); },
-  blip(out,n,S,key){ const P=S.P, f=hz(n[key]), o=osc(P.wave,f,n.t), fl=lp(P.cut,P.q), g=gainN(); o.frequency.setValueAtTime(f*1.5,n.t); o.frequency.exponentialRampToValueAtTime(f,n.t+.02); const e=perc(g,n.t,P.level*1.3,Math.max(.08,n.dur*1.3)); chain([o,fl,g],out); o.start(n.t); o.stop(e+.05); },
-  fm(out,n,S,key){ const p=S.c.p, f=hz(n[key]), t=n.t, c=osc('sine',f,t), m=osc('sine',f*p.r,t), mg=gainN(), g=gainN(); const dec=Math.max(.3,Math.min(1.4,n.slot*2.4));
-    mg.gain.setValueAtTime(f*p.I,t); mg.gain.setTargetAtTime(f*p.I*.04,t,p.tau); m.connect(mg).connect(c.frequency);
-    g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(.14,t+.003); g.gain.exponentialRampToValueAtTime(.0005,t+dec); chain([c,g],out); c.start(t); m.start(t); c.stop(t+dec+.05); m.stop(t+dec+.05); },
-  ks(out,n,S,key){ const f=hz(n[key]), s=AC.createBufferSource(); s.buffer=ksBuf(f,S.c.p.damp); const g=gainN(.34), fl=lp(5000,.7); const end=n.t+Math.max(n.slot*1.6,.2); g.gain.setValueAtTime(.34,n.t); g.gain.setTargetAtTime(0,end,.05); chain([s,fl,g],out); s.start(n.t); s.stop(end+.3); },
-  supersaw(out,n,S,key){ const ch=key==='s'?n.ch:n.chp, d=S.c.p.det, t=n.t, end=n.t+n.dur, mix=gainN(1), fl=lp(S.mood==='relaxed'?1800:3200,.8), g=gainN();
-    ch.forEach(p=>OFFS.forEach((o,i)=>{ if(i%2&&i!==3) return; const x=osc('sawtooth',hz(p),t); x.detune.value=o/0.11*d*100; const a=gainN(i===3?.22:.14); x.connect(a).connect(mix); x.start(t); x.stop(end+.15); }));
-    fl.frequency.setValueAtTime(fl.frequency.value*2,t); fl.frequency.setTargetAtTime(fl.frequency.value,t,.08);
-    g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(.05,t+.006); g.gain.setTargetAtTime(.032,t+.01,.1); g.gain.setTargetAtTime(0,end-.01,.03); chain([mix,fl,g],out); },
-  crush(out,n,S,key,sh){ const P=S.P, p=S.c.p, b=n.bits||p.b0;
-    const f=hz(n[key]), o=osc(P.wave==='triangle'?'sawtooth':P.wave,f,n.t), pre=gainN(.9), c=AC.createWaveShaper(); c.curve=crushCurve(b); const fl=lp(Math.max(P.cut,3000),.7), g=gainN();
-    o.frequency.setValueAtTime(f*P.swoop,n.t); o.frequency.setTargetAtTime(f,n.t,.016); leadEnv(g,n.t,n.t+n.dur,.05); chain([o,pre,c,fl,g],out); o.start(n.t); o.stop(n.t+n.dur+.12); n.bits=b; },
-  fold(out,n,S,key,sh){ const p=S.c.p, gg=n.g||1;
-    const f=hz(n[key]), o=osc('sine',f,n.t), c=AC.createWaveShaper(); c.curve=foldCurve(gg); const fl=lp(6000,.7), g=gainN();
-    o.frequency.setValueAtTime(f*1.5,n.t); o.frequency.setTargetAtTime(f,n.t,.016); leadEnv(g,n.t,n.t+n.dur,.07); chain([o,c,fl,g],out); o.start(n.t); o.stop(n.t+n.dur+.12); },
-  ring(out,n,S,key){ const P=S.P, f=hz(n[key]), o=osc(P.wave==='triangle'?'triangle':'square',f,n.t), m=osc('sine',f*S.c.p.rm,n.t), rg=gainN(0), fl=lp(4000,.7), g=gainN();
-    m.connect(rg.gain); leadEnv(g,n.t,n.t+n.dur,.1); chain([o,rg,fl,g],out); o.start(n.t); m.start(n.t); o.stop(n.t+n.dur+.12); m.stop(n.t+n.dur+.12); },
-  echo(out,n,S,key){ V.lead(S._echoIn||out,n,S,key); },
-  pump(out,n,S,key){ V.lead(S._pumpIn||out,{...n,dur:n.slot},S,key); },
-  chip(out,n,S,key){ const f=hz(n[key]), o=osc('p12',f,n.t), g=gainN(); g.gain.setValueAtTime(0,n.t); g.gain.linearRampToValueAtTime(.06,n.t+.002); g.gain.setValueAtTime(.06,n.t+n.dur*.8); g.gain.linearRampToValueAtTime(0,n.t+n.dur); chain([o,g],out); o.start(n.t); o.stop(n.t+n.dur+.02); },
-  organ(out,n,S,key){ const f=hz(n[key]), t=n.t, end=n.t+n.dur; [[1,.11],[2,.03]].forEach(([r,a])=>{ const o=osc('sine',f*r,t), g=gainN(); g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(a,t+.01); g.gain.setTargetAtTime(a*.7,t+.02,.1); g.gain.setTargetAtTime(0,end-.01,.02); chain([o,g],out); o.start(t); o.stop(end+.1); }); },
-  pwm(out,n,S,key){ const p=S.c.p, f=hz(n[key]), d=n.duty||.5, o=AC.createOscillator(); o.setPeriodicWave(pw(Math.max(.08,Math.min(.92,d)))); o.frequency.setValueAtTime(f*S.P.swoop,n.t); o.frequency.setTargetAtTime(f,n.t,.016); n.duty=d;
-    const fl=lp(S.P.cut,.8), g=gainN(); leadEnv(g,n.t,n.t+n.dur,.05); chain([o,fl,g],out); o.start(n.t); o.stop(n.t+n.dur+.12); },
-  stab(out,n,S,key){ const ch=key==='s'?n.ch:n.chp, t=n.t, mix=gainN(1), fl=lp(2600,2), g=gainN(); ch.forEach(p=>{ const o=osc(S.P.wave==='triangle'?'sawtooth':S.P.wave,hz(p),t); o.connect(mix); o.start(t); o.stop(t+.5); });
-    fl.frequency.setValueAtTime(5200,t); fl.frequency.setTargetAtTime(900,t,.07); const e=perc(g,t,.06,.32); chain([mix,fl,g],out); },
-  tom(out,n,S,key){ const f=hz(n[key]), o=osc('sine',f*2.4,n.t), g=gainN(); o.frequency.exponentialRampToValueAtTime(f,n.t+.06); const e=perc(g,n.t,.22,.38); chain([o,g],out); o.start(n.t); o.stop(e+.05); noise(out,n.t,'bandpass',f*6,.05,.03,2); },
-};
-/* mono voices that need the whole phrase at once */
-function glideVoice(out,notes,S,key,tEnd){ if(!notes.length) return; const P=S.P, t0=notes[0].t-.004, f0=hz(notes[0][key]);
-  const o=osc(P.wave==='square'?'triangle':P.wave,f0,t0), fl=lp(P.cut,P.q), g=gainN(); chain([o,fl,g],out); let prev=f0;
-  notes.forEach((n,i)=>{ const f=hz(n[key]); if(i>0){ o.frequency.setValueAtTime(prev,n.t); o.frequency.exponentialRampToValueAtTime(f,n.t+Math.min(.07,n.dur*.5)); }
-    if(i===0) g.gain.setTargetAtTime(P.wave==='square'?.13:P.level,n.t,.005); prev=f; });
-  g.gain.setTargetAtTime(0,tEnd,.02); o.start(t0); o.stop(tEnd+.3); }
-function vibVoice(out,notes,S,key,tEnd){ if(!notes.length) return; const p=S.c.p, t0=notes[0].t-.004, f0=hz(notes[0][key]);
-  const o=osc('triangle',f0,t0), lf=osc('sine',p.rate,t0), lg=gainN(p.dep*100), g=gainN(); lf.connect(lg).connect(o.detune); chain([o,lp(2400,.7),g],out); let prev=f0;
-  notes.forEach((n,i)=>{ const f=hz(n[key]); if(i>0){ o.frequency.setValueAtTime(prev,n.t); o.frequency.exponentialRampToValueAtTime(f,n.t+.05); } prev=f; });
-  g.gain.setValueAtTime(0,t0); g.gain.linearRampToValueAtTime(.14,t0+.03); g.gain.setTargetAtTime(0,tEnd,.03); o.start(t0); lf.start(t0); o.stop(tEnd+.3); lf.stop(tEnd+.3); }
-function acidVoice(out,notes,S,key,tEnd){ if(!notes.length) return; const p=S.c.p, t0=notes[0].t-.004, f0=hz(notes[0][key]-12);
-  const o=osc('sawtooth',f0,t0), fl=lp(500,p.q), sh=AC.createWaveShaper(), g=gainN(); sh.curve=curve(3); chain([o,fl,sh,g],out); let prev=f0;
-  notes.forEach((n,i)=>{ const f=hz(n[key]-12), slide=i>0&&(n.v%3===0); if(i>0){ o.frequency.setValueAtTime(prev,n.t); if(slide) o.frequency.exponentialRampToValueAtTime(f,n.t+.06); else o.frequency.setValueAtTime(f,n.t); }
-    const acc=n.acc||.6; fl.frequency.setValueAtTime(Math.min(9000,380*Math.pow(2,p.env*acc)),n.t); fl.frequency.setTargetAtTime(380,n.t,.07);
-    g.gain.setTargetAtTime(.065*(.8+.4*acc),n.t,.004); const nx=notes[i+1], e=n.t+n.dur; if(!nx||nx.t-e>.01) g.gain.setTargetAtTime(0,e-.005,.015); prev=f; });
-  g.gain.setTargetAtTime(0,tEnd,.02); o.start(t0); o.stop(tEnd+.3); }
-function reeseVoice(out,notes,S,key,low){ const df=S.c.p.df;
-  notes.forEach(n=>{ const f=hz(n[key]), a=osc('sawtooth',f,n.t), b=osc('sawtooth',f+df[0],n.t), fl=lp(low?500:1100,1.2), g=gainN(), m=gainN(1), lvl=low?.07:.05;
-    b.frequency.linearRampToValueAtTime(f+df[1],n.t+n.dur); a.connect(m); b.connect(m); let nodes=[m,fl]; if(low){ const sh=AC.createWaveShaper(); sh.curve=curve(10); nodes=[m,sh,fl]; }
-    g.gain.setValueAtTime(0,n.t); g.gain.linearRampToValueAtTime(lvl,n.t+.02); g.gain.setValueAtTime(lvl,n.t+n.dur-.03); g.gain.linearRampToValueAtTime(0,n.t+n.dur);
-    chain([...nodes,g],out); a.start(n.t); b.start(n.t); a.stop(n.t+n.dur+.05); b.stop(n.t+n.dur+.05); }); }
-function shepVoice(out,n,key,amp){ n.cp.forEach(c=>{ if(c.a<.03) return; const s=key==='s'?c.s:c.s+(n.sp-n.s); const o=osc(key==='s'?'triangle':'sine',hz(s),n.t), g=gainN(); g.gain.setValueAtTime(0,n.t); g.gain.linearRampToValueAtTime(amp*c.a,n.t+.01); g.gain.setTargetAtTime(0,n.t+n.dur*.9,.03); chain([o,g],out); o.start(n.t); o.stop(n.t+n.dur+.2); }); }
-/* reveal: the very same notes — f/4 as a distorted 808 (or a saw wall), 2f as a glass bell (or the concept itself) */
-function k808(out,n){ const f=hz(n.sp), o=osc('sine',f*2,n.t), sh=AC.createWaveShaper(), fl=lp(1300), g=gainN(); sh.curve=curve(14); o.frequency.exponentialRampToValueAtTime(f,n.t+.04); const e=perc(g,n.t,.3,Math.min(.6,Math.max(.14,n.slot*1.6))); chain([o,sh,fl,g],out); o.start(n.t); o.stop(e+.05); }
-function sawWall(out,n){ const f=hz(n.sp), mix=gainN(1); [-12,0,12].forEach(d=>{ const o=osc('sawtooth',f*2,n.t); o.detune.value=d; o.connect(mix); o.start(n.t); o.stop(n.t+n.slot+.05); }); const sh=AC.createWaveShaper(); sh.curve=curve(6); const fl=lp(1800,1), g=gainN(); g.gain.setValueAtTime(0,n.t); g.gain.linearRampToValueAtTime(.05,n.t+.005); g.gain.setTargetAtTime(0,n.t+n.slot*.8,.03); chain([mix,sh,fl,g],out); }
-function bell(out,n,amp=1){ const f=hz(n.sp); [[1,.085,1.1],[2.76,.03,.5],[5.4,.012,.25]].forEach(([r,a,d])=>{ const o=osc('sine',f*r,n.t), g=gainN(); const e=perc(g,n.t,a*amp,d,.002); chain([o,g],out); o.start(n.t); o.stop(e+.05); }); }
-
-/* adaptive layers: calm drops to half time; tension stacks hats, a sub pulse and a riser into the trigger */
-function scheduleLayers(sh){
-  const out=bus, mood=sh.S.mood, beats=sh.pre+sh.post, crit=G.lives===1;
-  for(let b=0;b<beats;b++){ const t=sh.start+b*BEAT;
-    if(mood==='relaxed'){ if(b%2===0) kick(out,t,.3,0); }
-    else kick(out,t,mood==='tense'?.46:.4,mood==='tense'?3:0);
-    if(mood==='tense'){ hat(out,t+BEAT/2,.035); if(crit){ hat(out,t+BEAT/4,.018); hat(out,t+BEAT*3/4,.018); }
-      const r=hz(12); [0,.5].forEach(o=>{ const tt=t+o*BEAT, s=osc('sine',r,tt), g=gainN(); const e=perc(g,tt,.07,.16); chain([s,g],out); s.start(tt); s.stop(e+.05); }); }
-  }
-  if(mood==='tense') riser(out,sh.trig-BEAT*4,BEAT*4,crit?.1:.06);
-}
-function scheduleShell(sh){
-  const out=bus, S=sh.S, c=S.c, pre=sh.notes.filter(n=>!n.post), post=sh.notes.filter(n=>n.post);
-  scheduleLayers(sh);
-  S._t0=sh.start;
-  const send=gainN({relaxed:.5,neutral:.18,tense:.08}[S.mood]); const lead=gainN(LEVEL[c.id]||1); lead.connect(out); lead.connect(send); send.connect(verbIn);
-  if(c.voice==='echo'){ const inp=gainN(1), dl=AC.createDelay(2), fb=gainN(c.p.g), lpf=lp(2500); dl.delayTime.value=c.p.D*S16; inp.connect(lead); inp.connect(dl); dl.connect(lpf).connect(fb).connect(dl); lpf.connect(lead); S._echoIn=inp; }
-  if(c.voice==='pump'){ const pg=gainN(1); pg.connect(lead); for(let b=0;b<sh.pre;b++){ const t=sh.start+b*BEAT; pg.gain.setValueAtTime(.12,t); pg.gain.setTargetAtTime(1,t,c.p.tau); } S._pumpIn=pg; }
-  if(c.voice==='reese') reeseVoice(lead,pre,S,'s',false);
-  else if(c.voice==='shep') pre.forEach(n=>shepVoice(lead,n,'s',.1));
-  else if(c.voice==='glide') glideVoice(lead,pre,S,'s',sh.trig);
-  else if(c.voice==='vib') vibVoice(lead,pre,S,'s',sh.trig);
-  else if(c.voice==='acid') acidVoice(lead,pre,S,'s',sh.trig);
-  else pre.forEach(n=>V[c.voice](lead,n,S,'s',sh));
-  const pg=gainN(1); pg.connect(out);
-  if(sh.out){
-    if(c.live==='reese') reeseVoice(pg,post,S,'sp',true);
-    else { post.forEach(n=>k808(pg,n)); if(c.live==='wall') post.forEach(n=>sawWall(pg,n)); }
-  } else {
-    if(c.blank==='shep') post.forEach(n=>shepVoice(pg,n,'sp',.09));
-    else if(c.blank==='fm') post.forEach(n=>V.fm(pg,n,S,'sp'));
-    else if(c.blank==='ks') post.forEach(n=>V.ks(pg,n,S,'sp'));
-    else post.forEach(n=>bell(pg,n,1.4));
-    const bs=gainN(.25); pg.connect(bs); bs.connect(verbIn);
-  }
-  noise(out,sh.trig,'bandpass',2400,.12,.03,2);
-}
-/* per-concept loudness trims, measured offline so every idea sits at the same level */
-const LEVEL={pulse:1.24,hills:2.16,reese:1.79,mirror:1.36,poly:5.51,shep:1.13,fm:1.0,ks:0.84,supersaw:3.51,crush:2.64,fold:1.32,ring:1.34,pump:1.95,echo:1.51,arp:3.55,harm:1.07,acid:1.35,pwm:2.28,vib:0.97,stab:1.84,toms:0.72,mag:1.76};
-function newBus(){ bus=AC.createGain(); bus.gain.value=1; bus.connect(master); return bus; }
-function killBus(){ if(!bus) return; const b=bus; bus=null; b.gain.setTargetAtTime(0,AC.currentTime,.15); setTimeout(()=>{try{b.disconnect()}catch(e){}},1800); }
-function ding(){ const t=AC.currentTime; [[hz(48),.04],[hz(55),.03]].forEach(([f,a],i)=>{ const o=osc('sine',f,t+i*.06), g=gainN(); const e=perc(g,t+i*.06,a,.5); chain([o,g],master); o.start(t+i*.06); o.stop(e+.05); }); }
-function bang(){ const t=AC.currentTime; noise(master,t,'lowpass',1400,.45,.45); }
-
 /* ================= game ================= */
-const G={phase:'title',round:0,lives:3,score:0,streak:0,correct:0,total:0,onbeat:0,n:8,k:4,mag:[],clues:[],cands:[],total0:1,shells:[],cur:-1,pre:8,post:8,t0:0,mood:-.15,introDone:false};
+const URLSEED=(()=>{ try{ const s=new URLSearchParams(location.search).get('seed'); return s?(parseInt(s,16)>>>0):0; }catch(e){ return 0; } })();
+const G={phase:'title',round:0,lives:3,score:0,streak:0,correct:0,total:0,onbeat:0,n:8,k:4,mag:[],clues:[],cands:[],total0:1,shells:[],cur:-1,pre:8,post:8,t0:0,mood:-.15,introDone:false,
+  song:null,rs:null,aud:null,rid:0,recent:[],lv:2};
 const mult=()=>Math.min(4,1+Math.floor(Math.max(0,G.streak-1)/3));
+const beat=()=>60/G.song.bpm;
+function newSession(){
+  const seed=URLSEED&&!G.song?URLSEED:newSeed();
+  G.song=makeSong(seed); G.aud=prepSongAudio(G.song); G.recent=[];
+  $('session').innerHTML=`сессия <b>#${seed.toString(16).toUpperCase().padStart(8,'0')}</b> · ${G.song.name} ${G.song.modes[0].name} · ${G.song.bpm} BPM`;
+}
+function levelNow(final){ if(final) return 3; let L=Math.min(3,Math.floor((G.round-1)/2)); if(G.mood<-.3) L++; if(G.mood>.4) L--; if(G.lives===1) L++; return clamp(L,0,3); }
+function gameShell(i){
+  const final=i===G.n-1;
+  const sh=buildShell({song:G.song,rs:G.rs,seed:newSeed(),want:G.mag[i],pre:G.pre,post:G.post,lv:G.lv,level:levelNow(final),crit:G.lives===1,final,bits:G.mag,recent:G.recent});
+  sh.i=i; if(!final){ G.recent=[sh.puz.fam,...G.recent].slice(0,4); }
+  if(G.t0) sh.start=G.t0+4*beat()+i*sh.len;
+  const rid=G.rid;
+  sh.bufP=renderShell(sh,renderRate()).then(buf=>{ sh.buf=buf; if(rid===G.rid&&G.t0&&!sh.src&&(G.phase==='play'||G.phase==='loading')) sh.src=playBuf(buf,sh.start); return buf; }).catch(e=>{ console.error(e); });
+  return sh;
+}
+function prepShell(i){ if(i<G.n&&!G.shells[i]) G.shells[i]=gameShell(i); return G.shells[i]; }
 
 function newRound(){
-  G.round++; const r=G.round;
+  G.round++; const r=G.round; G.rid++;
   G.n=r===1?6:r===2?7:8; G.k=rnd(2,G.n-2);
   G.mag=shuffle(Array.from({length:G.n},(_,i)=>i<G.k?1:0));
   const {chosen,cands}=pickClues(G.mag,G.k,r===1?1:r<=3?2:3,r<=2?3:2);
   G.clues=chosen; G.cands=cands; G.total0=combos(G.n,G.k).length;
-  G.pre=r<=3?8:4; G.post=G.pre; G.mood*=.6;
-  G.shells=[]; G.cur=-1; pickedUI(null); setProg(0,false);
+  G.pre=r<=3?8:4; G.post=G.pre; G.mood*=.6; G.lv=Math.min(5,r+1);
+  G.rs=roundStyle(G.song,r); G.t0=0;
+  G.shells=new Array(G.n).fill(null); G.cur=-1; pickedUI(null); setProg(0,false);
+  prepShell(0); clearFormula();
   G.phase='intro'; renderMag(); renderClues(); $('bin').innerHTML=''; hud(); setSub('рулетка, но это математика');
   $('badge').className='badge'; $('badge').textContent=`#1/${G.n} боевой или холостой?`; setChance(G.k/G.n);
   showOverlay(`
-    <div class="meta">Раунд ${r}</div>
+    <div class="meta">Раунд ${r} · ${G.song.name} ${G.rs.mode.name}</div>
     <h2>${G.n} патронов: <span class="l">${G.k} боев${G.k===1?'ой':'ых'}</span>, <span class="b">${G.n-G.k} холост${G.n-G.k===1?'ой':'ых'}</span></h2>
     <ul>${G.clues.map(c=>`<li>${c.t}</li>`).join('')}</ul>
-    <p>Совместимых раскладов: ${G.cands.length} из ${G.total0}. На ответ — ${G.pre/4} ${plural(G.pre/4,'такт','такта','тактов')}.</p>
+    <p>Совместимых раскладов: ${G.cands.length} из ${G.total0}. На ответ — ${G.pre/4} ${plural(G.pre/4,'такт','такта','тактов')}.${r>1?' Формулы становятся хитрее.':''}</p>
     <button class="go" id="goBtn" type="button"><span>Зарядить</span><kbd>Пробел</kbd></button>`);
   $('goBtn').onclick=startRound; $('goBtn').focus({preventScroll:true});
 }
-function shellAt(i){
-  const S=makeShell(newSeed(),moodOf(G.mood),i===G.n-1?magazineConcept(G.mag):null);
-  const sh=buildShell(S,G.t0+BEAT*4+i*(G.pre+G.post)*BEAT,G.pre,G.post,G.mag[i]); sh.i=i; return sh;
-}
-function startRound(){
+async function startRound(){
   if(G.phase!=='intro') return;
-  initAudio(); hideOverlay(); newBus();
-  G.phase='loading'; renderMag();
+  initAudio(); G.phase='loading'; const rid=G.rid, btn=$('goBtn'); if(btn){ btn.disabled=true; btn.classList.add('wait'); }
+  await Promise.all([G.shells[0].bufP,G.aud.count]).catch(()=>{}); if(rid!==G.rid) return;
+  hideOverlay();
   const t0=AC.currentTime+.12; G.t0=t0;
-  for(let b=0;b<4;b++) kick(bus,t0+b*BEAT,.36,0);
-  riser(bus,t0,BEAT*4,.1);
-  G.shells=new Array(G.n).fill(null);
-  G.shells[0]=shellAt(0); scheduleShell(G.shells[0]);
-  G.phase='play';
+  G.shells.forEach((sh,i)=>{ if(sh) sh.start=t0+4*beat()+i*sh.len; });
+  playBuf(G.aud.countB,t0);
+  const s0=G.shells[0]; if(s0.buf&&!s0.src) s0.src=playBuf(s0.buf,s0.start);
+  prepShell(1);
+  G.phase='play'; renderMag();
 }
 function enterShell(i){
   G.cur=i; const sh=G.shells[i], seen=G.mag.slice(0,i), liveLeft=G.k-sum(seen), left=G.n-i;
+  prepShell(i+1); if(PERF.low) prepShell(i+2);
   sh.pNaive=liveLeft/left; sh.pExact=G.cands.length?G.cands.filter(s=>s[i]===1).length/G.cands.length:sh.pNaive;
   setChance(sh.pNaive); $('badge').className='badge'; $('badge').textContent=`#${i+1}/${G.n} боевой или холостой?`;
-  setFormula(sh,null); renderMag();
+  setFormula(sh,false); renderMag();
   if(i===G.n-1&&sh.pNaive===1) setSub('последний — боевой',true);
   else if(i===G.n-1) setSub('последний патрон',true);
   else if(sh.pNaive===1) setSub('остались только боевые',true);
@@ -713,33 +1001,33 @@ function enterShell(i){
 }
 function answer(choice){
   if(G.phase!=='play'||!AC) return; const sh=G.shells[G.cur]; if(!sh) return;
-  const now=AC.currentTime; if(now<sh.start||now>=sh.trig||sh.answer!==null) return;
+  const now=audioNow(); if(now<sh.start||now>=sh.start+sh.tr||sh.answer!==null) return;
   sh.answer=choice; sh.at=now;
-  const ph=(now-G.t0)/BEAT, dist=Math.abs(ph-Math.round(ph))*BEAT; sh.onbeat=dist<=.075;
+  const bt=beat(), ph=(now-G.t0)/bt, dist=Math.abs(ph-Math.round(ph))*bt; sh.onbeat=dist<=.075;
   pickedUI(choice); if(sh.onbeat) judge('В ТАКТ','','var(--amber)',true);
 }
 function resolve(sh){
   sh.resolved=true; G.total++; const ok=sh.answer===sh.out;
   G.cands=G.cands.filter(s=>s[sh.i]===sh.out);
   const hint=`по уликам шанс был ${Math.round(sh.pExact*100)} %`;
-  if(ok){ G.correct++; G.streak++; if(sh.onbeat) G.onbeat++; const pts=100*mult()+(sh.onbeat?25:0); G.score+=pts; judge(`ВЕРНО +${pts}`,hint,sh.out?'var(--live)':'var(--blank)'); ding(); G.mood=Math.min(1,G.mood+.3); }
-  else { G.lives--; G.streak=0; judge(sh.answer===null?'НЕ УСПЕЛ':'МИМО',hint,'var(--live)'); bang(); G.mood=Math.max(-1,G.mood-.6); }
+  if(ok){ G.correct++; G.streak++; if(sh.onbeat) G.onbeat++; const pts=100*mult()+(sh.onbeat?25:0); G.score+=pts; judge(`ВЕРНО +${pts}`,hint,sh.out?'var(--live)':'var(--blank)'); playBuf(G.aud.dingB,AC.currentTime,.8); G.mood=Math.min(1,G.mood+.3); }
+  else { G.lives--; G.streak=0; judge(sh.answer===null?'НЕ УСПЕЛ':'МИМО',hint,'var(--live)'); playBuf(G.aud.bangB,AC.currentTime,.8); G.mood=Math.max(-1,G.mood-.6); }
   if(G.lives===1) G.mood=Math.min(G.mood,-.5);
   flash(sh.out?'live':'blank',!ok);
   $('badge').className='badge '+(sh.out?'live':'blank'); $('badge').textContent=`#${sh.i+1}/${G.n} ${sh.out?'боевой':'холостой'}`;
   setSub(ok?(G.streak>=3?`серия: ${G.streak}`:'верно'):'минус жизнь',!ok);
-  setFormula(sh,sh.out); renderMag(); hud(); renderCandCount();
+  setFormula(sh,true); renderMag(); hud(); renderCandCount();
   if(G.lives<=0){ G.phase='dying'; setTimeout(gameOver,900); return; }
-  if(sh.i+1<G.n){ const nx=shellAt(sh.i+1); G.shells[sh.i+1]=nx; scheduleShell(nx); }
+  prepShell(sh.i+1);
 }
 function endRound(){
   G.phase='between'; const bits=G.mag, val=bits.reduce((a,x)=>a*2+x,0);
   $('bin').innerHTML=`Магазин: ${bits.map(x=>`<span class="${x?'l':'b'}">${x}</span>`).join(' ')} = ${val}`;
-  G.lives=Math.min(3,G.lives+1); hud(); killBus();
-  setTimeout(()=>{ if(G.phase==='between') newRound(); },1200);
+  G.lives=Math.min(3,G.lives+1); hud(); const rid=G.rid;
+  setTimeout(()=>{ if(G.phase==='between'&&rid===G.rid){ stopAll(.3); newRound(); } },1400);
 }
 function gameOver(){
-  G.phase='over'; killBus();
+  G.phase='over'; stopAll(.15); G.rid++;
   const acc=G.total?Math.round(G.correct/G.total*100):0;
   let best=0; try{best=+localStorage.getItem('patronnik-best')||0;}catch(e){}
   const isBest=G.score>best; if(isBest){ try{localStorage.setItem('patronnik-best',String(G.score));}catch(e){} }
@@ -748,29 +1036,28 @@ function gameOver(){
     <div class="big">${G.score}</div>
     <div class="stats"><span>верно <b>${G.correct}/${G.total}</b></span><span>точность <b>${acc} %</b></span><span>в такт <b>${G.onbeat}</b></span></div>
     <p>${isBest?'Новый личный рекорд.':'Личный рекорд: '+Math.max(best,G.score)+'.'} <span id="saveNote"></span></p>
+    <div id="sendSlot"></div>
+    <p>Следующая игра — новая сессия: другая тональность, темп, звуки и формулы.</p>
     <button class="go" id="goBtn" type="button"><span>Ещё раз</span><kbd>Пробел</kbd></button>`);
   $('goBtn').onclick=resetGame; $('goBtn').focus({preventScroll:true});
   submitScore(acc);
 }
 function resetGame(){
   if(G.phase!=='over'&&G.phase!=='title') return;
-  Object.assign(G,{round:0,lives:3,score:0,streak:0,correct:0,total:0,onbeat:0,mood:-.15});
   initAudio();
+  Object.assign(G,{round:0,lives:3,score:0,streak:0,correct:0,total:0,onbeat:0,mood:-.15});
+  newSession();
   if(!G.introDone){ G.introDone=true; playIntro(); } else newRound();
 }
-function playIntro(){
-  G.phase='introseq'; newBus(); const t0=AC.currentTime+.1;
-  riser(bus,t0,BEAT*8,.14);
-  for(let b=0;b<4;b++) kick(bus,t0+b*BEAT,.38,0);
-  for(let k=0;k<4;k++) kick(bus,t0+4*BEAT+k*BEAT/2,.36,0);
-  for(let k=0;k<8;k++) kick(bus,t0+6*BEAT+k*BEAT/4,.24+k*.02,0);
-  impact(bus,t0+8*BEAT);
+async function playIntro(){
+  G.phase='introseq'; showOverlay('<div class="intro" id="introText"></div>');
+  const b=await G.aud.intro.catch(()=>null); const t0=AC.currentTime+.1, bt=beat(), lag=t0-AC.currentTime+(AC.outputLatency||0);
+  playBuf(b,t0);
   const words=[[0,'<span class="w l">БОЕВОЙ</span>'],[1,' <span class="w or">или</span> '],[2,'<span class="w b">ХОЛОСТОЙ?</span>'],[4,'<br><span class="w g">УГАДАЙ.</span>'],[7,'<br><span class="w x">…ИНАЧЕ</span>']];
-  showOverlay('<div class="intro" id="introText"></div>');
   const el=$('introText'); let html='';
-  words.forEach(([b,w])=>setTimeout(()=>{ html+=w; el.innerHTML=html; },(t0-AC.currentTime+b*BEAT)*1000));
-  setTimeout(()=>flash('live',true),(t0-AC.currentTime+8*BEAT)*1000);
-  setTimeout(()=>{ killBus(); newRound(); },(t0-AC.currentTime+8*BEAT+1.1)*1000);
+  words.forEach(([k,w])=>setTimeout(()=>{ html+=w; el.innerHTML=html; },(lag+k*bt)*1000));
+  setTimeout(()=>flash('live',true),(lag+8*bt)*1000);
+  setTimeout(()=>{ newRound(); },(lag+8*bt+1.1)*1000);
 }
 
 /* ================= UI helpers ================= */
@@ -786,18 +1073,20 @@ function renderClues(){ $('clueList').innerHTML=G.clues.length?G.clues.map(c=>`<
 function renderCandCount(){ $('cands').textContent=`раскладов: ${G.cands.length} из ${G.total0}`; $('meter').style.width=Math.max(4,100*G.cands.length/G.total0)+'%'; }
 function setChance(p){ $('chance').textContent=Math.round(p*100)+' %'; }
 function setSub(t,hot){ const s=$('sub'); s.textContent=t; s.classList.toggle('hot',!!hot); }
-const PRE_S='<i>f</i><sub>out</sub> = <i>f</i>·2<sup><i>s</i></sup>,&nbsp; <i>s</i> = ?';
-function noteNames(sh){ return sh.notes.filter(n=>!n.post).slice(0,4).map(n=>NOTE[mod(Math.round(n.s),12)]).join(', '); }
-function setFormula(sh,out){
-  const S=sh.S, c=S.c;
-  $('fMain').innerHTML=c.html;
-  $('fSub1').innerHTML=c.sub?c.sub:c.plainSub?`нота = гамма[${I('d<sub>n</sub>')}]: ${noteNames(sh)} &nbsp;(${S.mode[0]})`:`ноты: ${c.mel.html} → ${noteNames(sh)}`;
-  const live=c.live==='reese'?'риз-бас на две октавы ниже':c.live==='wall'?'808 и стена пил':'перегруженный 808';
-  const blank=c.blank==='shep'?'стеклянные колокола, всё так же падает':c.blank==='fm'?'FM-колокол октавой выше':c.blank==='ks'?'струна октавой выше':'стеклянный колокол';
-  const s2=$('fSub2'); s2.innerHTML=out==null?PRE_S:out?`<i>s</i> = −2: &nbsp;<i>f</i>/4 &nbsp;БОЕВОЙ (${live})`:`<i>s</i> = +1: &nbsp;2<i>f</i> &nbsp;ХОЛОСТОЙ (${blank})`;
-  s2.className='f-sub'+(out==null?'':(out?' res-live':' res-blank'));
-  $('caption').innerHTML=c.cap;
+const idxOf=(sh,j)=>sh.puz.idx?sh.puz.idx(j):j;
+function setFormula(sh,rev){
+  const P=sh.puz, N=sh.N, a=idxOf(sh,N), b=idxOf(sh,N-1), vN=P.v[N], vP=P.v[N-1];
+  $('fMain').innerHTML=rev&&P.htmlRev?P.htmlRev:P.html; fitFormula();
+  $('fSub1').innerHTML=P.sub||`на графике ${yk(0)} … ${yk(b)}; после спуска — ${yk(a)}`;
+  const s2=$('fSub2');
+  if(!rev){ s2.innerHTML=`${yk(a)} &lt; ${yk(b)} ⇒ <span class="dn">вниз, ${I('s')} = −2: ${I('f')}/4</span> &nbsp;·&nbsp; ${yk(a)} &gt; ${yk(b)} ⇒ <span class="up">вверх, ${I('s')} = +1: 2${I('f')}</span>`; s2.className='f-sub'; }
+  else { const lt=vN<vP; s2.innerHTML=`${yk(a)} = ${vN} ${lt?'&lt;':'&gt;'} ${vP} = ${yk(b)} ⇒ ${lt?`${I('s')} = −2: ${I('f')}/4 &nbsp;БОЕВОЙ (808)`:`${I('s')} = +1: 2${I('f')} &nbsp;ХОЛОСТОЙ (колокол)`}`; s2.className='f-sub '+(lt?'res-live':'res-blank'); }
+  $('caption').innerHTML=P.cap;
 }
+/* long generated formulas shrink to at most two lines, so nothing below the graph jumps */
+function fitFormula(){ const el=$('fMain'); el.style.fontSize=''; let fs=parseFloat(getComputedStyle(el).fontSize)||22;
+  for(let i=0;i<12&&fs>13&&(el.scrollWidth>el.clientWidth+1||el.offsetHeight>fs*1.3*2+3);i++){ fs-=1; el.style.fontSize=fs+'px'; } }
+function clearFormula(){ ['fMain','fSub1','fSub2'].forEach(id=>$(id).innerHTML=''); $('caption').innerHTML='формула появится на первом патроне'; }
 function pickedUI(c){ $('btnLive').classList.toggle('picked',c===1); $('btnBlank').classList.toggle('picked',c===0); document.querySelector('.controls').classList.toggle('chosen',c===0||c===1); }
 function judge(text,small,color,quick){ const j=$('judge'); j.style.color=color; j.innerHTML=text+(small?`<small>${small}</small>`:''); j.classList.remove('show'); void j.offsetWidth; j.classList.add('show'); j.style.animationDuration=quick?'.6s':''; }
 function flash(kind,hard){ const f=$('flash'); f.className='flash'; void f.offsetWidth; f.className='flash '+kind; const s=$('stage'); s.classList.remove('shake','glitch'); void s.offsetWidth; s.classList.add(hard?'shake':'glitch'); }
@@ -805,163 +1094,146 @@ function showOverlay(html){ const o=$('overlay'); o.innerHTML=html; o.hidden=fal
 function hideOverlay(){ $('overlay').hidden=true; }
 function setProg(p,late){ const f=$('progFill'); f.style.width=(p*100)+'%'; f.classList.toggle('late',late); $('progKnob').style.left=(p*100)+'%'; }
 
-/* ================= the scope ================= */
+/* ===================================================================================
+   THE GRAPH. x = time (the trigger sits exactly in the middle), y = scale steps.
+   Rows F1…F5 are octaves of the session's key; the question sits on the third octave,
+   a live answer lands two octaves below, a blank one an octave above.
+   =================================================================================== */
 const cv=$('scope'), X=cv.getContext('2d'); let dpr=1, W=0, H0=0;
-function resize(){ dpr=Math.min(2,window.devicePixelRatio||1); W=cv.clientWidth; H0=Math.round(Math.min(window.innerWidth>=980?360:420,Math.max(290,W*.82))); cv.style.height=H0+'px'; cv.width=Math.round(W*dpr); cv.height=Math.round(H0*dpr); }
+function resize(){ dpr=Math.min(2,window.devicePixelRatio||1); W=Math.round(cv.getBoundingClientRect().width)||cv.clientWidth||320; H0=Math.round(Math.min(window.innerWidth>=980?380:440,Math.max(300,W*.86))); cv.style.height=H0+'px'; cv.width=Math.round(W*dpr); cv.height=Math.round(H0*dpr); }
 const FONT=getComputedStyle(document.documentElement).getPropertyValue('--f-display').trim()||'sans-serif';
-const COL={grid:'#15241d',grid2:'#1c2e25',axis:'#8a9bb0',txt:'#6c8a7a',amber:'#ffc845',live:'#ff3d5e',blank:'#55c7ff',tick:'#3f6b50'};
-const S_LO=-3, S_HI=55;
+const COL={grid:'#15241d',grid2:'#1c2e25',axis:'#8a9bb0',txt:'#6c8a7a',amber:'#ffc845',live:'#ff3d5e',blank:'#55c7ff',tick:'#3f6b50',mirror:'#c9d6cf'};
+const AX_P=14, P_LO=AX_P-17.5, P_HI=AX_P+17.5;   /* the axis is the middle octave line, in the exact centre */
+function glow(path,col,w,alpha=1){ X.save(); X.strokeStyle=col; X.lineJoin='round'; X.lineCap='round';
+  X.globalAlpha=.09*alpha; X.lineWidth=w*5; X.stroke(path); X.globalAlpha=.2*alpha; X.lineWidth=w*2.4; X.stroke(path); X.globalAlpha=alpha; X.lineWidth=w; X.stroke(path); X.restore(); }
+function dot(x,y,r,col,alpha=1){ X.save(); X.fillStyle=col; X.globalAlpha=.18*alpha; X.beginPath(); X.arc(x,y,r*2.6,0,7); X.fill(); X.globalAlpha=alpha; X.beginPath(); X.arc(x,y,r,0,7); X.fill(); X.restore(); }
+function pathSteps(gm,ns,lim){ const P=new Path2D(); let h=null, pe=-9;
+  for(const n of ns){ if(n.tr>lim) break; const x0=gm.x(n.tr), x1=Math.max(x0+1,gm.x(Math.min(n.tr+n.slot,lim))), y=gm.y(n.p);
+    if(h&&Math.abs(n.tr-pe)<.003) P.lineTo(x0,y); else P.moveTo(x0,y); P.lineTo(x1,y); h={x:x1,y}; pe=n.tr+n.slot; }
+  return {P,h}; }
+function pathStems(gm,ns,lim,base){ const P=new Path2D(); let h=null; const yb=gm.y(base);
+  for(const n of ns){ if(n.tr>lim) break; const x=gm.x(n.tr)+2, y=gm.y(n.p); P.moveTo(x,yb); P.lineTo(x,y); h={x,y}; }
+  return {P,h}; }
+function marker(x,y,kind,col,r){ if(kind==='none') return; X.save(); X.fillStyle=col; X.strokeStyle=col; X.lineWidth=1.4; X.beginPath();
+  if(kind==='ring'){ X.arc(x,y,r+.6,0,7); X.stroke(); X.restore(); return; }
+  if(kind==='circle') X.arc(x,y,r,0,7); else if(kind==='diamond'){ X.moveTo(x,y-r-1); X.lineTo(x+r+1,y); X.lineTo(x,y+r+1); X.lineTo(x-r-1,y); X.closePath(); } else X.rect(x-r,y-r,2*r,2*r);
+  X.fill(); X.restore(); }
+/* one formula, one look: the trace style comes from the theme (steps, dots, spline, bars, area, pulses, stems) */
+const PLAIN_LOOK={trace:'steps',marker:'none',width:2.2,glow:1,dash:false};
+function drawTrace(gm,ns,lim,col,mode,th,base){
+  const vis=ns.filter(n=>n.tr<=lim); if(!vis.length) return null;
+  const Lk=mode==='theme'&&th?th.look:PLAIN_LOOK, tr=mode==='theme'?Lk.trace:mode, w=Lk.width, yb=gm.y(base), last=vis[vis.length-1];
+  const cx=n=>gm.x(n.tr), ex=n=>Math.max(cx(n)+1,gm.x(Math.min(n.tr+n.slot,lim))), dx=n=>Math.max(cx(n)+2,gm.x(Math.min(n.tr+n.dur,lim))), y=n=>gm.y(n.p);
+  if(tr==='stems'){ const r=pathStems(gm,vis,lim,base); glow(r.P,col,1.6,.8); vis.forEach(n=>dot(cx(n)+2,y(n),3,col)); return r.h; }
+  if(tr==='dots'||tr==='spline'){ const P=new Path2D();
+    vis.forEach((n,i)=>{ const x=cx(n), yy=y(n); if(!i){ P.moveTo(x,yy); return; } if(tr==='dots'){ P.lineTo(x,yy); return; }
+      const p0=vis[Math.max(0,i-2)], p1=vis[i-1], p3=vis[Math.min(vis.length-1,i+1)];
+      P.bezierCurveTo(cx(p1)+(x-cx(p0))/6,y(p1)+(yy-y(p0))/6,x-(cx(p3)-cx(p1))/6,yy-(y(p3)-y(p1))/6,x,yy); });
+    P.lineTo(ex(last),y(last)); X.save(); if(Lk.dash) X.setLineDash([5,4]); glow(P,col,w*.8,Lk.glow); X.restore();
+    vis.forEach(n=>marker(cx(n),y(n),Lk.marker==='none'?'circle':Lk.marker,col,3)); return {x:ex(last),y:y(last)}; }
+  if(tr==='bars'){ vis.forEach(n=>{ const x0=cx(n), x1=dx(n)-1, yy=y(n); X.save(); X.fillStyle=col; X.globalAlpha=.15; X.fillRect(x0,Math.min(yy,yb),Math.max(1,x1-x0),Math.abs(yb-yy)); X.restore(); const P=new Path2D(); P.moveTo(x0,yy); P.lineTo(x1,yy); glow(P,col,w,Lk.glow); }); return {x:dx(last),y:y(last)}; }
+  if(tr==='pulse'){ const P=new Path2D(); vis.forEach(n=>{ const x0=cx(n), x1=dx(n), yy=y(n); P.moveTo(x0,yb); P.lineTo(x0,yy); P.lineTo(x1,yy); P.lineTo(x1,yb); }); glow(P,col,w*.85,Lk.glow); vis.forEach(n=>marker(cx(n),y(n),Lk.marker,col,2.6)); return {x:dx(last),y:y(last)}; }
+  const r=pathSteps(gm,vis,lim);
+  if(tr==='area'){ const F=new Path2D(); F.moveTo(cx(vis[0]),yb); vis.forEach(n=>{ F.lineTo(cx(n),y(n)); F.lineTo(ex(n),y(n)); }); F.lineTo(ex(last),yb); F.closePath(); X.save(); X.fillStyle=col; X.globalAlpha=.12; X.fill(F); X.restore(); }
+  glow(r.P,col,w,Lk.glow); vis.forEach(n=>marker(cx(n),y(n),Lk.marker,col,2.6)); return r.h;
+}
 function drawShell(sh,now,countdown){
-  X.setTransform(dpr,0,0,dpr,0,0); X.clearRect(0,0,W,H0); X.shadowBlur=0; X.globalAlpha=1;
-  const L=30, R=W-14, T=30, B=H0-30, xT=(L+R)/2;
-  const xOf=t=>L+(t-sh.start)/(sh.end-sh.start)*(R-L), yOf=s=>B-(s-S_LO)/(S_HI-S_LO)*(B-T);
-  const ctx={xOf,yOf,B,T,L,R};
-  const revealed=now>=sh.trig, col=revealed?(sh.out?COL.live:COL.blank):COL.amber;
+  X.setTransform(dpr,0,0,dpr,0,0); X.clearRect(0,0,W,H0); X.globalAlpha=1;
+  const M=34, L=M, Rr=W-M, T=26, B=H0-34, xT=W/2, tau=now-sh.start;
+  const gm={x:t=>L+t/sh.len*(Rr-L), y:p=>B-(p-P_LO)/(P_HI-P_LO)*(B-T)};
+  const revealed=tau>=sh.tr, pc=sh.out?COL.live:COL.blank, col=COL.amber;
+  /* grid */
   X.lineWidth=1;
-  for(let i=0;i<=12;i++){ const x=Math.round(L+(R-L)*i/12)+.5; X.strokeStyle=COL.grid; X.beginPath(); X.moveTo(x,T); X.lineTo(x,B); X.stroke(); }
+  for(let i=0;i<=16;i++){ const x=Math.round(L+(Rr-L)*i/16)+.5; X.strokeStyle=i%4===0?COL.grid2:COL.grid; X.beginPath(); X.moveTo(x,T); X.lineTo(x,B); X.stroke(); }
   X.font=`800 10px ${FONT}`; X.textAlign='right';
-  for(let k=0;k<5;k++){ const y=Math.round(yOf(12*k))+.5; X.strokeStyle=COL.grid2; X.beginPath(); X.moveTo(L,y); X.lineTo(R,y); X.stroke(); X.fillStyle=COL.txt; X.fillText('F'+(k+1),L-6,y+3); }
-  const ay=yOf(19); X.strokeStyle=COL.axis; X.lineWidth=1.3;
-  X.beginPath(); X.moveTo(L-6,ay); X.lineTo(R,ay); X.moveTo(R-7,ay-4); X.lineTo(R,ay); X.lineTo(R-7,ay+4); X.stroke();
+  for(let k=0;k<5;k++){ const y=Math.round(gm.y(7*k))+.5; X.strokeStyle=COL.grid2; X.beginPath(); X.moveTo(L,y); X.lineTo(Rr,y); X.stroke(); X.fillStyle=COL.txt; X.fillText(sh.song.name+(k+1),L-5,y+3); }
+  const ay=gm.y(AX_P); X.strokeStyle=COL.axis; X.lineWidth=1.3;
+  X.beginPath(); X.moveTo(L-4,ay); X.lineTo(Rr+6,ay); X.moveTo(Rr-1,ay-4); X.lineTo(Rr+6,ay); X.lineTo(Rr-1,ay+4); X.stroke();
   X.beginPath(); X.moveTo(xT,B+6); X.lineTo(xT,T-2); X.moveTo(xT-4,T+5); X.lineTo(xT,T-2); X.lineTo(xT+4,T+5); X.stroke();
   X.fillStyle=COL.axis; X.textAlign='center'; X.font=`800 9px ${FONT}`; X.fillText('СПУСК',xT,T-8);
-  if(!revealed){ const p=Math.max(0,(now-sh.start)/(sh.trig-sh.start)); X.save(); X.setLineDash([5,5]); X.strokeStyle=p>.75?COL.live:'#ff9a3c'; X.globalAlpha=.85; X.lineWidth=1.5; X.beginPath(); X.moveTo(xT,T+8); X.lineTo(xT,B); X.stroke(); X.restore(); }
-  sh.notes.forEach(n=>{ if(n.t>now) return; const x=xOf(n.t)+.5, h=3+(mod(Math.round(n.v),5))*2; X.strokeStyle=n.post?(sh.out?'#7a2a3a':'#2a5f7a'):COL.tick; X.lineWidth=1.5; X.beginPath(); X.moveTo(x,B+20); X.lineTo(x,B+20-h); X.stroke(); });
-  const S=sh.S, c=S.c;
-  const pre=sh.notes.filter(n=>!n.post&&n.t<=now), post=sh.notes.filter(n=>n.post&&n.t<=now), lim=Math.min(now,sh.trig);
-  X.save(); X.font=`800 9px ${FONT}`; X.fillStyle=col; X.strokeStyle=col; X.globalAlpha=.75; X.lineWidth=1;
-  if(c.look==='mirror'){ const y=yOf(24); X.setLineDash([4,4]); X.beginPath(); X.moveTo(L,y); X.lineTo(R,y); X.stroke(); X.setLineDash([]); X.textAlign='left'; X.fillText('зеркало',L+3,y+12); }
-  if(c.bracket){ const p=c.bracket; for(let i=0;i+3<pre.length;i+=4){ const g=pre.slice(i,i+4), xa=xOf(g[0].t), xb=xOf(g[3].t+g[3].slot), y=yOf(44); X.beginPath(); X.moveTo(xa,y+4); X.lineTo(xa,y); X.lineTo(xb,y); X.lineTo(xb,y+4); X.stroke(); X.textAlign='center'; X.fillText(`${p} ${plural(p,'доля','доли','долей')}`,(xa+xb)/2,y-4); } }
-  if(c.look==='mag'){ const y=yOf(44); X.textAlign='left'; X.fillText(c.bits.join(''),L+4,y-8); X.setLineDash([2,3]); X.beginPath(); X.moveTo(L,y); X.lineTo(revealed?R:xOf(now),y); X.stroke(); X.setLineDash([]);
-    pre.forEach(n=>{ if(n.v===0){ X.globalAlpha=1; X.lineWidth=3; X.beginPath(); X.moveTo(xOf(n.t),y); X.lineTo(xOf(n.t+n.dur*.8),y); X.stroke(); } }); }
+  if(!revealed){ const p=clamp(tau/sh.tr,0,1); X.save(); X.setLineDash([5,5]); X.strokeStyle=p>.75?COL.live:'#ff9a3c'; X.globalAlpha=.85; X.lineWidth=1.5; X.beginPath(); X.moveTo(xT,T+8); X.lineTo(xT,B); X.stroke(); X.restore(); }
+  /* rhythm ticks */
+  sh.notes.forEach(n=>{ if(n.tr>tau) return; const x=Math.round(gm.x(n.tr))+.5, h=3+mod(n.y,5)*2; X.strokeStyle=n.post?(sh.out?'#7a2a3a':'#2a5f7a'):COL.tick; X.lineWidth=1.5; X.beginPath(); X.moveTo(x,B+22); X.lineTo(x,B+22-h); X.stroke(); });
+  const pre=sh.notes.filter(n=>!n.post), post=sh.notes.filter(n=>n.post), P=sh.puz, look=P.look, lim=Math.min(tau,sh.tr);
+  const shift=sh.out?-14:7, base=AX_P-.9;
+  /* decorations under the line */
+  X.save(); X.font=`800 9px ${FONT}`;
+  if(look==='mirror'){ const segs=[]; for(let k=0;k*P.L<sh.notes.length;k++){ const ns=sh.notes.filter(n=>Math.floor(n.j/P.L)===k); if(ns.length) segs.push({k,ns}); }
+    let labelled={pre:false,post:false};
+    segs.forEach(({k,ns})=>{ ns.forEach((n,ii)=>{ if(n.tr>tau) return; const first=ii===0||ns[ii-1].post!==n.post; const pa=14+(P.axes[k]-sh.lo)+(n.post?shift:0), y=gm.y(pa), xa=gm.x(n.tr), xb=gm.x(Math.min(n.tr+n.slot,tau));
+      X.strokeStyle=n.post?pc:COL.mirror; X.globalAlpha=n.post?.55:.4; X.lineWidth=1; X.setLineDash([3,3]); X.beginPath(); X.moveTo(xa,y); X.lineTo(xb,y); X.stroke(); X.setLineDash([]);
+      if(first){ X.globalAlpha=n.post?.8:.55; X.beginPath(); X.moveTo(xa,y-4); X.lineTo(xa,y+4); X.stroke(); const key=n.post?'post':'pre'; if(!labelled[key]){ labelled[key]=true; X.fillStyle=n.post?pc:COL.mirror; X.textAlign='left'; X.fillText('зеркало',xa+3,y+11); } } }); }); }
+  if(look==='walk'&&revealed||look==='walk'&&tau>sh.tr*.5){ const y=gm.y(14+(P.target-sh.lo)+(revealed?shift:0)); X.strokeStyle=revealed?pc:COL.amber; X.globalAlpha=.6; X.setLineDash([2,4]); X.beginPath(); X.moveTo(revealed?xT:gm.x(sh.tr*.5),y); X.lineTo(Rr,y); X.stroke(); X.setLineDash([]); X.fillStyle=X.strokeStyle; X.textAlign='right'; X.fillText(`цель ${P.target}`,Rr-2,y-5); }
   X.restore();
-  if(!c.noLabels){ const preTop=sh.notes.filter(n=>!n.post).reduce((m,n)=>Math.max(m,n.ch?Math.max(...n.ch):n.s),0);
-    X.font=`800 9px ${FONT}`; X.textAlign='center'; X.globalAlpha=.9; let lastR=[-99,-99];
-    sh.notes.forEach((n,j)=>{ if(n.t>now) return; const top=n.post?Math.max(preTop,n.sp):preTop, row=j%2, y=yOf(top)-12-row*10, x=xOf(n.t)+2, lab=String(n.x), hw=X.measureText(lab).width/2;
-      if(x-hw<lastR[row]+3) return; lastR[row]=x+hw; X.fillStyle=n.post?(sh.out?COL.live:COL.blank):col; X.fillText(lab,x,Math.max(T+8,y)); });
-    X.globalAlpha=1; }
-  X.save(); X.strokeStyle=col; X.fillStyle=col; X.lineWidth=2.4; X.lineJoin='round'; X.lineCap='round'; X.shadowColor=col; X.shadowBlur=14;
-  let head=LOOK[c.look](ctx,pre,'s',lim,c,sh,now);
-  X.restore();
-  if(revealed&&post.length){
-    const pc=sh.out?COL.live:COL.blank;
-    X.save(); X.strokeStyle=pc; X.fillStyle=pc; X.lineWidth=2.4; X.lineJoin='round'; X.lineCap='round'; X.shadowColor=pc; X.shadowBlur=14;
-    const y0=head?head.y:yOf(24), y1=yOf(post[0].sp);
-    if(sh.out&&c.live!=='reese'&&c.look!=='shep') head=traceSpikes(ctx,post,now);
-    else head=LOOK[c.look](ctx,post,'sp',now,c,sh,now);
-    if(!sh.out) post.forEach(n=>{ const age=now-n.t; if(age<.5){ X.save(); X.globalAlpha=1-age/.5; X.lineWidth=1.2; X.shadowBlur=6; X.beginPath(); X.arc(xOf(n.t),yOf(n.sp),3+age*16,0,Math.PI*2); X.stroke(); X.restore(); } });
-    X.restore();
-    X.fillStyle=pc; X.font=`800 10px ${FONT}`;
-    if(sh.out){ X.textAlign='right'; X.fillText('÷4  (s = −2)',xT-8,y1+4); } else { X.textAlign='left'; X.fillText('×2  (s = +1)',xT+8,(y0+y1)/2+4); }
-    if(c.voice==='reese'){ X.textAlign='left'; X.fillText(`Δf = ${c.p.df[0]} → ${c.p.df[1]} Гц`,xT+8,yOf(post[0].sp)-10); }
+  /* the question */
+  if(look==='smooth'&&P.curve&&pre.length){ const cp=new Path2D(); const ts=pre.map(n=>n.tr); let first=true;
+    for(let x=gm.x(0);x<=gm.x(lim);x+=2){ const t=(x-L)/(Rr-L)*sh.len; let u; if(t<=ts[0]) u=0; else { let i=ts.findIndex(q=>q>t); if(i<0) i=ts.length; const a=ts[i-1], b2=i<ts.length?ts[i]:sh.tr; u=(i-1)+(t-a)/Math.max(1e-6,b2-a); }
+      const y=gm.y(14+P.curve(u)-sh.lo); if(first){ cp.moveTo(x,y); first=false; } else cp.lineTo(x,y); }
+    X.save(); X.setLineDash([3,4]); glow(cp,col,1.2,.55); X.restore(); }
+  const mode=look==='theme'?'theme':look==='stems'?'stems':'steps';
+  let head=drawTrace(gm,pre,lim,col,mode,sh.th,base);
+  if(look==='smooth') pre.forEach(n=>{ if(n.tr<=lim) dot(gm.x(n.tr),gm.y(n.p),2.6,col); });
+  /* value labels: two rows above the phrase, like the reference */
+  const labels=(ns,top,c)=>{ X.font=`800 9px ${FONT}`; X.textAlign='center'; X.fillStyle=c; let last=[-99,-99];
+    ns.forEach((n,i)=>{ if(n.tr>tau) return; const row=i%2, x=gm.x(n.tr)+3, hw=X.measureText(n.lab).width/2; if(x-hw<last[row]+2) return; last[row]=x+hw; X.globalAlpha=.9; X.fillText(n.lab,x,Math.max(T+8,gm.y(top)-10-row*10)); }); X.globalAlpha=1; };
+  const preTop=Math.max(...pre.map(n=>n.p)); labels(pre,preTop+(look==='mirror'?0:0),col);
+  /* the trigger: before — a question mark with both ways out; after — the arrow to where the graph went */
+  const lastPre=pre[pre.length-1], firstPost=post[0];
+  if(!revealed&&lastPre&&tau>0){ const y=gm.y(lastPre.p), x=xT+11, pulse=.55+.45*Math.sin(now*6);
+    X.save(); X.globalAlpha=pulse; X.fillStyle=COL.amber; X.font=`900 15px ${FONT}`; X.textAlign='center'; X.fillText('?',x,y+5);
+    X.strokeStyle=COL.blank; X.lineWidth=1.6; X.beginPath(); X.moveTo(x-4,y-11); X.lineTo(x,y-16); X.lineTo(x+4,y-11); X.stroke();
+    X.strokeStyle=COL.live; X.beginPath(); X.moveTo(x-4,y+11); X.lineTo(x,y+16); X.lineTo(x+4,y+11); X.stroke(); X.restore(); }
+  if(revealed&&lastPre&&firstPost){
+    const u=clamp((tau-sh.tr)/.22,0,1), e=1-Math.pow(1-u,3), y0=gm.y(lastPre.p), y1=gm.y(firstPost.p), yy=y0+(y1-y0)*e, dir=Math.sign(y1-y0);
+    const ap=new Path2D(); ap.moveTo(xT,y0); ap.lineTo(xT,yy); ap.moveTo(xT-5,yy-dir*7); ap.lineTo(xT,yy); ap.lineTo(xT+5,yy-dir*7); glow(ap,pc,2.2);
+    X.save(); X.fillStyle=pc; X.font=`800 10px ${FONT}`; X.globalAlpha=u; const ym=(y0+yy)/2+4;
+    if(sh.out){ X.textAlign='right'; X.fillText('f/4 · s = −2',xT-8,ym); } else { X.textAlign='left'; X.fillText('2f · s = +1',xT+8,ym); } X.restore();
+    /* the continuation */
+    const vis=post.filter(n=>n.tr<=tau);
+    head=drawTrace(gm,post,tau,pc,mode,sh.th,base+shift)||head;
+    if(!sh.out) vis.forEach(n=>{ const age=now-(sh.start+n.tr); if(age<.6){ X.save(); X.strokeStyle=pc; X.globalAlpha=1-age/.6; X.lineWidth=1.2; X.beginPath(); X.arc(gm.x(n.tr),gm.y(n.p),3+age*18,0,7); X.stroke(); X.restore(); } });
+    labels(post,Math.max(...post.map(n=>n.p)),pc);
   }
-  if(sh.answer!==null){ const x=xOf(sh.at), c2=sh.answer?COL.live:COL.blank; X.save(); X.strokeStyle=c2; X.globalAlpha=.7; X.lineWidth=1; X.setLineDash([2,4]); X.beginPath(); X.moveTo(x,T+8); X.lineTo(x,B); X.stroke(); X.restore();
-    X.fillStyle=c2; X.textAlign='left'; X.font=`800 9px ${FONT}`; X.fillText((sh.answer?'БОЕВОЙ':'ХОЛОСТОЙ')+(sh.onbeat?' · в такт':''),x+4,B-4); }
-  if(head&&now<sh.end){ X.save(); X.fillStyle=revealed?(sh.out?COL.live:COL.blank):COL.amber; X.shadowColor=X.fillStyle; X.shadowBlur=18; X.beginPath(); X.arc(head.x,head.y,4.5,0,Math.PI*2); X.fill(); X.restore(); }
-  if(countdown!=null){ X.fillStyle=COL.amber; X.globalAlpha=.9; X.textAlign='center'; X.font=`900 64px ${FONT}`; X.fillText(String(countdown),(L+R)/2,(T+B)/2+22); X.globalAlpha=1; }
-}
-/* stepped pitch line with a textured hold: tex(u) returns an offset in px for 0..1 through the note */
-function traceTex(g,ns,key,lim,tex,stacc,stairs){
-  let h=null, pe=-9; X.beginPath();
-  ns.forEach(n=>{
-    const q=stairs?stairs(n):0, y0=g.yOf(n[key]), y=q?Math.round(y0/q)*q:y0, x0=g.xOf(n.t), xf=g.xOf(n.t+n.dur), xe=g.xOf(Math.min(n.t+n.dur,lim)), w=Math.max(1,xf-x0), gl=q?0:Math.min(5,w*.3);
-    if(stacc){ const yb=y+5; X.moveTo(x0,yb); X.quadraticCurveTo(x0+1,y,x0+gl,y); X.lineTo(Math.max(x0+gl,xe-gl),y); if(n.t+n.dur<=lim) X.quadraticCurveTo(xe-1,y,xe,yb); h={x:xe,y}; return; }
-    if(h&&n.t-pe<.012){ X.lineTo(x0,h.y);
-      if(q) X.lineTo(x0,y); else X.quadraticCurveTo(x0+gl*.2,y,x0+gl,y); }
-    else X.moveTo(x0,y);
-    let ly=y; for(let px=x0+gl;px<=xe;px+=1.2){ ly=y+(tex?tex((px-x0)/w,n):0); X.lineTo(px,ly); }
-    h={x:Math.max(x0+gl,xe),y}; pe=n.t+n.dur;
-  });
-  X.stroke(); return h;
-}
-const isStacc=c=>c.rh&&(c.rh[0]==='p'||c.rh==='off'||c.rh==='sparse'||c.rh==='fib'||c.rh==='euclid');
-const LOOK={
-  steps:(g,ns,key,lim,c)=>traceTex(g,ns,key,lim,null,isStacc(c)),
-  mirror:(g,ns,key,lim)=>traceTex(g,ns,key,lim,null,false),
-  mag:(g,ns,key,lim)=>traceTex(g,ns,key,lim,null,false),
-  smooth:(g,ns,key,lim)=>traceSmooth(g,ns,key,lim,0),
-  vib:(g,ns,key,lim)=>traceSmooth(g,ns,key,lim,2.2),
-  shep:(g,ns,key,lim)=>traceShep(g,ns,key,lim),
-  /* FM: a bell's bright attack eases back onto the note; string: a pluck that settles */
-  decay:(g,ns,key,lim,c)=>{ const ks=c.voice==='ks'; return traceTex(g,ns,key,lim,ks?(u)=>-7*Math.exp(-10*u)+3*(1-Math.exp(-3*u)):(u)=>-11*Math.exp(-5*u),isStacc(c)); },
-  /* fewer bits = the pitch snaps to a coarser grid, square corners */
-  crush:(g,ns,key,lim)=>{ X.lineJoin='miter'; X.lineCap='butt'; return traceTex(g,ns,key,lim,null,false,(n)=>3*Math.pow(2,Math.max(0,7-(n.bits||8))/1.6)); },
-  /* the fold grows: each note bows higher as the gain rises */
-  fold:(g,ns,key,lim)=>traceTex(g,ns,key,lim,(u,n)=>-((n.g||1)-1)*2.4*Math.sin(Math.PI*u),false),
-  /* ring modulation: a slow, smooth tremolo across the note */
-  ring:(g,ns,key,lim,c)=>traceTex(g,ns,key,lim,(u)=>-4*Math.sin(Math.PI*u*(c.p.rm>1?2:1)),isStacc(c)),
-  pwm:(g,ns,key,lim)=>traceTex(g,ns,key,lim,null,false),
-  pump:(g,ns,key,lim,c,sh)=>traceTex(g,ns,key,lim,(u,n)=>{ const t=n.t+u*n.dur, b=t-Math.floor((t-sh.start)/BEAT)*BEAT-sh.start; return 16*Math.exp(-b/c.p.tau); },false),
-  acid:(g,ns,key,lim,c)=>traceTex(g,ns,key,lim,(u,n)=>-10*(n.acc||.6)*Math.exp(-u*7),false),
-  echo:(g,ns,key,lim,c)=>{ const h=traceTex(g,ns,key,lim,null,true); X.save();
-    for(let k=1;k<=4;k++){ X.globalAlpha=Math.pow(c.p.g,k); const sh=ns.map(n=>({...n,t:n.t+k*c.p.D*S16})).filter(n=>n.t<=lim); traceTex(g,sh,key,lim,null,true); } X.restore(); return h; },
-  thick:(g,ns,key,lim)=>{ let h=null;
-    ns.forEach(n=>{ const ps=(key==='s'?n.ch:n.chp)||[n[key]], x0=g.xOf(n.t), xe=g.xOf(Math.min(n.t+n.dur,lim));
-      ps.forEach((p,i)=>{ const y=g.yOf(p); X.beginPath(); X.moveTo(x0,y); X.lineTo(Math.max(x0+3,xe),y); X.stroke();
-        X.save(); X.globalAlpha=.3; X.lineWidth=1; X.shadowBlur=0; [-3,-1.5,1.5,3].forEach(o=>{ X.beginPath(); X.moveTo(x0+1,y+o); X.lineTo(Math.max(x0+3,xe)-1,y+o); X.stroke(); }); X.restore();
-        if(i===ps.length-1) h={x:Math.max(x0+3,xe),y}; });
-      X.save(); X.globalAlpha=.5; X.lineWidth=1; X.beginPath(); X.moveTo(x0,g.yOf(ps[0])); X.lineTo(x0,g.yOf(ps[ps.length-1])); X.stroke(); X.restore(); });
-    return h; },
-  fan:(g,ns,key,lim)=>{ let h=null; const base=g.yOf(key==='s'?12:24);
-    ns.forEach(n=>{ const y=g.yOf(n[key]), x=g.xOf(n.t)+1; X.beginPath(); X.moveTo(x,base); X.lineTo(x,y); X.moveTo(x-4,y); X.lineTo(x+4,y); X.stroke(); h={x,y}; });
-    return h; },
-  stems:(g,ns,key,lim,c,sh,now)=>{ let h=null; const base=g.yOf(20);
-    ns.forEach(n=>{ const y=g.yOf(n[key]), x=g.xOf(n.t)+1, age=now-n.t; X.save(); X.globalAlpha=.5; X.lineWidth=1.2; X.beginPath(); X.moveTo(x,base); X.lineTo(x,y); X.stroke(); X.restore();
-      X.beginPath(); X.arc(x,y,3.2,0,Math.PI*2); X.fill(); if(age<.5){ X.save(); X.globalAlpha=1-age/.5; X.lineWidth=1.3; X.beginPath(); X.arc(x,y,4+age*22,0,Math.PI*2); X.stroke(); X.restore(); } h={x,y}; });
-    return h; },
-};
-function traceSmooth(g,ns,key,lim,wig){
-  if(!ns.length) return null; const cs=ns.map(n=>n.t+n.dur*.5); let h=null; X.beginPath();
-  const xa=g.xOf(ns[0].t), xb=g.xOf(lim);
-  for(let px=xa;px<=xb;px+=1.5){ const t=ns[0].t+(px-xa)/(xb-xa||1)*(lim-ns[0].t); let s=ns[0][key];
-    if(t>cs[0]){ s=ns[ns.length-1][key]; for(let i=0;i<ns.length-1;i++) if(t<cs[i+1]){ const u=(t-cs[i])/(cs[i+1]-cs[i]), e=(1-Math.cos(Math.PI*u))/2; s=ns[i][key]+(ns[i+1][key]-ns[i][key])*e; break; } }
-    const y=g.yOf(s)+(wig?wig*Math.sin(px*.55):0); if(!h) X.moveTo(px,y); else X.lineTo(px,y); h={x:px,y}; }
-  X.stroke(); return h;
-}
-function traceShep(g,ns,key,lim){
-  let h=null;
-  for(let c=0;c<4;c++){ let prev=null;
-    ns.forEach(n=>{ const cp=n.cp[c], s=cp.s+(key==='sp'?n.sp-n.s:0), y=g.yOf(s), x0=g.xOf(n.t), x1=g.xOf(Math.min(n.t+n.dur,lim));
-      X.save(); X.globalAlpha=.1+.9*cp.a; X.beginPath();
-      if(prev&&Math.abs(prev.s-s)<=3){ X.moveTo(prev.x,prev.y); X.lineTo(x0,prev.y); X.lineTo(x0,y); } else X.moveTo(x0,y);
-      X.lineTo(x1,y); X.stroke(); X.restore(); prev={x:x1,y,s}; });
-    if(prev){ const a=ns[ns.length-1].cp[c].a; X.save(); X.globalAlpha=.25+.75*a; X.beginPath(); X.arc(prev.x,prev.y,3.5,0,Math.PI*2); X.fill(); X.restore(); if(a>.5) h={x:prev.x,y:prev.y}; }
-  }
-  return h;
-}
-function traceSpikes(g,ns,now){
-  let h=null, pe=-9; X.beginPath();
-  ns.forEach(n=>{ const y=g.yOf(n.sp), x0=g.xOf(n.t), xs=g.xOf(n.t+n.slot), x1=g.xOf(Math.min(n.t+n.slot,now)), w=Math.max(1,xs-x0), top=(g.B-g.T)*(n.slot<S16*1.5?.18:.28);
-    if(!h||n.t-pe>.01||Math.abs(h.y-y)>2) X.moveTo(x0,y); else X.lineTo(x0,y); pe=n.t+n.slot;
-    X.lineTo(x0+1,y-top);
-    for(let px=x0+1;px<=x1;px+=1.2){ const u=(px-x0)/w; X.lineTo(px,y-top*Math.exp(-6*u)); }
-    h={x:x1,y}; });
-  X.stroke(); return h;
+  if(sh.answer!==null){ const x=gm.x(sh.at-sh.start), c2=sh.answer?COL.live:COL.blank; X.save(); X.strokeStyle=c2; X.globalAlpha=.7; X.lineWidth=1; X.setLineDash([2,4]); X.beginPath(); X.moveTo(x,T+8); X.lineTo(x,B); X.stroke(); X.restore();
+    X.fillStyle=c2; X.textAlign=x>xT-60?'right':'left'; X.font=`800 9px ${FONT}`; X.fillText((sh.answer?'БОЕВОЙ ↓':'ХОЛОСТОЙ ↑')+(sh.onbeat?' · в такт':''),x>xT-60?x-4:x+4,B-4); }
+  if(head&&tau<sh.len) dot(head.x,head.y,4.2,revealed?pc:COL.amber);
+  if(countdown!=null){ X.fillStyle=COL.amber; X.globalAlpha=.9; X.textAlign='center'; X.font=`900 64px ${FONT}`; X.fillText(String(countdown),xT,(T+B)/2+22); X.globalAlpha=1; }
 }
 
 /* title screen: a silent, endless stream of freshly grown shells */
-let demo=null, demoT0=0;
+let demo=null, demoT0=0, demoSong=null;
 function demoFrame(){
-  if(!demo){ demo=buildShell(makeShell(newSeed(),rp(Math.random,['neutral','tense','relaxed'])),0,8,8,Math.random()<.5?1:0); demoT0=performance.now(); setFormula(demo,null); }
-  const el=(performance.now()-demoT0)/1000*1.4, t=Math.min(demo.end,el);
-  if(t>=demo.trig&&!demo._rev){ demo._rev=true; setFormula(demo,demo.out); }
-  drawShell(demo,t);
-  if(el>demo.end+1) demo=null;
+  if(!demo){ if(!demoSong) demoSong=makeSong(newSeed()); const rs=roundStyle(demoSong,1+Math.floor(Math.random()*3));
+    demo=buildShell({song:demoSong,rs,seed:newSeed(),want:Math.random()<.5?1:0,pre:8,post:8,lv:rnd(2,5),level:1,recent:[]}); demoT0=performance.now(); setFormula(demo,false); }
+  const el=(performance.now()-demoT0)/1000*1.25;
+  if(el>=demo.tr&&!demo._rev){ demo._rev=true; setFormula(demo,true); }
+  drawShell(demo,Math.min(demo.len,el));
+  if(el>demo.len+1.2) demo=null;
 }
+/* game logic runs on the audio clock; it is ticked from rAF and from a timer, so a stalled frame never stalls the round */
+function tick(){
+  if(G.phase!=='play') return; const now=audioNow();
+      for(let guard=0;guard<G.n;guard++){
+        const i=G.cur, sh=G.shells[i];
+        if(i<0){ const s0=G.shells[0]; if(s0&&now>=s0.start){ enterShell(0); continue; } break; }
+        if(sh&&!sh.resolved&&now>=sh.start+sh.tr){ resolve(sh); if(G.phase!=='play') break; continue; }
+        if(sh&&sh.resolved&&now>=sh.start+sh.len){ if(i+1<G.n){ prepShell(i+1); enterShell(i+1); continue; } endRound(); }
+        break;
+      }
+}
+setInterval(tick,100);
 function frame(){
-  if(G.phase==='debug'){ requestAnimationFrame(frame); return; }
-  if(G.phase==='play'||G.phase==='dying'||G.phase==='between'){
-    const now=AC.currentTime;
-    if(G.phase==='play'){
-      let idx=-1; for(let i=0;i<G.shells.length;i++) if(G.shells[i]&&now>=G.shells[i].start) idx=i;
-      if(idx>=0&&idx!==G.cur) enterShell(idx);
-      const sh=G.shells[Math.max(0,idx)];
-      if(idx>=0&&now>=sh.trig&&!sh.resolved) resolve(sh);
-      if(G.phase==='play'&&idx===G.n-1&&now>=sh.end) endRound();
-      if(idx<0){ const cd=4-Math.floor((now-G.t0)/BEAT); drawShell(G.shells[0],G.shells[0].start-.001,Math.max(1,Math.min(4,cd))); setProg(0,false); }
-      else { drawShell(sh,now); const p=(now-sh.start)/(sh.trig-sh.start); setProg(Math.max(0,Math.min(1,p)),p>.75); }
-    } else { const sh=G.shells[Math.max(0,G.cur)]; if(sh) drawShell(sh,Math.min(AC.currentTime,sh.end)); }
-  } else demoFrame();
+  tick();
+  const ph=G.phase;
+  if(ph==='play'||ph==='dying'||ph==='between'){
+    const now=audioNow();
+    if(ph==='play'){
+      const sh=G.shells[Math.max(0,G.cur)];
+      if(G.cur<0&&sh){ const cd=4-Math.floor((now-G.t0)/beat()); drawShell(sh,sh.start-.001,clamp(cd,1,4)); setProg(0,false); }
+      else if(sh){ drawShell(sh,now); const p=(now-sh.start)/sh.tr; setProg(clamp(p,0,1),p>.75); }
+    } else { const sh=G.shells[Math.max(0,G.cur)]; if(sh) drawShell(sh,Math.min(now,sh.start+sh.len)); }
+  } else if(ph==='loading'||ph==='intro'){ const sh=G.shells[0]; if(sh) drawShell(sh,sh.start-.001,ph==='loading'?4:null); }
+  else if(ph!=='debug') demoFrame();
   requestAnimationFrame(frame);
 }
 
@@ -969,53 +1241,100 @@ function frame(){
 let lastPointer=0;
 [['btnLive',1],['btnBlank',0]].forEach(([id,v])=>{ const b=$(id); b.addEventListener('pointerdown',()=>{ lastPointer=performance.now(); answer(v); }); b.addEventListener('click',()=>{ if(performance.now()-lastPointer>400) answer(v); }); });
 document.addEventListener('keydown',e=>{
-  if(e.repeat) return; const k=e.code;
-  if(k==='ArrowLeft'||k==='KeyA'||k==='Digit1'){ if(G.phase==='play'){ e.preventDefault(); answer(1);} }
-  else if(k==='ArrowRight'||k==='KeyD'||k==='Digit2'){ if(G.phase==='play'){ e.preventDefault(); answer(0);} }
+  if(e.repeat) return; const tg=e.target; if(tg&&(tg.tagName==='INPUT'||tg.tagName==='TEXTAREA'||tg.isContentEditable)) return; const k=e.code;
+  if(k==='ArrowLeft'||k==='ArrowDown'||k==='KeyA'||k==='KeyS'||k==='Digit1'){ if(G.phase==='play'){ e.preventDefault(); answer(1);} }
+  else if(k==='ArrowRight'||k==='ArrowUp'||k==='KeyD'||k==='KeyW'||k==='Digit2'){ if(G.phase==='play'){ e.preventDefault(); answer(0);} }
   else if(k==='Space'||k==='Enter'){ const go=$('goBtn'); if(go&&!$('overlay').hidden){ if(document.activeElement!==go){ e.preventDefault(); go.click(); } } else if(G.phase==='play') e.preventDefault(); }
 });
+/* leaving the tab pauses the whole timeline (it runs on the audio clock) */
+document.addEventListener('visibilitychange',()=>{ if(!AC) return; if(document.hidden){ if(G.phase==='play'||G.phase==='loading') AC.suspend&&AC.suspend(); } else if(AC.state!=='running') AC.resume(); });
 
-/* ================= leaderboard ================= */
-let DB=null, USER=null, UID=null, rows=[], remoteBest=0, canWrite=null;
+/* ================= leaderboard =================
+   No outside services. Three homes, tried in this order:
+   1) the game's own GitHub repository: scores.json next to this page is the shared table.
+      A player sends a result as a GitHub issue (the button pre-fills it); the workflow in
+      .github/workflows/scores.yml checks it, writes it into scores.json and closes the issue.
+      GitHub Pages then serves the new table. Works on any username.github.io/repo page.
+   2) Claude's shared storage, when the page runs as a Claude artifact.
+   3) this device only — the local top 10, always kept. */
+const LB_REPO='';   /* "owner/repo"; empty = detect from a *.github.io address */
+const store={ get(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }, set(k,v){ try{ localStorage.setItem(k,v); }catch(e){} } };
+const LB_ID=(()=>{ let v=store.get('patronnik-id'); if(!v){ v=(crypto.randomUUID?crypto.randomUUID():newSeed().toString(16)+'-'+newSeed().toString(16)); store.set('patronnik-id',v); } return v; })();
+const defaultName='Игрок '+LB_ID.replace(/[^0-9a-f]/gi,'').slice(0,4).toUpperCase();
+const playerName=()=>((store.get('patronnik-name')||'').trim().slice(0,24))||defaultName;
+const repoOf=()=>{ if(LB_REPO) return LB_REPO; const h=location.hostname; if(!/\.github\.io$/i.test(h)) return ''; const owner=h.split('.')[0], seg=location.pathname.split('/').filter(Boolean)[0];
+  return seg&&!/\.html?$/i.test(seg)?`${owner}/${seg}`:`${owner}/${h}`; };
+/* a light checksum so a hand-typed issue is rejected; it is not real protection, the table is for fun */
+function scoreSig(o){ const s=`${o.name}|${o.score}|${o.rounds}|${o.acc}|${o.session}|patronnik-v2`, b=new TextEncoder().encode(s); let h=0x811c9dc5; for(const x of b){ h^=x; h=Math.imul(h,16777619)>>>0; } return h.toString(16).padStart(8,'0'); }
+let LB={mode:'local',rows:[],lastLocal:null,canWrite:null,remoteBest:0,updated:null}, DB=null, USER=null, UID=null;
+function localTop(){ try{ const t=JSON.parse(store.get('patronnik-top')||'[]'); return Array.isArray(t)?t:[]; }catch(e){ return []; } }
+function localAdd(e){ const t=localTop(); t.push(e); t.sort((a,b)=>b.best-a.best||a.at-b.at); const out=t.slice(0,10); store.set('patronnik-top',JSON.stringify(out)); return out; }
+async function ghLoad(){ const r=await fetch('scores.json?t='+Date.now(),{cache:'no-store'}); if(!r.ok) throw new Error('no table'); const j=await r.json(); if(!j||!Array.isArray(j.scores)) throw new Error('bad table');
+  LB.rows=j.scores.slice().sort((a,b)=>b.best-a.best).slice(0,10); LB.updated=j.updated||null; }
+function issueUrl(acc){
+  const repo=repoOf(); if(!repo) return '';
+  const o={name:playerName(),score:G.score,rounds:G.round,acc,session:(G.song&&G.song.seed||0).toString(16)}; o.sig=scoreSig(o);
+  const body=`Результат игры «Патронник». Просто нажмите «Submit new issue», таблица обновится сама через пару минут.\n\n\`\`\`json\n${JSON.stringify(o)}\n\`\`\`\n`;
+  return `https://github.com/${repo}/issues/new?title=${encodeURIComponent(`score: ${o.name} — ${o.score}`)}&body=${encodeURIComponent(body)}`;
+}
 function renderLB(){
-  const ol=$('lb'), note=$('lbNote');
-  if(!DB){ ol.innerHTML=''; let best=0; try{best=+localStorage.getItem('patronnik-best')||0;}catch(e){} note.textContent=`Общая таблица работает, когда страница открыта в Claude и вы вошли в аккаунт. Ваш рекорд на этом устройстве: ${best}.`; return; }
-  if(!rows.length){ ol.innerHTML=''; note.textContent='Пока пусто. Сыграйте, и ваш результат станет первым.'; return; }
-  note.textContent=canWrite===false?'У вас доступ только на просмотр, поэтому ваш рекорд сюда не попадёт.':'Сюда попадает лучший результат каждого игрока.';
-  const draw=ps=>{ ol.innerHTML=''; rows.forEach((r,i)=>{ const li=document.createElement('li'); if(r.id===UID) li.className='me';
+  const ol=$('lb'), note=$('lbNote'), wrap=$('lbNameWrap');
+  wrap.hidden=LB.mode==='claude';
+  const rows=LB.mode==='local'?localTop():LB.rows, best=Math.max(+store.get('patronnik-best')||0,...localTop().map(r=>+r.best||0));
+  if(LB.mode==='local') note.textContent=`Рекорды этого устройства. Ваш лучший: ${best}.`;
+  else if(LB.mode==='gh') note.textContent=rows.length?`Общая таблица игры. Ваш лучший на этом устройстве: ${best}.`:'Общая таблица пока пуста: отправьте первый рекорд после игры.';
+  else if(!rows.length) note.textContent='Пока пусто. Сыграйте, и ваш результат станет первым.';
+  else note.textContent=LB.canWrite===false?'У вас доступ только на просмотр, поэтому ваш рекорд сюда не попадёт.':'Сюда попадает лучший результат каждого игрока.';
+  const me=playerName(), isMe=r=>LB.mode==='local'?r.at===LB.lastLocal:LB.mode==='claude'?r.id===UID:r.name===me;
+  const draw=ps=>{ ol.innerHTML=''; rows.forEach((r,i)=>{ const li=document.createElement('li'); if(isMe(r)) li.className='me';
     const rk=document.createElement('span'); rk.className='rk'; rk.textContent=String(i+1).padStart(2,'0');
-    const nm=document.createElement('span'); nm.className='nm'; nm.textContent=(ps&&ps[r.id]&&ps[r.id].name)||(r.id===UID?'Вы':'Игрок');
+    const nm=document.createElement('span'); nm.className='nm'; nm.textContent=LB.mode==='claude'?((ps&&ps[r.id]&&ps[r.id].name)||(r.id===UID?'Вы':'Игрок')):(r.name||'Игрок');
     const rd=document.createElement('span'); rd.className='rd'; rd.textContent=`раунд ${r.rounds||1}`;
     const sc=document.createElement('span'); sc.className='sc'; sc.textContent=r.best; li.append(rk,nm,rd,sc); ol.appendChild(li); }); };
-  draw(null); if(USER) USER.profiles(rows.map(r=>r.id)).then(draw).catch(()=>{});
+  draw(null); if(LB.mode==='claude'&&USER) USER.profiles(rows.map(r=>r.id)).then(draw).catch(()=>{});
 }
 async function submitScore(acc){
-  const sn=$('saveNote'); if(!DB||!UID||G.score<=remoteBest) return;
-  try{ await DB.doc('scores/'+UID).set({best:G.score,rounds:G.round,acc,at:Date.now()}); remoteBest=G.score; if(sn) sn.textContent='Рекорд записан в общую таблицу.'; }
-  catch(e){ canWrite=false; if(sn) sn.textContent='Записать рекорд в общую таблицу не получилось: у вас доступ только на просмотр.'; renderLB(); }
+  const sn=$('saveNote'), say=t=>{ if(sn) sn.textContent=t; };
+  const at=Date.now(); localAdd({name:playerName(),best:G.score,rounds:G.round,acc,at}); LB.lastLocal=at;
+  if(LB.mode==='gh'&&G.score>0){ const url=issueUrl(acc), slot=$('sendSlot');
+    if(url&&slot){ const a=document.createElement('a'); a.className='go send'; a.href=url; a.target='_blank'; a.rel='noopener'; a.textContent='Отправить в общую таблицу'; slot.replaceChildren(a);
+      const p=document.createElement('p'); p.className='small'; p.textContent='Откроется GitHub с готовой заявкой (нужен аккаунт GitHub). Таблица обновится через пару минут.'; slot.append(p); } }
+  else if(LB.mode==='claude'){
+    if(DB&&UID&&G.score>LB.remoteBest){ try{ await DB.doc('scores/'+UID).set({best:G.score,rounds:G.round,acc,at}); LB.remoteBest=G.score; say('Рекорд записан в общую таблицу.'); }
+      catch(e){ LB.canWrite=false; say('Записать рекорд в общую таблицу не получилось: у вас доступ только на просмотр.'); } }
+  }
+  renderLB();
 }
 (async()=>{
-  renderLB(); if(!window.claude||typeof window.claude.use!=='function') return;
-  try{ const [db,user]=await Promise.all([claude.use('db'),claude.use('user')]); DB=db; USER=user;
-    if(user){ UID=await user.id(); canWrite=await user.can('data.write'); }
-    if(!DB){ renderLB(); return; } $('lbNote').textContent='Загружаю рекорды…';
-    DB.collection('scores').orderBy('best','desc').limit(10).onSnapshot(s=>{ rows=s.docs.map(d=>({id:d.id,...d.data()})); renderLB(); },()=>{ DB=null; renderLB(); });
-    if(UID){ const me=await DB.doc('scores/'+UID).get(); if(me.exists) remoteBest=+(me.data().best||0); }
-  }catch(e){ renderLB(); }
+  const inp=$('lbName'); inp.value=store.get('patronnik-name')||''; inp.placeholder=defaultName;
+  inp.addEventListener('change',()=>{ store.set('patronnik-name',inp.value.trim().slice(0,24)); renderLB(); });
+  inp.addEventListener('keydown',e=>{ if(e.key==='Enter') inp.blur(); });
+  if(window.claude&&typeof window.claude.use==='function'){
+    try{ const [db,user]=await Promise.all([claude.use('db'),claude.use('user')]); DB=db; USER=user;
+      if(user){ UID=await user.id(); LB.canWrite=await user.can('data.write'); }
+      if(DB){ LB.mode='claude'; $('lbNote').textContent='Загружаю рекорды…';
+        DB.collection('scores').orderBy('best','desc').limit(10).onSnapshot(s=>{ LB.rows=s.docs.map(d=>({id:d.id,...d.data()})); renderLB(); },()=>{ LB.mode='local'; renderLB(); });
+        if(UID){ const me=await DB.doc('scores/'+UID).get(); if(me.exists) LB.remoteBest=+(me.data().best||0); }
+        return; } }catch(e){}
+  }
+  try{ await ghLoad(); LB.mode='gh'; setInterval(()=>{ if(!document.hidden&&G.phase!=='play') ghLoad().then(renderLB).catch(()=>{}); },60000); }catch(e){ LB.mode='local'; }
+  renderLB();
 })();
+
+/* debug hooks for offline checks (only with ?debug in the URL) */
+if(/[?&]debug/.test(location.search)) window.__pt={levelShell,LB,LB_ID,submitScore,scoreSig,issueUrl,genFormula,makeTheme,SEEN,makeSong,roundStyle,buildShell,renderWith,drawShell,setFormula,FAM,G,get AC(){return AC;},initAudio};
 
 function boot(){
   resize(); window.addEventListener('resize',resize);
+  if(typeof ResizeObserver==='function') new ResizeObserver(()=>{ const w=Math.round(cv.getBoundingClientRect().width); if(w&&w!==W) resize(); }).observe(cv);
   G.mag=Array(8).fill(0); G.n=8; G.k=4; G.cands=combos(8,4); G.total0=G.cands.length;
   renderMag(); hud(); setChance(.5); renderCandCount();
   showOverlay(`
     <h2><span class="l">Боевой</span> или <span class="b">холостой</span>?</h2>
-    <p>Каждый патрон — своя звуковая идея и своя формула. Угадайте его до линии спуска.</p>
-    <ul>
-      <li>Шанс = боевых осталось / патронов осталось</li>
-      <li>Улики дилера помогают вычислить точно</li>
-      <li>В долю: <b>+25</b>. Три ошибки — конец</li>
-    </ul>
+    <p>Каждый патрон — формула. График показывает её значения до линии спуска. Продолжите его в уме:</p>
+    <div class="rule"><span class="k l">↓ БОЕВОЙ</span><span>следующее значение <b>меньше</b> последнего: график уйдёт вниз, звук — ${I('f')}/4</span>
+      <span class="k b">↑ ХОЛОСТОЙ</span><span>следующее значение <b>больше</b>: график пойдёт вверх, звук — 2${I('f')}</span></div>
+    <ul><li>Не успеваете посчитать — помогут шанс и улики дилера</li><li>В долю: <b>+25</b>. Три ошибки — конец</li><li>Каждая игра — новая музыка и новые формулы</li></ul>
     <button class="go" id="goBtn" type="button"><span>Играть</span><kbd>Пробел</kbd></button>`);
   $('goBtn').onclick=()=>{ initAudio(); resetGame(); };
   requestAnimationFrame(frame);
