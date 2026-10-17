@@ -1,5 +1,5 @@
 {
- "updated": "2026-10-17T21:18:20+00:00",
+ "updated": "2026-10-17T21:24:04+00:00",
  "scores": [
   {
    "id": "kotyan31",
@@ -34,20 +34,20 @@
    "at": "2026-10-17T17:27:19+00:00"
   },
   {
+   "id": "clowerchik",
+   "nick": "Clowerchik",
+   "best": 1600,
+   "rounds": 3,
+   "acc": 71,
+   "at": "2026-10-17T21:24:04+00:00"
+  },
+  {
    "id": "pro100kotyanlox",
    "nick": "Pro100KotyanLox",
    "best": 725,
    "rounds": 2,
    "acc": 60,
    "at": "2026-10-17T13:30:55+00:00"
-  },
-  {
-   "id": "clowerchik",
-   "nick": "Clowerchik",
-   "best": 550,
-   "rounds": 2,
-   "acc": 56,
-   "at": "2026-10-17T21:12:38+00:00"
   },
   {
    "id": "11",
@@ -178,7 +178,8 @@
   "a518f53a15722ca86a1fa032": "low",
   "cabf41bed1aeee7a45c26747": "low",
   "3f98f3c2ef6abae89b36a09f": "ok",
-  "e85da2e3e19b5a6c2646ff51": "bad"
+  "e85da2e3e19b5a6c2646ff51": "bad",
+  "ed678f5b4bf6e8575acfba80": "ok"
  },
  "code": [
   "ccb941a10420ccd49d5fd8b8772b9a1d",
@@ -371,7 +372,8 @@
   },
   "e3191f8c368c21c90b495ca0": {
    "gk": "BJOm3P7S14kmwazzrvgyev0gUqhoiiwLJ/BO20NbfMFkEKSLWqPLXpzNBBtQyileA1mnLdmfkaIz2GxOsRmS9+Q=",
-   "at": 1792271622.0
+   "at": 1792271622.0,
+   "used": true
   },
   "f52bff25acf3d93e7c016a33": {
    "gk": "BFDbh6dMaLxtsoCgq0P9XKeRzfggWzdZy7YCoKtRkj3PovXfdQotv2riGYLkfYkw+1aul8GmXKWUvXOHcIMeHn0=",
