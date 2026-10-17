@@ -27,7 +27,7 @@ REPO = os.environ.get('REPO', '')
 TOKEN = os.environ.get('GH_TOKEN', '')
 TITLE = 'patronnik-scores'
 TABLE, CFG, DONE = 'scores.json', 'lb.json', '.lb-done.json'
-KEEP, ACKS = 100, 400
+KEEP, ACKS, STARTS = 100, 400, 3000
 MAX_PER_SHELL = 100 * 4 + 25
 
 # ---- P-256 (enough to verify ECDSA signatures from WebCrypto) ----
@@ -195,7 +195,7 @@ def replay(log, rounds):
     if not isinstance(log, str) or len(log) % 2 or not re.fullmatch(r'[0-9a-z]*', log):
         return None
     lives, streak, score, correct, total, fast, fast_all, r, i, lv_in_round = 3, 0, 0, 0, 0, 0, 0, 1, 0, 0
-    whens = []
+    whens, beats = [], 4                      # beats: the shortest the game can last, counted in beats (count-in of round 1)
     for k in range(0, len(log), 2):
         if lives <= 0:
             return None                       # a shell after the last life
@@ -211,6 +211,11 @@ def replay(log, rounds):
             fast += ok
         if b and not ok:
             return None
+        pre = 8 if r <= 3 else 4                  # question length in beats; a shell is question + answer of the same length
+        tol = .075 * 35 / (pre * 60 / 128) + .6   # the page's ±75 ms at the fastest tempo, plus the 1/35 rounding of the moment
+        if b and min(abs(int(when, 36) - 35 * k / pre) for k in range(pre + 1)) > tol:
+            return None                           # an "on the beat" bonus for an answer that was nowhere near a beat
+        beats += 2 * pre
         total += 1
         lv_in_round += o
         if ok:
@@ -225,15 +230,39 @@ def replay(log, rounds):
             if not 2 <= lv_in_round <= SHELLS(r) - 2:
                 return None
             lives, r, i, lv_in_round = min(3, lives + 1), r + 1, 0, 0
+            beats += 4                            # the next round's count-in
     if lives > 0 or r != rounds:              # the run ends with the last life, in the round it reports
         return None
-    return score, correct, total, fast, fast_all, whens
+    return score, correct, total, fast, fast_all, whens, beats * 60 / 128   # seconds at the fastest tempo
+
+
+def stamp(c):
+    return datetime.fromisoformat(str(c.get('created_at')).replace('Z', '+00:00')).timestamp()
+
+
+def handle_start(c, table, st):
+    """A game's start mark: its id and the public half of a key made for this one game. GitHub's own comment time is
+    the proof of when the game began; the page cannot set it."""
+    try:
+        g, gk = str(st['g']), str(st['gk'])
+        if re.fullmatch(r'[0-9a-f]{16,40}', g) and point(base64.b64decode(gk)) is not None and g not in table['starts']:
+            table['starts'][g] = {'gk': gk, 'at': stamp(c)}
+    except (KeyError, ValueError, TypeError):
+        pass
+
+
+def bad(nonce, why):
+    print(f'  {nonce}: bad ({why})')   # which check failed, for the workflow log only
+    return nonce, 'bad'
 
 
 def handle(c, table, now):
     """Returns the ack for one comment, or None if it is not a result at all."""
     try:
         m = json.loads(re.search(r'\{.*\}', c.get('body') or '', re.S).group(0))
+        if isinstance(m, dict) and isinstance(m.get('start'), dict):
+            handle_start(c, table, m['start'])
+            return None, None
         msg, sig, key = m['p'].encode('utf-8'), base64.b64decode(m['s']), base64.b64decode(m['k'])
         o = json.loads(msg)
         nonce = str(o['nonce'])
@@ -243,29 +272,45 @@ def handle(c, table, now):
         return nonce, None
     q = point(key)
     if q is None or not verify(q, msg, sig):
-        return nonce, 'bad'
+        return bad(nonce, 'signature')
     try:
         nick = re.sub(r'\s+', ' ', unicodedata.normalize('NFKC', str(o['nick']))).strip()
         score, rounds, acc = int(o['score']), int(o['rounds']), int(o['acc'])
     except (KeyError, ValueError, TypeError):
-        return nonce, 'bad'
+        return bad(nonce, 'fields')
     if o.get('v') != 3 or str(o.get('code')) not in table.get('code', []):
         return nonce, 'old'
     if not re.fullmatch(r'[\w\-. ]{2,20}', nick) or not (0 <= acc <= 100) or not (1 <= rounds <= 1000):
-        return nonce, 'bad'
+        return bad(nonce, 'nick/acc/rounds')
     try:   # a result older than a week is a replay of someone's old comment
         sent = datetime.fromisoformat(str(c.get('created_at', now)).replace('Z', '+00:00')).timestamp() * 1000
         if abs(sent - int(o['t'])) > 7 * 86400 * 1000:
-            return nonce, 'bad'
+            return bad(nonce, 'week-old')
     except (KeyError, ValueError, TypeError):
-        return nonce, 'bad'
+        return bad(nonce, 'time field')
     game = replay(o.get('log'), rounds)
     if not game or game[0] != score or round(100 * game[1] / max(1, game[2])) != acc:
-        return nonce, 'bad'
+        return bad(nonce, 'replay')
     if game[3] >= 5 and game[3] > .85 * game[4]:   # snap answers before the graph can be read, and nearly all right: a script
         return nonce, 'bot'
     if scripted(game[5]):
         return nonce, 'bot'
+    st = table['starts'].get(str(o.get('g')))
+    if not st or st.get('used'):
+        return nonce, 'nostart'
+    core = json.dumps({'g': str(o['g']), 'score': score, 'rounds': rounds, 'acc': acc, 'log': o.get('log')}, separators=(',', ':'))
+    try:
+        gs = base64.b64decode(str(o.get('gs')))
+    except ValueError:
+        return bad(nonce, 'game-key b64')
+    if not verify(point(base64.b64decode(st['gk'])), core.encode(), gs):
+        return bad(nonce, 'game-key signature')
+    took = stamp(c) - st['at']
+    if took < .9 * game[6]:   # sent sooner than the game takes to play: the log was written, not played
+        return nonce, 'time'
+    if took > 1.6 * game[6] + 1800:   # start marks stockpiled long ago and spent on made-up games later
+        return nonce, 'time'
+    st['used'] = True
     n = norm(nick)
     k64 = base64.b64encode(key).decode()
     who = table['players'].get(n)
@@ -301,7 +346,9 @@ def process():
     cur = code_print()
     if cur and cur not in code:   # the last few versions stay valid, so a player with a cached page is not turned away
         code = (code + [cur])[-4:]
-    table = {'updated': table.get('updated'), 'scores': rows, 'players': table.get('players', {}), 'acks': table.get('acks', {}), 'code': code}
+    cutoff = datetime.now(timezone.utc).timestamp() - 8 * 86400
+    starts = {g: v for g, v in table.get('starts', {}).items() if isinstance(v, dict) and v.get('at', 0) > cutoff}
+    table = {'updated': table.get('updated'), 'scores': rows, 'players': table.get('players', {}), 'acks': table.get('acks', {}), 'code': code, 'starts': starts}
     now = datetime.now(timezone.utc).isoformat(timespec='seconds')
     done, log = [], []
     for c in comments(cfg['issue']):
@@ -315,6 +362,7 @@ def process():
     table['scores'].sort(key=lambda r: (-r['best'], r['at']))
     table['scores'] = table['scores'][:KEEP]
     table['acks'] = dict(list(table['acks'].items())[-ACKS:])
+    table['starts'] = dict(sorted(table['starts'].items(), key=lambda kv: kv[1]['at'])[-STARTS:])
     save(TABLE, table)
     save(CFG, cfg)
     save(DONE, done)
