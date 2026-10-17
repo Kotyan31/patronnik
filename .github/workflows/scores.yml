@@ -19,7 +19,8 @@ concurrency:
 
 jobs:
   scores:
-    if: github.event_name == 'workflow_dispatch' || github.event.issue.title == 'patronnik-scores'
+    # any comment wakes it: the script itself only reads the issue named in lb.json, so renaming that issue cannot stop it
+    if: github.event_name == 'workflow_dispatch' || !github.event.issue.pull_request
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
