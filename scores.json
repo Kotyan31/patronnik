@@ -1,5 +1,5 @@
 {
- "updated": "2026-10-17T12:57:29+00:00",
+ "updated": "2026-10-17T12:58:25+00:00",
  "scores": [
   {
    "id": "pro100kotyanlox",
@@ -42,6 +42,14 @@
    "at": "2026-10-17T10:55:06+00:00"
   },
   {
+   "id": "ketson",
+   "nick": "ketson",
+   "best": 300,
+   "rounds": 1,
+   "acc": 50,
+   "at": "2026-10-17T12:58:25+00:00"
+  },
+  {
    "id": "kumaq99",
    "nick": "kumaq99",
    "best": 125,
@@ -80,6 +88,11 @@
    "nick": "Sekret0s",
    "key": "BA0eaPq25uSuoPOAqK1i7Hye2oMBl+9IYJ6np7zXm+uE/hLBHTTik+zkIuWk5ffN4QaX4KkWVz8jTwzBCd6j2TY=",
    "since": "2026-10-17T10:55:06+00:00"
+  },
+  "ketson": {
+   "nick": "ketson",
+   "key": "BJggeWNPJID6RWB0iYdpjorZx7h3/lJdUnFTCUHS682mgAlzCtwxDxsiVoUnSAJa9QwB23pEV5DapIQZ1Fp6Yl0=",
+   "since": "2026-10-17T12:58:25+00:00"
   }
  },
  "acks": {
@@ -110,6 +123,7 @@
   "3a8f7cc2432d528449823f23": "ok",
   "17c847ba595081244e949db8": "ok",
   "f258274ae0f5a7ba072c01fa": "low",
-  "9ee51cc361b6149012638ef4": "low"
+  "9ee51cc361b6149012638ef4": "low",
+  "a2078dc280378915757586ee": "ok"
  }
 }
