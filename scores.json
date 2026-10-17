@@ -1,5 +1,5 @@
 {
- "updated": "2026-10-17T10:12:47+00:00",
+ "updated": "2026-10-17T10:14:22+00:00",
  "scores": [
   {
    "id": "kotyan31",
@@ -8,6 +8,14 @@
    "rounds": 3,
    "acc": 79,
    "at": "2026-10-17T10:12:47+00:00"
+  },
+  {
+   "id": "ник фурри",
+   "nick": "ник фурри",
+   "best": 200,
+   "rounds": 1,
+   "acc": 40,
+   "at": "2026-10-17T10:14:22+00:00"
   },
   {
    "id": "kumaq99",
@@ -28,12 +36,18 @@
    "nick": "kumaq99",
    "key": "BMWgGK4VNZAsQ4QUQ1B1xFLX3v4bJDx5J1dwyFyGfSk9ODxOILtPWKr/sJrOIhxVfEegpoCafiV7TpO0eNH9ytw=",
    "since": "2026-10-17T10:11:09+00:00"
+  },
+  "ник фурри": {
+   "nick": "ник фурри",
+   "key": "BO6pXSA7SHvNUotRioIn15NHfSDJjmwfOpEf83yM8Ef0GLYi31/caj9DskYjePu6mWf2BKEEFCvjba761biYpXU=",
+   "since": "2026-10-17T10:14:22+00:00"
   }
  },
  "acks": {
   "6ac1f8e65cb64372a80e1497": "low",
   "d7ed13687ef2bf7c4e5f8e4a": "low",
   "2af82eae70fb9257afaa8174": "ok",
-  "5b6e698dd38ec84442daa541": "ok"
+  "5b6e698dd38ec84442daa541": "ok",
+  "b3b931c8b422c77478bf2dd4": "ok"
  }
 }
