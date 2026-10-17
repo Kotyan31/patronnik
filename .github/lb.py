@@ -201,8 +201,18 @@ def handle(c, table, now):
 def process():
     cfg = ensure_config()
     table = load(TABLE, {})
-    table = {'updated': table.get('updated'), 'scores': [r for r in table.get('scores', []) if isinstance(r, dict) and r.get('id')],
-             'players': table.get('players', {}), 'acks': table.get('acks', {})}
+    rows = []
+    for r in table.get('scores', []):
+        if not isinstance(r, dict):
+            continue
+        if not r.get('id'):   # a row from the earlier issue-based table: keep it under its name
+            name = str(r.get('name') or r.get('login') or '').strip()
+            if not name:
+                continue
+            r = {'id': norm(name), 'nick': name, 'best': int(r.get('best', 0)), 'rounds': int(r.get('rounds', 1)),
+                 'acc': int(r.get('acc', 0)), 'at': str(r.get('at', ''))}
+        rows.append(r)
+    table = {'updated': table.get('updated'), 'scores': rows, 'players': table.get('players', {}), 'acks': table.get('acks', {})}
     now = datetime.now(timezone.utc).isoformat(timespec='seconds')
     done, log = [], []
     for c in comments(cfg['issue']):
