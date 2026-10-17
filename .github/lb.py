@@ -144,6 +144,11 @@ def ensure_config():
         return cfg
     issue = cfg.get('issue')
     found = api('GET', f'/repos/{REPO}/issues/{issue}') if issue else None
+    if found and not found.get('locked') and found.get('title') == TITLE:   # someone with the public token unlocked it
+        api('PUT', f'/repos/{REPO}/issues/{issue}/lock', {'lock_reason': 'resolved'})
+    if found and found.get('title') != TITLE and not found.get('pull_request'):   # or renamed it: put the name back
+        api('PATCH', f'/repos/{REPO}/issues/{issue}', {'title': TITLE, 'state': 'open'})
+        found['title'] = TITLE
     if not found or found.get('title') != TITLE or found.get('pull_request'):
         new = api('POST', f'/repos/{REPO}/issues', {
             'title': TITLE,
@@ -157,6 +162,48 @@ def ensure_config():
     else:
         cfg.pop('tok', None)
     return cfg
+
+
+SHELLS = lambda r: 6 if r == 1 else 7 if r == 2 else 8
+
+
+def replay(log, rounds):
+    """Re-plays the game from its answer log and returns (score, correct, total, fast_right, fast_all) or None if impossible.
+    Each shell is two base-36 characters: (answer*4 + shell*2 + on_beat) and the answer moment as a share of the question
+    (0..35, 'z' = no answer). answer: 0 blank, 1 live, 2 none; shell: 0 blank, 1 live."""
+    if not isinstance(log, str) or len(log) % 2 or not re.fullmatch(r'[0-9a-z]*', log):
+        return None
+    lives, streak, score, correct, total, fast, fast_all, r, i, lv_in_round = 3, 0, 0, 0, 0, 0, 0, 1, 0, 0
+    for k in range(0, len(log), 2):
+        if lives <= 0:
+            return None                       # a shell after the last life
+        code, when = int(log[k], 36), log[k + 1]
+        a, o, b = code // 4, (code // 2) % 2, code % 2
+        if a > 2 or (when == 'z') != (a == 2):
+            return None
+        ok = a == o
+        if a != 2 and int(when, 36) <= 4:     # answered in the first ~12 % of the question
+            fast_all += 1
+            fast += ok
+        if b and not ok:
+            return None
+        total += 1
+        lv_in_round += o
+        if ok:
+            streak += 1
+            correct += 1
+            score += 100 * min(4, 1 + max(0, streak - 1) // 3) + (25 if b else 0)
+        else:
+            lives -= 1
+            streak = 0
+        i += 1
+        if i == SHELLS(r) and lives > 0:      # round over: one life back, next round
+            if not 2 <= lv_in_round <= SHELLS(r) - 2:
+                return None
+            lives, r, i, lv_in_round = min(3, lives + 1), r + 1, 0, 0
+    if lives > 0 or r != rounds:              # the run ends with the last life, in the round it reports
+        return None
+    return score, correct, total, fast, fast_all
 
 
 def handle(c, table, now):
@@ -178,9 +225,21 @@ def handle(c, table, now):
         score, rounds, acc = int(o['score']), int(o['rounds']), int(o['acc'])
     except (KeyError, ValueError, TypeError):
         return nonce, 'bad'
-    if (o.get('v') != 1 or not re.fullmatch(r'[\w\-. ]{2,20}', nick) or not (0 <= acc <= 100) or not (1 <= rounds <= 1000)
-            or not (0 <= score <= rounds * 8 * MAX_PER_SHELL)):
+    if o.get('v') != 2:
+        return nonce, 'old'
+    if not re.fullmatch(r'[\w\-. ]{2,20}', nick) or not (0 <= acc <= 100) or not (1 <= rounds <= 1000):
         return nonce, 'bad'
+    try:   # a result older than a week is a replay of someone's old comment
+        sent = datetime.fromisoformat(str(c.get('created_at', now)).replace('Z', '+00:00')).timestamp() * 1000
+        if abs(sent - int(o['t'])) > 7 * 86400 * 1000:
+            return nonce, 'bad'
+    except (KeyError, ValueError, TypeError):
+        return nonce, 'bad'
+    game = replay(o.get('log'), rounds)
+    if not game or game[0] != score or round(100 * game[1] / max(1, game[2])) != acc:
+        return nonce, 'bad'
+    if game[3] >= 5 and game[3] > .85 * game[4]:   # snap answers before the graph can be read, and nearly all right: a script
+        return nonce, 'bot'
     n = norm(nick)
     k64 = base64.b64encode(key).decode()
     who = table['players'].get(n)
