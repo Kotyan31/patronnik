@@ -1,48 +1,51 @@
 name: scores
 
-# A result sent from the game arrives as an issue titled "score: ...".
-# This job checks it, writes it into scores.json and closes the issue.
+# The game posts each result as a signed comment on the locked issue "patronnik-scores".
+# This job checks the signatures, writes scores.json and deletes the handled comments.
+# Run it once by hand after adding the LB_PAT secret: it creates the issue and lb.json.
 on:
-  issues:
-    types: [opened]
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
 
 permissions:
   contents: write
   issues: write
 
+# runs queue up; each run handles every comment waiting on the issue, so a skipped run loses nothing
 concurrency:
   group: scores
   cancel-in-progress: false
 
 jobs:
-  add:
-    if: startsWith(github.event.issue.title, 'score:')
+  scores:
+    if: github.event_name == 'workflow_dispatch' || github.event.issue.title == 'patronnik-scores'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Update scores.json
+      - name: Check new results
         env:
-          BODY: ${{ github.event.issue.body }}
-          LOGIN: ${{ github.event.issue.user.login }}
-        run: python3 .github/scores.py
+          GH_TOKEN: ${{ github.token }}
+          LB_PAT: ${{ secrets.LB_PAT }}
+          REPO: ${{ github.repository }}
+        run: python3 .github/lb.py process
 
       - name: Commit
-        env:
-          LOGIN: ${{ github.event.issue.user.login }}
         run: |
           git config user.name "scores-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add scores.json
-          if ! git diff --cached --quiet; then
-            git commit -m "score: $LOGIN"
-            git pull --rebase
-            git push
-          fi
+          git add scores.json lb.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "scores: update"
+          for i in 1 2 3; do
+            if git pull --rebase && git push; then exit 0; fi
+            sleep 5
+          done
+          exit 1
 
-      - name: Close the issue
-        if: always()
+      - name: Remove handled comments
         env:
           GH_TOKEN: ${{ github.token }}
-          NUM: ${{ github.event.issue.number }}
-        run: gh issue close "$NUM" --repo "$GITHUB_REPOSITORY" --comment "$(cat result.txt 2>/dev/null || echo 'Не получилось обработать результат.')"
+          REPO: ${{ github.repository }}
+        run: python3 .github/lb.py cleanup
