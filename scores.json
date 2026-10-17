@@ -1,5 +1,5 @@
 {
- "updated": "2026-10-17T14:36:19+00:00",
+ "updated": "2026-10-17T14:59:13+00:00",
  "scores": [
   {
    "id": "kotyan31",
@@ -32,6 +32,14 @@
    "rounds": 2,
    "acc": 60,
    "at": "2026-10-17T13:30:55+00:00"
+  },
+  {
+   "id": "11",
+   "nick": "11",
+   "best": 125,
+   "rounds": 1,
+   "acc": 25,
+   "at": "2026-10-17T14:59:13+00:00"
   }
  ],
  "players": {
@@ -74,6 +82,11 @@
    "nick": "lexsuPok",
    "key": "BAdNv4i9OK9v1CFojq17imyBcIi0J1ft8JEg8uL4G5VqJ9znBeRD5RpC7QJ6fzHI29eukiSCqzVcPn/6rDgpBHY=",
    "since": "2026-10-17T14:15:14+00:00"
+  },
+  "11": {
+   "nick": "11",
+   "key": "BC4tEt1abKFuUPSKRW/A72cNwwI9XRN2RvY8c6XBQ6eW7PezjHCYa7wSjSIIv7uFif6HJi0GRPehNyOnKSkyaM0=",
+   "since": "2026-10-17T14:59:13+00:00"
   }
  },
  "acks": {
@@ -103,6 +116,7 @@
   "f8b233225269654c58b6f4c6": "low",
   "2bba12955cacb359e3ede0b9": "bad",
   "814c71a46fb3495c7c72366c": "bad",
-  "dd0c54dee342963e5b3ea2d3": "low"
+  "dd0c54dee342963e5b3ea2d3": "low",
+  "9aae6febf805e0dd5281c79a": "ok"
  }
 }
