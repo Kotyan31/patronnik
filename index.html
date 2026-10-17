@@ -388,12 +388,34 @@ body.sheet-clues .side .board,body.sheet-top .side .clues{display:none}
    and this mark cannot be deleted or redefined, so the second copy stops here. */
 if(Object.getOwnPropertyDescriptor(window,'__patronnikOnce')){ document.body.innerHTML='<p style="color:#ccc;font:16px sans-serif;padding:24px">Страница была изменена в этой вкладке. Обновите её (F5).</p>'; return; }
 Object.defineProperty(window,'__patronnikOnce',{value:true,writable:false,enumerable:false,configurable:false});
+/* Lockdown. The magazine and every shell's outcome live inside this closure, but they pass through built-in methods
+   (forEach, map, slice, the Web Audio calls that render the answer ahead of time…). A console script that replaces one
+   of those after the page has loaded could read them. So, before anything else runs, the built-ins this game touches are
+   frozen and their global names made read-only: replacing Array.prototype.forEach or window.OfflineAudioContext later
+   silently does nothing. Hooks installed before the page even loads are caught by the native-code check and keep that
+   copy's results out of the shared table. */
+const NATIVE_OK=(()=>{ const W=window, seen=new Set(), fr=o=>{ if(!o||(typeof o!=='object'&&typeof o!=='function')||seen.has(o)) return; seen.add(o); try{ Object.freeze(o); }catch(e){} };
+  const names=['Object','Array','Function','String','Number','Boolean','Symbol','BigInt','Math','JSON','Reflect','Proxy','Promise','Map','Set','WeakMap','WeakSet','Date','RegExp',
+    'Error','TypeError','RangeError','ArrayBuffer','DataView','Uint8Array','Uint8ClampedArray','Uint16Array','Uint32Array','Int8Array','Int16Array','Int32Array','Float32Array','Float64Array',
+    'BigInt64Array','BigUint64Array','TextEncoder','TextDecoder','EventTarget','AudioContext','webkitAudioContext','OfflineAudioContext','webkitOfflineAudioContext','BaseAudioContext',
+    'AudioBuffer','AudioNode','AudioParam','AudioScheduledSourceNode','AudioBufferSourceNode','OscillatorNode','GainNode','BiquadFilterNode','WaveShaperNode','ConvolverNode','DelayNode',
+    'StereoPannerNode','DynamicsCompressorNode','PeriodicWave','AudioDestinationNode','OfflineAudioCompletionEvent','Crypto','SubtleCrypto','CryptoKey'];
+  let ok=true; const nat=f=>{ try{ return /\[native code\]\s*\}\s*$/.test(Function.prototype.toString.call(f)); }catch(e){ return false; } };
+  [Array.prototype.forEach,Array.prototype.map,Array.prototype.slice,Array.prototype.filter,Array.from,Object.freeze,Function.prototype.toString,JSON.stringify].forEach(f=>{ if(!nat(f)) ok=false; });
+  names.forEach(n=>{ const v=W[n]; if(v==null) return; if(typeof v==='function'&&!nat(v)) ok=false;
+    try{ Object.defineProperty(W,n,{value:v,writable:false,configurable:false}); }catch(e){} fr(v); if(typeof v==='function') fr(v.prototype); });
+  const TA=Object.getPrototypeOf(Uint8Array); fr(TA); fr(TA.prototype);
+  [[][Symbol.iterator](),''[Symbol.iterator](),new Map()[Symbol.iterator](),new Set()[Symbol.iterator]()].forEach(it=>{ const p=Object.getPrototypeOf(it); fr(p); fr(Object.getPrototypeOf(p)); });
+  [function*(){},async function(){},async function*(){}].forEach(f=>{ const p=Object.getPrototypeOf(f); fr(p); fr(p.prototype); });
+  try{ if(W.crypto){ fr(W.crypto); if(W.crypto.subtle) fr(W.crypto.subtle); } }catch(e){}
+  return ok; })();
+const AC_CTOR=window.AudioContext||window.webkitAudioContext, OAC_CTOR=window.OfflineAudioContext||window.webkitOfflineAudioContext;
 const $ = id => document.getElementById(id);
 /* The shared table only takes results from the page itself: its real address, not inside a frame, with its own code.
    CODE is a fingerprint of this script's text; the server computes the same fingerprint from the repository, so a
    copy with patched code (a cheat's iframe) can still be played but its results are not accepted. */
 const HOME=window.top===window.self&&(location.protocol==='https:'&&location.hostname==='kotyan31.github.io'&&/^\/patronnik\/(index\.html)?$/.test(location.pathname)||/^(localhost|127\.0\.0\.1)$/.test(location.hostname));
-let CODE=null, FAKE=0;
+let CODE=null, FAKE=NATIVE_OK?0:1;   /* built-ins hooked before the page loaded: play on, but nothing goes to the shared table */
 try{ const src=(document.currentScript&&document.currentScript.textContent)||''; crypto.subtle.digest('SHA-256',new TextEncoder().encode(src)).then(b=>{ CODE=Array.from(new Uint8Array(b).slice(0,16),x=>x.toString(16).padStart(2,'0')).join(''); }); }catch(e){}
 /* game randomness comes from the browser's crypto generator, taken once at load: replacing Math.random or
    crypto.getRandomValues from the console later cannot make the magazine predictable */
@@ -1022,7 +1044,7 @@ function makeEngine(ctx,song){
 /* render speed is measured on every job; a slow phone drops to a lower internal rate and renders further ahead */
 const PERF={ratio:0,low:false};
 function renderWith(sr,seconds,song,fn){
-  const C=window.OfflineAudioContext||window.webkitOfflineAudioContext;
+  const C=OAC_CTOR;
   const ctx=new C(2,Math.max(1,Math.ceil(sr*seconds)),sr), t0=performance.now();
   fn(makeEngine(ctx,song));
   return new Promise((res,rej)=>{ let done=false; const fin=b=>{ if(done) return; done=true; PERF.ratio=(performance.now()-t0)/1000/seconds; if(PERF.ratio>.28) PERF.low=true; res(b); };
@@ -1051,7 +1073,7 @@ const renderShell=(sh,sr)=>queueRender(sr,sh.len+TAIL,sh.song,E=>E.cell(sh));
 let AC=null, master=null; const playing=new Set();
 function initAudio(){
   if(AC){ if(AC.state!=='running') AC.resume(); return; }
-  const C=window.AudioContext||window.webkitAudioContext;
+  const C=AC_CTOR;
   try{ AC=new C({latencyHint:'playback'}); }catch(e){ AC=new C(); }
   try{ if(navigator.audioSession) navigator.audioSession.type='playback'; }catch(e){}
   const comp=AC.createDynamicsCompressor(); comp.threshold.value=-8; comp.knee.value=6; comp.ratio.value=4; comp.attack.value=.003; comp.release.value=.2;
