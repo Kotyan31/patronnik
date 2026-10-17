@@ -228,11 +228,21 @@ body{
 .go.wait span::after{content:"…"}
 .formula{min-height:212px;align-content:start}
 .f-main{max-width:100%}
-.overlay .small{font-size:12px;margin-top:6px}
+.overlay .small{font-size:12px;margin:0 0 6px}
+#sendSlot{display:grid;justify-items:center;width:100%}
+#sendSlot:empty{display:none}
 .go.send{display:inline-block;text-decoration:none;font-size:14px;padding:9px 18px}
-.lbname{display:flex;gap:10px;align-items:center;font-size:12px;color:var(--muted)}
-.lbname input{flex:1;min-width:0;background:var(--panel-2);border:1px solid var(--line-2);border-radius:7px;color:var(--fg);font:600 16px var(--f-body);padding:5px 9px}
-.lbname input:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
+.acct{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:8px;align-items:center;width:100%;max-width:400px}
+.acct input{min-width:0;background:var(--panel-2);border:1px solid var(--line-2);border-radius:7px;color:var(--fg);font:600 16px var(--f-body);padding:6px 9px}
+.acct input:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
+.acct-msg{grid-column:1/-1;font-size:12px;color:var(--muted);min-height:1.2em;text-align:left}
+.acct-msg:empty{min-height:0}
+.go.mini{font-size:13px;padding:8px 12px;box-shadow:none}
+.acct-in{font-size:13px;color:var(--muted)}
+.acct-in b{color:var(--fg)}
+.link{background:none;border:0;padding:0;color:var(--amber);font:inherit;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+.board li.pend .sc{opacity:.6}
+.board li.pend .rd{color:var(--amber)}
 </style>
 </head>
 <body>
@@ -283,7 +293,7 @@ body{
     <div class="card-h"><h3>Таблица рекордов</h3></div>
     <ol id="lb"></ol>
     <p class="note" id="lbNote">Загружаю рекорды…</p>
-    <label class="lbname" id="lbNameWrap" hidden><span>Имя в таблице</span><input id="lbName" maxlength="24" autocomplete="nickname" spellcheck="false"></label>
+    <div id="acctBox" hidden></div>
     <div class="keys"><kbd>←</kbd>/<kbd>↓</kbd> боевой · <kbd>→</kbd>/<kbd>↑</kbd> холостой · <kbd>Пробел</kbd> дальше. Ответ точно в долю даёт +25 очков.</div>
     <div class="session" id="session"></div>
   </section>
@@ -466,23 +476,24 @@ const FAM=[
    GENERATED FORMULAS: random expression trees in n (or recurrences in y_{n-1}, y_{n-2}),
    printed as real maths. Not templates with swapped numbers — every tree is built from scratch.
    =================================================================================== */
-const XPREC={n:9,c:9,y1:9,y2:9,s2:9,ds:9,gcd:9,tri:9,abs:9,fl:9,max:9,min:9,sq:8,mul:7,alt:7,add:6,sub:6,xor:5,md:4,if:1};
+const XPREC={n:9,c:9,y1:9,y2:9,s2:9,ds:9,gcd:9,tri:9,abs:9,fl:9,ce:9,pw:9,max:9,min:9,sq:8,mul:7,alt:7,add:6,sub:6,xor:5,md:4,if:1};
 const XDEF={s2:'s₂(x) — число единиц в двоичной записи x',ds:'S(x) — сумма цифр x',gcd:'НОД — наибольший общий делитель',tri:'T(x) = x(x+1)/2',xor:'⊕ — побитовое исключающее «или»'};
 function xgen(R,d,o){
   const leaf=()=>{ const r=R(); if(o.rec&&r<.5) return o.rec===2&&R()<.45?{k:'y2'}:{k:'y1'}; return r<.82?{k:'n'}:{k:'c',v:ri(R,2,9)}; };
   if(d<=0) return leaf();
-  const k=rw(R,[['add',4],['sub',2.5],['mul',3],['sq',1.5],['fl',2],['abs',1.3],['s2',1.2],['ds',1],['gcd',1],['tri',.9],['alt',.7],['if',1.4],['xor',.9],['max',.6],['min',.6],['md',.8],['leaf',1.6]]);
+  const k=rw(R,[['add',4],['sub',2.5],['mul',3],['sq',1.5],['fl',2],['abs',1.3],['s2',1.2],['ds',1],['gcd',1],['tri',.9],['alt',.7],['if',1.4],['xor',.9],['max',.6],['min',.6],['md',.8],['pw',.8],['ce',1],['leaf',1.6]]);
   const X=()=>xgen(R,d-1,o), C=(a,b)=>({k:'c',v:ri(R,a,b)});
   switch(k){
     case 'leaf': return leaf();
     case 'add': case 'sub': case 'xor': case 'max': case 'min': { const a=X(), b=R()<.45?C(1,9):X(); return {k,a,b}; }
     case 'mul': return {k,c:ri(R,2,7),a:X()};
     case 'sq': case 's2': case 'ds': case 'tri': case 'alt': return {k,a:X()};
-    case 'fl': return {k,a:X(),c:ri(R,2,5)};
+    case 'fl': case 'ce': return {k,a:X(),c:ri(R,2,5)};
+    case 'pw': return {k,c:rp(R,[2,2,3]),a:R()<.5?{k:'md',a:{k:'n'},c:ri(R,3,6)}:o.rec&&R()<.6?{k:'y1'}:X()};
     case 'abs': return {k,a:X(),c:ri(R,2,12)};
     case 'gcd': return {k,a:X(),c:rp(R,[4,6,8,9,10,12])};
     case 'md': return {k,a:X(),c:ri(R,3,6)};
-    case 'if': { const m=ri(R,2,4); return {k,m,r:ri(R,0,m-1),a:X(),b:X()}; }
+    case 'if': { const on=o.rec&&R()<.55?'y1':'n', m=on==='y1'?rp(R,[2,2,3]):ri(R,2,4); return {k,on,m,r:ri(R,0,m-1),a:X(),b:X()}; }
   }
   return leaf();
 }
@@ -491,11 +502,13 @@ function xev(x,e){
     case 'n': return e.n; case 'c': return x.v; case 'y1': return e.y1; case 'y2': return e.y2;
     case 'add': return xev(x.a,e)+xev(x.b,e); case 'sub': return xev(x.a,e)-xev(x.b,e); case 'mul': return x.c*xev(x.a,e);
     case 'sq': { const v=xev(x.a,e); return v*v; }
-    case 'fl': return Math.floor(xev(x.a,e)/x.c); case 'abs': return Math.abs(xev(x.a,e)-x.c);
+    case 'fl': return Math.floor(xev(x.a,e)/x.c); case 'ce': return Math.ceil(xev(x.a,e)/x.c);
+    case 'pw': { const v=xev(x.a,e); return v<0||v>30?NaN:Math.pow(x.c,v); }
+    case 'abs': return Math.abs(xev(x.a,e)-x.c);
     case 's2': { const v=xev(x.a,e); return v<0||v>2e9?NaN:popc(v); } case 'ds': { const v=xev(x.a,e); return v<0?NaN:dsum(v); }
     case 'gcd': return gcd(Math.abs(xev(x.a,e)),x.c); case 'tri': { const v=xev(x.a,e); return v*(v+1)/2; }
     case 'alt': return (e.n%2?-1:1)*xev(x.a,e); case 'md': return mod(xev(x.a,e),x.c);
-    case 'if': return mod(e.n,x.m)===x.r?xev(x.a,e):xev(x.b,e);
+    case 'if': return mod(x.on==='y1'?e.y1:e.n,x.m)===x.r?xev(x.a,e):xev(x.b,e);
     case 'xor': { const a=xev(x.a,e), b=xev(x.b,e); return a<0||b<0||a>2e9||b>2e9?NaN:(a^b); }
     case 'max': return Math.max(xev(x.a,e),xev(x.b,e)); case 'min': return Math.min(xev(x.a,e),xev(x.b,e));
   }
@@ -506,13 +519,14 @@ function xh(x){
   switch(x.k){
     case 'n': return I('n'); case 'c': return String(x.v); case 'y1': return yk(I('n')+'−1'); case 'y2': return yk(I('n')+'−2');
     case 'add': return `${w(x.a,6)} + ${w(x.b,6)}`; case 'sub': return `${w(x.a,6)} − ${w(x.b,7)}`;
-    case 'mul': return atomVar(x.a)?`${x.c}${xh(x.a)}`:`${x.c}·${w(x.a,8)}`;
+    case 'mul': return atomVar(x.a)?`${x.c}${xh(x.a)}`:x.a.k==='alt'?`${x.c}·${xh(x.a)}`:`${x.c}·${w(x.a,8)}`;
     case 'sq': return `${w(x.a,9)}<sup>2</sup>`;
-    case 'fl': return `⌊${w(x.a,7)}/${x.c}⌋`; case 'abs': return `|${w(x.a,2)} − ${x.c}|`;
+    case 'fl': return `⌊${w(x.a,7)}/${x.c}⌋`; case 'ce': return `⌈${w(x.a,7)}/${x.c}⌉`; case 'pw': return `${x.c}<sup>${xh(x.a)}</sup>`; case 'abs': return `|${w(x.a,6)} − ${x.c}|`;
     case 's2': return `s<sub>2</sub>(${w(x.a,2)})`; case 'ds': return `S(${w(x.a,2)})`; case 'gcd': return `НОД(${w(x.a,2)}, ${x.c})`; case 'tri': return `T(${w(x.a,2)})`;
-    case 'alt': return `(−1)<sup>${I('n')}</sup>·${w(x.a,8)}`; case 'md': return `${w(x.a,6)} mod ${x.c}`;
+    case 'alt': return `(−1)<sup>${I('n')}</sup>·${w(x.a,7)}`; case 'md': return `${w(x.a,7)} mod ${x.c}`;
     case 'xor': return `${w(x.a,9)} ⊕ ${w(x.b,9)}`; case 'max': case 'min': return `${x.k}(${w(x.a,2)}, ${w(x.b,2)})`;
-    case 'if': return `${xh(x.a)}, если ${I('n')} mod ${x.m} = ${x.r}; иначе ${xh(x.b)}`;
+    case 'if': { const v=x.on==='y1'?yk(I('n')+'−1'):I('n'), cond=x.m===2?`${v} ${x.r?'нечётно':'чётно'}`:`${v} mod ${x.m} = ${x.r}`;
+      return `${xh(x.a)}, если ${cond}; иначе ${xh(x.b)}`; }
   }
   return '?';
 }
@@ -524,18 +538,25 @@ function genFormula(R,c){
   /* reject what a person would simplify at a glance: n + n, 3n − n, |n + 9 − 12|, 2·(3·n), (−1)ⁿ·(−1)ⁿ… */
   const isVar=z=>z.k==='n'||z.k==='y1'||z.k==='y2', lin=z=>isVar(z)||(z.k==='mul'&&isVar(z.a)), varOf=z=>z.k==='mul'?z.a.k:z.k;
   const hasC=z=>(z.k==='add'||z.k==='sub')&&(z.a.k==='c'||z.b.k==='c');
-  xwalk(x,z=>{ size++; kinds.add(z.k); if(z.k==='n') hasN=true; if(z.k==='y1'||z.k==='y2') hasY=true;
+  xwalk(x,z=>{ size++; kinds.add(z.k); if(z.k==='n') hasN=true; if(z.k==='y1'||z.k==='y2'||(z.k==='if'&&z.on==='y1')) hasY=true;
     if(z.a&&z.b&&z.a.k==='c'&&z.b.k==='c') trivial=true; if(z.a&&!z.b&&z.a.k==='c') trivial=true;
     if((z.k==='add'||z.k==='sub')&&lin(z.a)&&lin(z.b)&&varOf(z.a)===varOf(z.b)) trivial=true;
     if((z.k==='add'||z.k==='sub')&&((z.a.k==='c'&&hasC(z.b))||(z.b.k==='c'&&hasC(z.a)))) trivial=true;
     if(z.k==='abs'&&hasC(z.a)) trivial=true; if(z.k==='mul'&&z.a.k==='mul') trivial=true; if(z.k==='alt'&&z.a.k==='alt') trivial=true;
-    if(z.k==='md'&&z.a.k==='md') trivial=true; if(z.k==='sq'&&z.a.k==='sq') trivial=true; if(z.k==='fl'&&z.a.k==='mul'&&z.a.c%z.c===0) trivial=true; });
+    if(z.k==='md'&&z.a.k==='md') trivial=true; if(z.k==='sq'&&z.a.k==='sq') trivial=true; if((z.k==='fl'||z.k==='ce')&&z.a.k==='mul'&&z.a.c%z.c===0) trivial=true; });
   if(x.k==='md') trivial=true;   /* (… mod 6) mod 7: the outer mod would be decoration */
-  const NONLIN=['sq','fl','abs','s2','ds','gcd','tri','alt','if','xor','max','min','md'];
+  /* readable: a case split only at the top of the formula, and no (−1)ⁿ cancelling another (−1)ⁿ */
+  const deep=(z,d)=>{ if(z.k==='if'&&d>(x.k==='add'||x.k==='sub'?1:0)) trivial=true; if(z.k==='alt'){ let q=z.a; while(q&&(q.k==='mul'||q.k==='sq')) q=q.a; if(q&&q.k==='alt') trivial=true; } ['a','b'].forEach(c=>z[c]&&typeof z[c]==='object'&&deep(z[c],d+1)); };
+  deep(x,0);
+  /* a sum is written as a person would leave it: one constant at most, each variable once */
+  const terms=(z,out)=>{ if(z.k==='add'||z.k==='sub'){ terms(z.a,out); terms(z.b,out); } else out.push(z); return out; };
+  xwalk(x,z=>{ if(z.k==='abs'&&z.a.k==='abs') trivial=true; if(z.k!=='add'&&z.k!=='sub') return; const t=terms(z,[]), vs=t.filter(lin).map(varOf);
+    if(t.filter(q=>q.k==='c').length>1||new Set(vs).size<vs.length) trivial=true; });
+  const NONLIN=['sq','fl','ce','pw','abs','s2','ds','gcd','tri','alt','if','xor','max','min','md'];
   if(!NONLIN.some(k=>kinds.has(k))&&rec!==2) trivial=true;   /* purely linear ones are the arithmetic family's job */
   if(size<[0,3,4,5,6,6][lv]) trivial=true;
   if(trivial||size<3||size>[0,4,6,8,10,12][lv]||!(hasN||hasY)||(rec&&!hasY)) return null;
-  const m=ri(R,5,10), fold=!rec&&R()<.18, y0=ri(R,0,m-1), y1=ri(R,0,m-1), lim=[0,800,3000,20000,90000,300000][lv], W=c.N+c.M+2;
+  const m=ri(R,5,10), fold=!rec&&x.k!=='abs'&&R()<.18, y0=ri(R,0,m-1), y1=ri(R,0,m-1), lim=[0,800,3000,20000,90000,300000][lv], W=c.N+c.M+2;
   const seq=(t,len)=>{ const v=[]; let big=0;
     for(let n=0;n<len;n++){ if(rec&&n<rec){ v.push(n?y1:y0); continue; }
       const raw=xev(t,{n,y1:v[n-1],y2:v[n-2]}); if(!Number.isFinite(raw)) return null; if(n<W) big=Math.max(big,Math.abs(raw));
@@ -564,6 +585,15 @@ function genFormula(R,c){
    Synth patches are built from continuous random spectra and ratios, so no two are alike.
    =================================================================================== */
 function hashStr(s){ let h=0x811c9dc5; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); } return h>>>0; }
+/* a theme hears the formula through its own lens: value i is the i-th note of a subset of the mode, always rising,
+   so a higher value is always a higher note (the puzzle reads the same by ear) while the melody gets its own colour */
+const LENS={mode:[0,1,2,3,4,5,6],pent:[0,2,3,4,6],hex:[0,1,2,3,4,6],triad:[0,2,4],sus:[0,3,4]};
+const lensSemi=(lens,st,i)=>{ const L=LENS[lens]||LENS.mode, k=L.length; return 24+12*Math.floor(i/k)+st[L[mod(i,k)]]; };
+/* bar two answers bar one: the same rhythm, or one long note split, or two short ones joined */
+function varyRhythm(R,p){ const q=p.slice(), r=R(); if(r<.35) return q;
+  if(r<.7&&q.length<9){ for(let j=q.length-1;j>=0;j--) if(q[j]>=4){ q.splice(j,1,q[j]-2,2); return q; } }
+  if(q.length>4){ let at=-1,bs=99; for(let j=1;j<q.length;j++){ const s2=q[j-1]+q[j]; if(s2<bs&&s2<=6){ bs=s2; at=j; } } if(at>0) q.splice(at-1,2,bs); }
+  return q; }
 const euclid=(k,N,rot)=>Array.from({length:N},(_,i)=>{ const j=mod(i+rot,N); return Math.floor(k*j/N)!==Math.floor(k*(j-1)/N)?1:0; });
 function hitsFrom0(R,k){ const h=euclid(k,16,ri(R,0,15)), f=h.indexOf(1); return h.slice(f).concat(h.slice(0,f)); }
 /* note rhythm of a bar: 4–8 onsets (Euclid), so a graph is never a blur and never a crawl */
@@ -591,9 +621,9 @@ function makeBellPatch(R){
   const kind=rw(R,[['partials',3],['fm',2],['pluck',1]]), B={id:newSeed(),kind};
   if(kind==='partials'){ const pool=[2,2.756,3,3.5,4.07,5.4,6.8,8.9,11.3], n=ri(R,3,6), base=rf(R,.8,2.2), sl=rf(R,.3,.8);
     B.p=[{r:1,a:1,d:base}]; for(let i=1;i<n;i++){ const r=(R()<.7?rp(R,pool):rf(R,1.5,9.5))*(1+rf(R,-.02,.02)); B.p.push({r,a:rf(R,.15,.6)/Math.sqrt(i+1),d:base/Math.pow(r,sl)}); }
-    const tot=B.p.reduce((s,q)=>s+q.a,0); B.p.forEach(q=>q.a/=tot); B.lv=.42; }
-  else if(kind==='fm'){ B.ratio=rf(R,2.4,4.6); B.index=rf(R,1,3.2); B.idec=rf(R,.12,.4); B.dec=rf(R,.9,2); B.lv=.32; }
-  else { B.damp=rf(R,.4935,.4985); B.bright=rf(R,2500,8000); B.lv=.75; }
+    const tot=B.p.reduce((s,q)=>s+q.a,0); B.p.forEach(q=>q.a/=tot); B.lv=.56; }
+  else if(kind==='fm'){ B.ratio=rf(R,2.4,4.6); B.index=rf(R,1,3.2); B.idec=rf(R,.12,.4); B.dec=rf(R,.9,2); B.lv=.4; }
+  else { B.damp=rf(R,.4935,.4985); B.bright=rf(R,2500,8000); B.lv=1.05; }
   return B;
 }
 function makeTheme(h,song){
@@ -605,7 +635,8 @@ function makeTheme(h,song){
     acc:(()=>{ const type=rw(R,[['pad',3],['stab',2],['arp',2],['bass',2.5],['none',1]]);
       return {type,voice:rp(R,V),wave:rp(R,['triangle','sawtooth','square']),cut0:rf(R,400,800),open:rf(R,1.6,3),steps:hitsFrom0(R,rp(R,[3,4,5,6])),
         dec:rf(R,.08,.22),rate:R()<.6?2:1,drive:rf(R,1,3),pat:rp(R,['formula','up','updown'])}; })(),
-    look:{trace:rw(R,[['steps',3],['dots',2],['spline',2],['bars',1.5],['area',1.5],['pulse',1.5],['stems',1]]),marker:rp(R,['none','circle','diamond','square','ring']),width:rf(R,1.7,2.7),glow:rf(R,.6,1.1),dash:R()<.3}};
+    look:{trace:rw(R,[['steps',3],['dots',2],['spline',2],['bars',1.5],['area',1.5],['pulse',1.5],['stems',1]]),marker:rp(R,['none','circle','diamond','square','ring']),width:rf(R,1.7,2.7),glow:rf(R,.6,1.1),dash:R()<.3,enter:R()<.6?'sweep':'snap'},
+    lens:rw(R,[['mode',4],['pent',2.2],['hex',1.2],['triad',1.1],['sus',.8]]), pad:R()<.5?song.pad:rp(R,['saw','choir','sub'])};
 }
 const LVL_W=(f,lv)=>f.lv>lv?0:f.w*(f.lv===lv?1.7:1);
 /* last shell of a round: the walk of the whole magazine. live = step down, blank = step up */
@@ -645,15 +676,16 @@ function pickPuzzle(R,want,c,recent){
 function buildShell(o){
   const {song,rs,seed,want,pre,post,lv,level,crit,final,bits,recent}=o;
   const R=mulberry(seed), bt=60/song.bpm, s16=bt/4;
-  const pat=final?RHY['8']:genRhythm(R), tot16=(pre+post)*4;
-  const notes=[]; let k16=0, j=0;
-  while(k16<tot16){ for(const d of pat){ if(k16>=tot16) break; notes.push({j:j++,k:k16,d,post:k16>=pre*4}); k16+=d; } }
+  const pat=final?RHY['8']:genRhythm(R), patB=final?pat:varyRhythm(R,pat), tot16=(pre+post)*4;
+  const notes=[]; let k16=0, j=0, bar=0;
+  while(k16<tot16){ for(const d of (bar%2?patB:pat)){ if(k16>=tot16) break; notes.push({j:j++,k:k16,d,post:k16>=pre*4}); k16+=d; } bar++; }
   const N=notes.filter(n=>!n.post).length, M=notes.length-N;
   const puz=final?walkPuzzle(bits,N,M):pickPuzzle(R,want,{lv,N,M},recent||[]);
   const th=makeTheme(hashStr(puz.html+'|'+puz.v.slice(0,24).join(',')),song);
-  const win=puz.v.slice(0,N+M), lo=Math.min(...win), st=rs.mode.st;
-  notes.forEach(n=>{ const y=puz.v[n.j], d0=14+(y-lo); n.y=y; n.p=n.post?d0+(want?-14:7):d0; n.s=degSemi(st,n.p); n.tr=n.k*s16; n.slot=n.d*s16; n.dur=n.slot*(final?.9:th.leg); n.lab=String(y); n.vel=n.j%th.accEvery===0?1:th.accAmt; });
-  return {seed,song,rs,rhythm:pat.join(''),notes,N,M,puz,th,lo,out:want,pre,post,bt,s16,len:(pre+post)*bt,tr:pre*bt,level,crit:!!crit,final:!!final,
+  const win=puz.v.slice(0,N+M), lo=Math.min(...win), st=rs.mode.st, span=Math.max(...win)-lo;
+  const lens=final?'mode':(th.lens==='triad'||th.lens==='sus')&&span>6?'pent':th.lens;
+  notes.forEach(n=>{ const y=puz.v[n.j], d0=14+(y-lo); n.y=y; n.p=n.post?d0+(want?-14:7):d0; n.s=lensSemi(lens,st,y-lo)+(n.post?(want?-24:12):0); n.tr=n.k*s16; n.slot=n.d*s16; n.dur=n.slot*(final?.9:th.leg); n.lab=String(y); n.vel=n.j%th.accEvery===0?1:th.accAmt; });
+  return {seed,song,rs,rhythm:pat.join('')+'/'+patB.join(''),lens,notes,N,M,puz,th,lo,out:want,pre,post,bt,s16,len:(pre+post)*bt,tr:pre*bt,level,crit:!!crit,final:!!final,
     qEnd:rw(R,[['riser',2],['stop',2],['roll',1.5],['swell',2]]),qTension:rp(R,[4,4,1,5,3,6]),
     start:0,answer:null,at:0,onbeat:false,resolved:false,pNaive:0,pExact:0};
 }
@@ -755,10 +787,10 @@ function makeEngine(ctx,song){
     else if(type==='vibes'){ const o=osc('sine',f,t), o2=osc('sine',f*4,t), a=g(0), b=g(0), tr=osc('sine',5.5,t), tg=g(.3), tm=g(1); env(a,t,.12*amp,.003,1.6); env(b,t,.03*amp,.002,.3); tr.connect(tg); tg.connect(tm.gain); ch(o,a,tm,bellBus); ch(o2,b,bellBus); [o,o2,tr].forEach(x=>{ x.start(t); x.stop(t+2.2); }); }
     else if(type==='pluck'){ const s=ctx.createBufferSource(), kb=ctx.createBuffer(1,Math.floor(sr*1.4),sr); kb.getChannelData(0).set(ksData(f,sr)); s.buffer=kb; const a=g(.42*amp); a.gain.setTargetAtTime(0,t+Math.max(.2,dur*2),.1); ch(s,bq('lowpass',6000),a,bellBus); s.start(t); s.stop(t+1.4); }
     else cowbell(t,.16*amp,f); }
-  function pad(t0,t1,s){ const f=hz(s), a=g(0); a.gain.setValueAtTime(0,t0); a.gain.linearRampToValueAtTime(1,t0+.25); a.gain.setValueAtTime(1,Math.max(t0+.26,t1-.12)); a.gain.linearRampToValueAtTime(0,t1+.25); a.connect(out); const vs=g(.3); a.connect(vs); vs.connect(verb);
+  function pad(t0,t1,s,type=song.pad){ const f=hz(s), a=g(0); a.gain.setValueAtTime(0,t0); a.gain.linearRampToValueAtTime(1,t0+.25); a.gain.setValueAtTime(1,Math.max(t0+.26,t1-.12)); a.gain.linearRampToValueAtTime(0,t1+.25); const pg=g(1.3); a.connect(pg); pg.connect(out); const vs=g(.3); a.connect(vs); vs.connect(verb);
     const src=[]; const sub=osc('sine',f,t0), sg=g(.12); ch(sub,sg,a); src.push(sub);
-    if(song.pad==='saw'){ const lpf=bq('lowpass',420,.9), m=g(.025); [-10,0,10].forEach(d=>{ const o=osc('sawtooth',f*2,t0); o.detune.value=d; o.connect(m); src.push(o); }); ch(m,lpf,a); }
-    else if(song.pad==='choir'){ const lpf=bq('lowpass',1500,.7), m=g(.018); [4,6,8].forEach(r=>{ const o=osc('triangle',f*r,t0); o.connect(m); src.push(o); }); ch(m,lpf,a); }
+    if(type==='saw'){ const lpf=bq('lowpass',420,.9), m=g(.025); [-10,0,10].forEach(d=>{ const o=osc('sawtooth',f*2,t0); o.detune.value=d; o.connect(m); src.push(o); }); ch(m,lpf,a); }
+    else if(type==='choir'){ const lpf=bq('lowpass',1500,.7), m=g(.018); [4,6,8].forEach(r=>{ const o=osc('triangle',f*r,t0); o.connect(m); src.push(o); }); ch(m,lpf,a); }
     else { const o=osc('triangle',f*2,t0), m=g(.03); ch(o,m,a); src.push(o); }
     src.forEach(o=>{ o.start(t0); o.stop(t1+.4); }); }
 
@@ -833,10 +865,11 @@ function makeEngine(ctx,song){
       for(let b=0;b<pb;b++){ const t0=tr+b*4*BT; KP[song.kickPat].forEach(k=>{ if(b===0&&k===0) return; kick(t0+k*S,.6); }); back(t0+BT,.55); back(t0+3*BT,.55);
         if(song.perc==='cowbell'&&lv>=1) [3,6,10,13].forEach(k=>cowbell(t0+k*S,.07,hz(48))); }
       hatsLive(tr,sh.post,lv);
+      if(D.perc&&lv>=1) for(let k=0;k<sh.post*4;k++) if(D.perc.steps[k%16]) perc(tr+k*S+(k%2?song.swing*S:0),D.perc,.06);
       const L8={...song.l808,...th.l808};
       let prev=null; post.forEach(n=>{ const f=hz(n.s); e808(n.tr,n.dur,f,prev,L8); prev=f; if(lv>=2||sh.final) wall(n.tr,n.dur,f*4); });
     } else { [0,4,7].forEach((d,i)=>bellGen(th.bell,tr+i*.035,.4,hz(48+degSemi(st,d)),.45)); chime(tr,st,true);
-      for(let b=0;b<pb;b++){ const t0=tr+b*4*BT; pad(t0,t0+4*BT,barRoot(sh.pre/4+b)); if(lv>=2) for(let q=0;q<8;q++) if(q%2) hat(t0+q*BT/2,.05,false); if(lv>=3) back(t0+2*BT,.12); }
+      for(let b=0;b<pb;b++){ const t0=tr+b*4*BT; pad(t0,t0+4*BT,barRoot(sh.pre/4+b),th.pad); if(lv>=2) D.hat.forEach((h,k)=>{ if(h&&k%4) hat(t0+k*S,.045,false); }); if(lv>=3) back(t0+2*BT,.12); }
       post.forEach(n=>bellGen(th.bell,n.tr,n.dur,hz(n.s),n.vel));
       if(sh.final) post.forEach(n=>bellGen(th.bell,n.tr+.002,n.dur,hz(n.s+12),.45));
     }
@@ -1037,7 +1070,7 @@ function gameOver(){
     <div class="stats"><span>верно <b>${G.correct}/${G.total}</b></span><span>точность <b>${acc} %</b></span><span>в такт <b>${G.onbeat}</b></span></div>
     <p>${isBest?'Новый личный рекорд.':'Личный рекорд: '+Math.max(best,G.score)+'.'} <span id="saveNote"></span></p>
     <div id="sendSlot"></div>
-    <p>Следующая игра — новая сессия: другая тональность, темп, звуки и формулы.</p>
+    <p class="nextp">Следующая игра — новая сессия: другая тональность, темп, звуки и формулы.</p>
     <button class="go" id="goBtn" type="button"><span>Ещё раз</span><kbd>Пробел</kbd></button>`);
   $('goBtn').onclick=resetGame; $('goBtn').focus({preventScroll:true});
   submitScore(acc);
@@ -1045,7 +1078,7 @@ function gameOver(){
 function resetGame(){
   if(G.phase!=='over'&&G.phase!=='title') return;
   initAudio();
-  Object.assign(G,{round:0,lives:3,score:0,streak:0,correct:0,total:0,onbeat:0,mood:-.15});
+  Object.assign(G,{round:0,lives:3,score:0,streak:0,correct:0,total:0,onbeat:0,mood:-.15,gameNo:(G.gameNo||0)+1});
   newSession();
   if(!G.introDone){ G.introDone=true; playIntro(); } else newRound();
 }
@@ -1120,10 +1153,11 @@ function marker(x,y,kind,col,r){ if(kind==='none') return; X.save(); X.fillStyle
   X.fill(); X.restore(); }
 /* one formula, one look: the trace style comes from the theme (steps, dots, spline, bars, area, pulses, stems) */
 const PLAIN_LOOK={trace:'steps',marker:'none',width:2.2,glow:1,dash:false};
-function drawTrace(gm,ns,lim,col,mode,th,base){
+function drawTrace(gm,ns,lim,col,mode,th,base,cap){
   const vis=ns.filter(n=>n.tr<=lim); if(!vis.length) return null;
   const Lk=mode==='theme'&&th?th.look:PLAIN_LOOK, tr=mode==='theme'?Lk.trace:mode, w=Lk.width, yb=gm.y(base), last=vis[vis.length-1];
-  const cx=n=>gm.x(n.tr), ex=n=>Math.max(cx(n)+1,gm.x(Math.min(n.tr+n.slot,lim))), dx=n=>Math.max(cx(n)+2,gm.x(Math.min(n.tr+n.dur,lim))), y=n=>gm.y(n.p);
+  const xl=Lk.enter==='snap'&&cap?cap:lim;   /* snap: a note's whole step appears on its onset; sweep: it grows with time */
+  const cx=n=>gm.x(n.tr), ex=n=>Math.max(cx(n)+1,gm.x(Math.min(n.tr+n.slot,xl))), dx=n=>Math.max(cx(n)+2,gm.x(Math.min(n.tr+n.dur,xl))), y=n=>gm.y(n.p);
   if(tr==='stems'){ const r=pathStems(gm,vis,lim,base); glow(r.P,col,1.6,.8); vis.forEach(n=>dot(cx(n)+2,y(n),3,col)); return r.h; }
   if(tr==='dots'||tr==='spline'){ const P=new Path2D();
     vis.forEach((n,i)=>{ const x=cx(n), yy=y(n); if(!i){ P.moveTo(x,yy); return; } if(tr==='dots'){ P.lineTo(x,yy); return; }
@@ -1133,7 +1167,7 @@ function drawTrace(gm,ns,lim,col,mode,th,base){
     vis.forEach(n=>marker(cx(n),y(n),Lk.marker==='none'?'circle':Lk.marker,col,3)); return {x:ex(last),y:y(last)}; }
   if(tr==='bars'){ vis.forEach(n=>{ const x0=cx(n), x1=dx(n)-1, yy=y(n); X.save(); X.fillStyle=col; X.globalAlpha=.15; X.fillRect(x0,Math.min(yy,yb),Math.max(1,x1-x0),Math.abs(yb-yy)); X.restore(); const P=new Path2D(); P.moveTo(x0,yy); P.lineTo(x1,yy); glow(P,col,w,Lk.glow); }); return {x:dx(last),y:y(last)}; }
   if(tr==='pulse'){ const P=new Path2D(); vis.forEach(n=>{ const x0=cx(n), x1=dx(n), yy=y(n); P.moveTo(x0,yb); P.lineTo(x0,yy); P.lineTo(x1,yy); P.lineTo(x1,yb); }); glow(P,col,w*.85,Lk.glow); vis.forEach(n=>marker(cx(n),y(n),Lk.marker,col,2.6)); return {x:dx(last),y:y(last)}; }
-  const r=pathSteps(gm,vis,lim);
+  const r=pathSteps(gm,vis,xl);
   if(tr==='area'){ const F=new Path2D(); F.moveTo(cx(vis[0]),yb); vis.forEach(n=>{ F.lineTo(cx(n),y(n)); F.lineTo(ex(n),y(n)); }); F.lineTo(ex(last),yb); F.closePath(); X.save(); X.fillStyle=col; X.globalAlpha=.12; X.fill(F); X.restore(); }
   glow(r.P,col,w,Lk.glow); vis.forEach(n=>marker(cx(n),y(n),Lk.marker,col,2.6)); return r.h;
 }
@@ -1171,7 +1205,7 @@ function drawShell(sh,now,countdown){
       const y=gm.y(14+P.curve(u)-sh.lo); if(first){ cp.moveTo(x,y); first=false; } else cp.lineTo(x,y); }
     X.save(); X.setLineDash([3,4]); glow(cp,col,1.2,.55); X.restore(); }
   const mode=look==='theme'?'theme':look==='stems'?'stems':'steps';
-  let head=drawTrace(gm,pre,lim,col,mode,sh.th,base);
+  let head=drawTrace(gm,pre,lim,col,mode,sh.th,base,sh.tr);
   if(look==='smooth') pre.forEach(n=>{ if(n.tr<=lim) dot(gm.x(n.tr),gm.y(n.p),2.6,col); });
   /* value labels: two rows above the phrase, like the reference */
   const labels=(ns,top,c)=>{ X.font=`800 9px ${FONT}`; X.textAlign='center'; X.fillStyle=c; let last=[-99,-99];
@@ -1190,13 +1224,13 @@ function drawShell(sh,now,countdown){
     if(sh.out){ X.textAlign='right'; X.fillText('f/4 · s = −2',xT-8,ym); } else { X.textAlign='left'; X.fillText('2f · s = +1',xT+8,ym); } X.restore();
     /* the continuation */
     const vis=post.filter(n=>n.tr<=tau);
-    head=drawTrace(gm,post,tau,pc,mode,sh.th,base+shift)||head;
+    head=drawTrace(gm,post,tau,pc,mode,sh.th,base+shift,sh.len)||head;
     if(!sh.out) vis.forEach(n=>{ const age=now-(sh.start+n.tr); if(age<.6){ X.save(); X.strokeStyle=pc; X.globalAlpha=1-age/.6; X.lineWidth=1.2; X.beginPath(); X.arc(gm.x(n.tr),gm.y(n.p),3+age*18,0,7); X.stroke(); X.restore(); } });
     labels(post,Math.max(...post.map(n=>n.p)),pc);
   }
   if(sh.answer!==null){ const x=gm.x(sh.at-sh.start), c2=sh.answer?COL.live:COL.blank; X.save(); X.strokeStyle=c2; X.globalAlpha=.7; X.lineWidth=1; X.setLineDash([2,4]); X.beginPath(); X.moveTo(x,T+8); X.lineTo(x,B); X.stroke(); X.restore();
     X.fillStyle=c2; X.textAlign=x>xT-60?'right':'left'; X.font=`800 9px ${FONT}`; X.fillText((sh.answer?'БОЕВОЙ ↓':'ХОЛОСТОЙ ↑')+(sh.onbeat?' · в такт':''),x>xT-60?x-4:x+4,B-4); }
-  if(head&&tau<sh.len) dot(head.x,head.y,4.2,revealed?pc:COL.amber);
+  if(head&&tau<sh.len){ let on=-1; for(const n of sh.notes) if(n.tr<=tau&&n.tr>on) on=n.tr; dot(head.x,head.y,4.2+3*Math.exp(-(tau-on)*9),revealed?pc:COL.amber); }
   if(countdown!=null){ X.fillStyle=COL.amber; X.globalAlpha=.9; X.textAlign='center'; X.font=`900 64px ${FONT}`; X.fillText(String(countdown),xT,(T+B)/2+22); X.globalAlpha=1; }
 }
 
@@ -1251,54 +1285,142 @@ document.addEventListener('visibilitychange',()=>{ if(!AC) return; if(document.h
 
 /* ================= leaderboard =================
    No outside services. Three homes, tried in this order:
-   1) the game's own GitHub repository: scores.json next to this page is the shared table.
-      A player sends a result as a GitHub issue (the button pre-fills it); the workflow in
-      .github/workflows/scores.yml checks it, writes it into scores.json and closes the issue.
-      GitHub Pages then serves the new table. Works on any username.github.io/repo page.
+   1) the game's own GitHub repository. The player types a nick and a password once; from them the page derives
+      a P-256 key pair (PBKDF2), so the password never leaves the device. Every finished game is signed and posted
+      by the page itself as a comment on the locked issue "patronnik-scores" (lb.json holds that issue and a token
+      that can only write issue comments here). The workflow .github/workflows/scores.yml checks the signature —
+      the first result registers the nick's key, later ones must match — writes scores.json and deletes the comment.
    2) Claude's shared storage, when the page runs as a Claude artifact.
    3) this device only — the local top 10, always kept. */
 const LB_REPO='';   /* "owner/repo"; empty = detect from a *.github.io address */
-const store={ get(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }, set(k,v){ try{ localStorage.setItem(k,v); }catch(e){} } };
+const store={ get(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }, set(k,v){ try{ if(v==null) localStorage.removeItem(k); else localStorage.setItem(k,v); }catch(e){} } };
 const LB_ID=(()=>{ let v=store.get('patronnik-id'); if(!v){ v=(crypto.randomUUID?crypto.randomUUID():newSeed().toString(16)+'-'+newSeed().toString(16)); store.set('patronnik-id',v); } return v; })();
-const defaultName='Игрок '+LB_ID.replace(/[^0-9a-f]/gi,'').slice(0,4).toUpperCase();
-const playerName=()=>((store.get('patronnik-name')||'').trim().slice(0,24))||defaultName;
 const repoOf=()=>{ if(LB_REPO) return LB_REPO; const h=location.hostname; if(!/\.github\.io$/i.test(h)) return ''; const owner=h.split('.')[0], seg=location.pathname.split('/').filter(Boolean)[0];
   return seg&&!/\.html?$/i.test(seg)?`${owner}/${seg}`:`${owner}/${h}`; };
-/* a light checksum so a hand-typed issue is rejected; it is not real protection, the table is for fun */
-function scoreSig(o){ const s=`${o.name}|${o.score}|${o.rounds}|${o.acc}|${o.session}|patronnik-v2`, b=new TextEncoder().encode(s); let h=0x811c9dc5; for(const x of b){ h^=x; h=Math.imul(h,16777619)>>>0; } return h.toString(16).padStart(8,'0'); }
-let LB={mode:'local',rows:[],lastLocal:null,canWrite:null,remoteBest:0,updated:null}, DB=null, USER=null, UID=null;
+const normNick=s=>s.normalize('NFKC').replace(/\s+/g,' ').trim().toLowerCase();
+const cleanNick=s=>s.normalize('NFKC').replace(/\s+/g,' ').trim();
+const NICK_RE=/^[\p{L}\p{N}_\-. ]{2,20}$/u;
+
+/* --- P-256 by hand, only to turn the password-derived secret into a public key (WebCrypto signs) --- */
+const EC={p:0xffffffff00000001000000000000000000000000ffffffffffffffffffffffffn,n:0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551n,
+  g:[0x6b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c296n,0x4fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5n]};
+const bm=(a,m)=>((a%m)+m)%m;
+function binv(a,m){ let r0=bm(a,m),r1=m,s0=1n,s1=0n; while(r1){ const q=r0/r1; [r0,r1]=[r1,r0-q*r1]; [s0,s1]=[s1,s0-q*s1]; } return bm(s0,m); }
+function padd(P,Q){ const p=EC.p; if(!P) return Q; if(!Q) return P; let l;
+  if(P[0]===Q[0]){ if(bm(P[1]+Q[1],p)===0n) return null; l=bm((3n*P[0]*P[0]-3n)*binv(2n*P[1],p),p); } else l=bm((Q[1]-P[1])*binv(Q[0]-P[0],p),p);
+  const x=bm(l*l-P[0]-Q[0],p); return [x,bm(l*(P[0]-x)-P[1],p)]; }
+function pmul(k,P){ let R=null; while(k>0n){ if(k&1n) R=padd(R,P); P=padd(P,P); k>>=1n; } return R; }
+const hex=b=>Array.from(b,x=>x.toString(16).padStart(2,'0')).join('');
+const unhex=h=>Uint8Array.from(h.match(/../g),x=>parseInt(x,16));
+const b64=b=>btoa(String.fromCharCode(...b));
+const b64u=b=>b64(b).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+const h32=x=>x.toString(16).padStart(64,'0');
+async function deriveAcct(nick,pass){
+  const enc=new TextEncoder(), base=await crypto.subtle.importKey('raw',enc.encode(pass),'PBKDF2',false,['deriveBits']);
+  const bits=new Uint8Array(await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt:enc.encode('patronnik|'+normNick(nick)),iterations:150000},base,256));
+  const d=bm(BigInt('0x'+hex(bits)),EC.n-1n)+1n, Q=pmul(d,EC.g);
+  return {nick:cleanNick(nick),d:h32(d),x:h32(Q[0]),y:h32(Q[1])};
+}
+const pubOf=a=>b64(new Uint8Array([4,...unhex(a.x),...unhex(a.y)]));
+async function signStr(a,str){
+  const key=await crypto.subtle.importKey('jwk',{kty:'EC',crv:'P-256',d:b64u(unhex(a.d)),x:b64u(unhex(a.x)),y:b64u(unhex(a.y)),ext:true},{name:'ECDSA',namedCurve:'P-256'},false,['sign']);
+  return b64(new Uint8Array(await crypto.subtle.sign({name:'ECDSA',hash:'SHA-256'},key,new TextEncoder().encode(str))));
+}
+const deobf=s=>{ const k='patronnik-lb', b=atob(s.split('').reverse().join('')); let o=''; for(let i=0;i<b.length;i++) o+=String.fromCharCode(b.charCodeAt(i)^k.charCodeAt(i%k.length)); return o; };
+
+let LB={mode:'local',rows:[],players:{},acks:{},lastLocal:null,canWrite:null,remoteBest:0,updated:null,cfg:null,pending:null,status:''}, DB=null, USER=null, UID=null;
+const acct=()=>{ try{ const a=JSON.parse(store.get('patronnik-acct')||'null'); return a&&a.d&&a.nick?a:null; }catch(e){ return null; } };
+const canSend=()=>LB.mode==='gh'&&LB.cfg&&LB.cfg.tok&&LB.cfg.issue&&window.crypto&&crypto.subtle;
 function localTop(){ try{ const t=JSON.parse(store.get('patronnik-top')||'[]'); return Array.isArray(t)?t:[]; }catch(e){ return []; } }
 function localAdd(e){ const t=localTop(); t.push(e); t.sort((a,b)=>b.best-a.best||a.at-b.at); const out=t.slice(0,10); store.set('patronnik-top',JSON.stringify(out)); return out; }
-async function ghLoad(){ const r=await fetch('scores.json?t='+Date.now(),{cache:'no-store'}); if(!r.ok) throw new Error('no table'); const j=await r.json(); if(!j||!Array.isArray(j.scores)) throw new Error('bad table');
-  LB.rows=j.scores.slice().sort((a,b)=>b.best-a.best).slice(0,10); LB.updated=j.updated||null; }
-function issueUrl(acc){
-  const repo=repoOf(); if(!repo) return '';
-  const o={name:playerName(),score:G.score,rounds:G.round,acc,session:(G.song&&G.song.seed||0).toString(16)}; o.sig=scoreSig(o);
-  const body=`Результат игры «Патронник». Просто нажмите «Submit new issue», таблица обновится сама через пару минут.\n\n\`\`\`json\n${JSON.stringify(o)}\n\`\`\`\n`;
-  return `https://github.com/${repo}/issues/new?title=${encodeURIComponent(`score: ${o.name} — ${o.score}`)}&body=${encodeURIComponent(body)}`;
+/* the shared table: straight from the repository through the API (fresh), else the copy GitHub Pages serves */
+async function ghLoad(){ const repo=repoOf(); let j=null;
+  if(repo) try{ const r=await fetch(`https://api.github.com/repos/${repo}/contents/scores.json`,{headers:{Accept:'application/vnd.github.raw'},cache:'no-store'}); if(r.ok) j=await r.json(); }catch(e){}
+  if(!j){ const r=await fetch('scores.json?t='+Date.now(),{cache:'no-store'}); if(!r.ok) throw new Error('no table'); j=await r.json(); }
+  if(!j||!Array.isArray(j.scores)) throw new Error('bad table');
+  LB.rows=j.scores.filter(r=>r&&r.id).sort((a,b)=>b.best-a.best).slice(0,10); LB.players=j.players||{}; LB.acks=j.acks||{}; LB.updated=j.updated||null;
+  const P=LB.pending; if(P&&LB.acks[P.nonce]) settle(P,LB.acks[P.nonce]); }
+const ACK_TEXT={ok:'Рекорд в общей таблице.',low:'Принято. Ваш лучший результат в таблице выше этого.',key:'Этот ник уже занят другим паролем. Войдите заново.',bad:'Сервер не принял результат.'};
+function settle(P,ack){ LB.pending=null; store.set('patronnik-outbox',null); LB.status=ACK_TEXT[ack]||'';
+  if(ack==='key'){ store.set('patronnik-acct',null); }
+  const sn=$('saveNote'); if(sn&&P.game===G.gameNo) sn.textContent=LB.status; renderLB(); }
+/* after a send, look for the verdict a few times; the workflow usually answers within a minute */
+let pollT=null;
+function pollAck(){ clearTimeout(pollT); let k=0; const step=()=>{ if(!LB.pending||k++>10) return; ghLoad().then(renderLB).catch(()=>{}).finally(()=>{ if(LB.pending) pollT=setTimeout(step,k<4?15000:30000); }); }; pollT=setTimeout(step,20000); }
+async function sendResult(r){
+  const a=acct(); if(!a||!canSend()) return false;
+  const p=JSON.stringify({v:1,nick:a.nick,score:r.score,rounds:r.rounds,acc:r.acc,session:r.session,nonce:r.nonce,t:r.t});
+  const body=JSON.stringify({p,s:await signStr(a,p),k:pubOf(a)});
+  const res=await fetch(`https://api.github.com/repos/${repoOf()}/issues/${LB.cfg.issue}/comments`,{method:'POST',
+    headers:{Authorization:'Bearer '+deobf(LB.cfg.tok),Accept:'application/vnd.github+json','Content-Type':'application/json'},body:JSON.stringify({body})});
+  if(!res.ok) throw new Error('HTTP '+res.status);
+  return true;
+}
+/* a result waits in the outbox until GitHub has it, so a lost connection only delays it */
+async function flushOutbox(){
+  let r=null; try{ r=JSON.parse(store.get('patronnik-outbox')||'null'); }catch(e){} if(!r||!acct()||!canSend()) return;
+  LB.pending=r; const sn=$('saveNote'), say=t=>{ LB.status=t; if(sn&&r.game===G.gameNo) sn.textContent=t; };
+  if(r.sent){ pollAck(); return; }
+  say('Отправляю в общую таблицу…');
+  try{ await sendResult(r); r.sent=true; store.set('patronnik-outbox',JSON.stringify(r)); say('Отправлено. Таблица обновится примерно через минуту.'); pollAck(); }
+  catch(e){ say('Нет связи с GitHub: результат сохранён и уйдёт при следующем запуске.'); }
+  renderLB();
 }
 function renderLB(){
-  const ol=$('lb'), note=$('lbNote'), wrap=$('lbNameWrap');
-  wrap.hidden=LB.mode==='claude';
-  const rows=LB.mode==='local'?localTop():LB.rows, best=Math.max(+store.get('patronnik-best')||0,...localTop().map(r=>+r.best||0));
+  const ol=$('lb'), note=$('lbNote'), a=acct();
+  const rows=LB.mode==='local'?localTop():LB.rows.slice(), best=Math.max(+store.get('patronnik-best')||0,...localTop().map(r=>+r.best||0));
+  const myId=a?normNick(a.nick):null;
+  /* a result on its way shows up at once, marked as pending */
+  if(LB.mode==='gh'&&LB.pending&&a){ const mine=rows.find(r=>r.id===myId); if(!mine||mine.best<LB.pending.score){ if(mine) rows.splice(rows.indexOf(mine),1); rows.push({id:myId,nick:a.nick,best:LB.pending.score,rounds:LB.pending.rounds,pend:true}); rows.sort((x,y)=>y.best-x.best); rows.length=Math.min(rows.length,10); } }
   if(LB.mode==='local') note.textContent=`Рекорды этого устройства. Ваш лучший: ${best}.`;
-  else if(LB.mode==='gh') note.textContent=rows.length?`Общая таблица игры. Ваш лучший на этом устройстве: ${best}.`:'Общая таблица пока пуста: отправьте первый рекорд после игры.';
+  else if(LB.mode==='gh') note.textContent=LB.status||(!canSend()?'Общая таблица (отправка пока не настроена владельцем игры).':rows.length?(a?'Результаты отправляются сами после каждой игры.':'Войдите, и ваши результаты будут попадать сюда сами.'):'Таблица пока пуста: сыграйте первым.');
   else if(!rows.length) note.textContent='Пока пусто. Сыграйте, и ваш результат станет первым.';
   else note.textContent=LB.canWrite===false?'У вас доступ только на просмотр, поэтому ваш рекорд сюда не попадёт.':'Сюда попадает лучший результат каждого игрока.';
-  const me=playerName(), isMe=r=>LB.mode==='local'?r.at===LB.lastLocal:LB.mode==='claude'?r.id===UID:r.name===me;
-  const draw=ps=>{ ol.innerHTML=''; rows.forEach((r,i)=>{ const li=document.createElement('li'); if(isMe(r)) li.className='me';
+  const isMe=r=>LB.mode==='local'?r.at===LB.lastLocal:LB.mode==='claude'?r.id===UID:r.id===myId;
+  const draw=ps=>{ ol.innerHTML=''; rows.forEach((r,i)=>{ const li=document.createElement('li'); li.className=(isMe(r)?'me':'')+(r.pend?' pend':'');
     const rk=document.createElement('span'); rk.className='rk'; rk.textContent=String(i+1).padStart(2,'0');
-    const nm=document.createElement('span'); nm.className='nm'; nm.textContent=LB.mode==='claude'?((ps&&ps[r.id]&&ps[r.id].name)||(r.id===UID?'Вы':'Игрок')):(r.name||'Игрок');
-    const rd=document.createElement('span'); rd.className='rd'; rd.textContent=`раунд ${r.rounds||1}`;
+    const nm=document.createElement('span'); nm.className='nm'; nm.textContent=LB.mode==='claude'?((ps&&ps[r.id]&&ps[r.id].name)||(r.id===UID?'Вы':'Игрок')):(r.nick||r.name||'Игрок');
+    const rd=document.createElement('span'); rd.className='rd'; rd.textContent=r.pend?'отправляется':`раунд ${r.rounds||1}`;
     const sc=document.createElement('span'); sc.className='sc'; sc.textContent=r.best; li.append(rk,nm,rd,sc); ol.appendChild(li); }); };
   draw(null); if(LB.mode==='claude'&&USER) USER.profiles(rows.map(r=>r.id)).then(draw).catch(()=>{});
+  renderAcct();
+}
+/* nick + password, in the side card and on the game-over screen */
+function acctForm(id,label){
+  return `<form class="acct" id="${id}" autocomplete="on"><input name="nick" maxlength="20" placeholder="Ник" autocomplete="username" spellcheck="false" required>
+    <input name="pass" type="password" placeholder="Пароль" autocomplete="current-password" required><button class="go mini" type="submit">${label}</button><span class="acct-msg" aria-live="polite"></span></form>`;
+}
+function bindAcct(form,after){
+  if(!form) return; const msg=form.querySelector('.acct-msg'), btn=form.querySelector('button');
+  form.addEventListener('submit',async e=>{ e.preventDefault(); const nick=cleanNick(form.nick.value), pass=form.pass.value;
+    if(!NICK_RE.test(nick)){ msg.textContent='Ник: от 2 до 20 букв, цифр, пробелов или _ - .'; return; }
+    if(pass.length<4){ msg.textContent='Пароль: хотя бы 4 символа.'; return; }
+    btn.disabled=true; msg.textContent='Проверяю…';
+    try{ const a=await deriveAcct(nick,pass), who=LB.players[normNick(nick)];
+      if(who&&who.key!==pubOf(a)){ msg.textContent='Этот ник занят, или пароль не тот.'; btn.disabled=false; return; }
+      if(who&&who.nick) a.nick=who.nick;
+      store.set('patronnik-acct',JSON.stringify(a)); LB.status=who?`С возвращением, ${a.nick}.`:`Ник «${a.nick}» станет вашим после первой отправки.`;
+      renderLB(); if(after) after(); }
+    catch(err){ msg.textContent='Не получилось: этот браузер не умеет нужное шифрование.'; btn.disabled=false; } });
+}
+function renderAcct(){
+  const box=$('acctBox'); if(!box) return; const a=acct();
+  if(LB.mode!=='gh'||!canSend()){ box.hidden=true; return; } box.hidden=false;
+  if(a){ if(box.dataset.state===a.nick) return; box.dataset.state=a.nick; box.innerHTML=`<div class="acct-in">Вы играете как <b></b> · <button type="button" class="link" id="acctOut">выйти</button></div>`;
+    box.querySelector('b').textContent=a.nick; $('acctOut').onclick=()=>{ store.set('patronnik-acct',null); LB.status=''; renderLB(); }; }
+  else { if(box.dataset.state==='-') return; box.dataset.state='-'; box.innerHTML=acctForm('acctSide','Войти'); bindAcct($('acctSide')); }
 }
 async function submitScore(acc){
   const sn=$('saveNote'), say=t=>{ if(sn) sn.textContent=t; };
-  const at=Date.now(); localAdd({name:playerName(),best:G.score,rounds:G.round,acc,at}); LB.lastLocal=at;
-  if(LB.mode==='gh'&&G.score>0){ const url=issueUrl(acc), slot=$('sendSlot');
-    if(url&&slot){ const a=document.createElement('a'); a.className='go send'; a.href=url; a.target='_blank'; a.rel='noopener'; a.textContent='Отправить в общую таблицу'; slot.replaceChildren(a);
-      const p=document.createElement('p'); p.className='small'; p.textContent='Откроется GitHub с готовой заявкой (нужен аккаунт GitHub). Таблица обновится через пару минут.'; slot.append(p); } }
+  const at=Date.now(); localAdd({name:acct()?acct().nick:'Вы',best:G.score,rounds:G.round,acc,at}); LB.lastLocal=at;
+  if(LB.mode==='gh'&&G.score>0&&canSend()){
+    const r={score:G.score,rounds:G.round,acc,session:(G.song&&G.song.seed||0).toString(16),nonce:hex(crypto.getRandomValues(new Uint8Array(12))),t:at,game:G.gameNo};
+    store.set('patronnik-outbox',JSON.stringify(r));
+    if(acct()) flushOutbox();
+    else { const slot=$('sendSlot'); if(slot){ slot.innerHTML=`<p class="small">Ник и пароль — и результат уйдёт в общую таблицу. Дальше всё будет уходить само.</p>${acctForm('acctOver','В таблицу')}`;
+      const np=document.querySelector('#overlay .nextp'); if(np) np.hidden=true;
+      bindAcct($('acctOver'),()=>{ slot.innerHTML=''; flushOutbox(); }); } }
+  }
   else if(LB.mode==='claude'){
     if(DB&&UID&&G.score>LB.remoteBest){ try{ await DB.doc('scores/'+UID).set({best:G.score,rounds:G.round,acc,at}); LB.remoteBest=G.score; say('Рекорд записан в общую таблицу.'); }
       catch(e){ LB.canWrite=false; say('Записать рекорд в общую таблицу не получилось: у вас доступ только на просмотр.'); } }
@@ -1306,9 +1428,6 @@ async function submitScore(acc){
   renderLB();
 }
 (async()=>{
-  const inp=$('lbName'); inp.value=store.get('patronnik-name')||''; inp.placeholder=defaultName;
-  inp.addEventListener('change',()=>{ store.set('patronnik-name',inp.value.trim().slice(0,24)); renderLB(); });
-  inp.addEventListener('keydown',e=>{ if(e.key==='Enter') inp.blur(); });
   if(window.claude&&typeof window.claude.use==='function'){
     try{ const [db,user]=await Promise.all([claude.use('db'),claude.use('user')]); DB=db; USER=user;
       if(user){ UID=await user.id(); LB.canWrite=await user.can('data.write'); }
@@ -1317,12 +1436,13 @@ async function submitScore(acc){
         if(UID){ const me=await DB.doc('scores/'+UID).get(); if(me.exists) LB.remoteBest=+(me.data().best||0); }
         return; } }catch(e){}
   }
-  try{ await ghLoad(); LB.mode='gh'; setInterval(()=>{ if(!document.hidden&&G.phase!=='play') ghLoad().then(renderLB).catch(()=>{}); },60000); }catch(e){ LB.mode='local'; }
-  renderLB();
+  try{ const r=await fetch('lb.json?t='+Date.now(),{cache:'no-store'}); if(r.ok) LB.cfg=await r.json(); }catch(e){}
+  try{ await ghLoad(); LB.mode='gh'; setInterval(()=>{ if(!document.hidden&&G.phase!=='play'&&!LB.pending) ghLoad().then(renderLB).catch(()=>{}); },180000); }catch(e){ LB.mode='local'; }
+  renderLB(); flushOutbox();
 })();
 
 /* debug hooks for offline checks (only with ?debug in the URL) */
-if(/[?&]debug/.test(location.search)) window.__pt={levelShell,LB,LB_ID,submitScore,scoreSig,issueUrl,genFormula,makeTheme,SEEN,makeSong,roundStyle,buildShell,renderWith,drawShell,setFormula,FAM,G,get AC(){return AC;},initAudio};
+if(/[?&]debug/.test(location.search)) window.__pt={gameOver,levelShell,LB,LB_ID,submitScore,deriveAcct,signStr,pubOf,ghLoad,flushOutbox,renderLB,genFormula,makeTheme,SEEN,makeSong,roundStyle,buildShell,renderWith,drawShell,setFormula,FAM,G,get AC(){return AC;},initAudio};
 
 function boot(){
   resize(); window.addEventListener('resize',resize);
