@@ -64,6 +64,10 @@ body{
 .hdr{grid-area:hdr;display:grid;justify-items:center;padding-top:2px}
 .pill-main{font-family:var(--f-display);font-size:clamp(28px,8vw,40px);letter-spacing:.02em;line-height:1.1;color:var(--white);background:var(--pill);padding:3px 18px 5px;border-radius:8px;transform:rotate(-1.4deg);box-shadow:0 0 0 1px color-mix(in srgb,var(--white) 12%,transparent) inset,0 8px 30px color-mix(in srgb,var(--pill) 40%,transparent)}
 .pill-sub{font-weight:700;font-size:13.5px;color:var(--ink);background:var(--fg);padding:2px 10px 3px;border-radius:4px;margin-top:-4px;transform:rotate(-1.4deg);transition:background .2s,color .2s}
+.vol{display:flex;align-items:center;gap:8px;margin-top:10px;color:var(--muted)}
+.vol-btn{background:none;border:0;padding:4px;color:inherit;cursor:pointer;display:grid;place-items:center;border-radius:6px}
+.vol-btn:focus-visible,.vol input:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+.vol input{width:130px;accent-color:var(--amber);cursor:pointer}
 .pill-sub.hot{background:var(--pill);color:var(--white);font-family:var(--f-display);font-weight:400;letter-spacing:.05em;text-transform:uppercase;font-size:12px;padding:3px 10px}
 
 /* hud */
@@ -261,6 +265,8 @@ body{
   <header class="hdr">
     <div class="pill-main">ПАТРОННИК</div>
     <div class="pill-sub" id="sub">рулетка, но это математика</div>
+    <div class="vol"><button type="button" id="volBtn" class="vol-btn" aria-label="Выключить звук"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path id="volWaves" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path id="volX" d="M16 9l5 6M21 9l-5 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" hidden/></svg></button>
+      <input id="vol" type="range" min="0" max="100" step="1" aria-label="Громкость"></div>
   </header>
 
   <div class="hud" aria-live="polite">
@@ -635,29 +641,29 @@ const CHARS={
   /* square-wave trap, like the reference: dry pulse lead, bass locked to the kick, glass bell on the answer */
   pulse:{duck:0.72,dsend:0,w:3,leg:[.55,.75],acc:[['bass',3],['stab',2]],kick:[[3,3],[4,2]],hat:[8,8,6],perc:0,lens:[['mode',3],['pent',2]],pad:'saw',accWave:'square',
     look:{trace:'steps',marker:'none',width:[2.2,2.6]},
-    lead:R=>leadBase(R,{arch:'dual',w1:rp(R,['square','p25']),w2:rp(R,['square','p25','p12']),iv:rp(R,[0,12]),l2:rf(R,.25,.45),ft:'lowpass',kt:rf(R,4,8),q:rf(R,.7,2),env:rf(R,1.5,2.6),drive:0,dec:rf(R,.08,.2),sus:rf(R,.5,.7),swoop:1+rf(R,.004,.012),lv:.18}),
+    lead:R=>leadBase(R,{arch:'dual',w1:rp(R,['square','p25']),w2:rp(R,['square','p25','p12']),iv:rp(R,[0,12]),l2:rf(R,.25,.45),ft:'lowpass',kt:rf(R,7,12),q:rf(R,.7,2),env:rf(R,1.5,2.6),drive:0,dec:rf(R,.08,.2),sus:rf(R,.5,.7),swoop:1+rf(R,.004,.012),lv:.18}),
     bell:R=>({kind:'fm',ratio:rp(R,[3,3.5,4]),index:rf(R,1.2,2.4),idec:rf(R,.15,.3),dec:rf(R,1,1.6),lv:.4})},
   /* clean FM glass: soft sine lead, a pad or a light arpeggio, few drums, harmonic chimes */
   glass:{duck:0.82,dsend:0.22,w:2.5,leg:[.8,.95],acc:[['pad',3],['arp',2]],kick:[[2,3],[3,1]],hat:[4,6],perc:.6,percSnd:['tick'],lens:[['pent',3],['triad',2],['sus',1]],pad:'choir',accWave:'triangle',
     look:{trace:'dots',marker:'circle',width:[1.6,2]},
-    lead:R=>leadBase(R,{arch:'fm',cw:'sine',ratio:rp(R,[1,2,2,3]),index:rf(R,.6,1.8),isus:rf(R,.1,.3),idec:rf(R,.1,.3),m2:null,att:rf(R,.004,.01),dec:rf(R,.2,.4),sus:rf(R,.55,.75),rel:.06,vib:{rate:rf(R,4.8,5.8),depth:rf(R,3,7),delay:.2},lv:.24}),
+    lead:R=>leadBase(R,{arch:'fm',cw:'sine',ratio:rp(R,[1,2,2,3]),index:rf(R,1.1,2.4),isus:rf(R,.1,.3),idec:rf(R,.1,.3),m2:null,att:rf(R,.004,.01),dec:rf(R,.2,.4),sus:rf(R,.55,.75),rel:.06,vib:{rate:rf(R,4.8,5.8),depth:rf(R,3,7),delay:.2},lv:.24}),
     bell:R=>{ const d=rf(R,1.4,2.2), p=[{r:1,a:1,d}]; [2,3,4,6].forEach(r=>{ if(R()<.7) p.push({r:r*(1+rf(R,-.003,.003)),a:rf(R,.2,.5)/r,d:d/Math.sqrt(r)}); }); return {kind:'partials',p:normP(p),lv:.56}; }},
   /* acid: resonant saw with drive, busy hats and a rim, plucked answer */
   acid:{duck:0.74,dsend:0.06,w:2,leg:[.55,.8],acc:[['none',2],['stab',2]],kick:[[4,3],[5,1]],hat:[10,12],perc:.7,percSnd:['rim'],lens:[['mode',3],['hex',2]],pad:'sub',accWave:'sawtooth',
     look:{trace:'steps',marker:'square',width:[1.9,2.3]},
-    lead:R=>leadBase(R,{arch:'dual',w1:'sawtooth',w2:'sawtooth',iv:0,l2:rf(R,.4,.6),ft:'lowpass',kt:rf(R,1.6,3),q:rf(R,6,11),env:rf(R,3,5),drive:rf(R,2,3.5),att:.002,dec:rf(R,.1,.25),sus:rf(R,.4,.6),rel:.025,lv:.16}),
+    lead:R=>leadBase(R,{arch:'dual',w1:'sawtooth',w2:'sawtooth',iv:0,l2:rf(R,.4,.6),ft:'lowpass',kt:rf(R,2.6,4.5),q:rf(R,6,11),env:rf(R,3,5),drive:rf(R,2,3.5),att:.002,dec:rf(R,.1,.25),sus:rf(R,.4,.6),rel:.025,lv:.16}),
     bell:R=>({kind:'pluck',damp:rf(R,.494,.4975),bright:rf(R,2500,5000),lv:1.3})},
   /* music box: hollow clarinet-like lead, an arpeggio, light shaker, music-box chimes */
   box:{duck:0.85,dsend:0.12,w:2,leg:[.45,.6],acc:[['arp',3],['pad',1]],kick:[[2,2],[3,2]],hat:[6,8],perc:.5,percSnd:['shaker','tick'],lens:[['triad',2],['pent',3]],pad:'choir',accWave:'triangle',
     look:{trace:'dots',marker:'diamond',width:[1.6,2]},
     lead:R=>{ const tilt=rf(R,.9,1.3), h=[0]; for(let k=1;k<24;k++) h.push(k%2?Math.pow(k,-tilt):rf(R,0,.06)/k);
-      return leadBase(R,{arch:'spec',h,kt:rf(R,6,10),q:rf(R,.6,1.2),env:rf(R,1.2,1.8),att:rf(R,.004,.012),dec:rf(R,.15,.3),sus:rf(R,.45,.65),rel:.04,lv:.2}); },
+      return leadBase(R,{arch:'spec',h,kt:rf(R,9,14),q:rf(R,.6,1.2),env:rf(R,1.2,1.8),att:rf(R,.004,.012),dec:rf(R,.15,.3),sus:rf(R,.45,.65),rel:.04,lv:.2}); },
     bell:R=>{ const d=rf(R,.9,1.4); return {kind:'partials',p:normP([{r:1,a:1,d},{r:3,a:.35,d:d*.4},{r:5.4,a:.18,d:d*.25},{r:8.9,a:.08,d:d*.15}]),lv:.56}; }},
   /* fog: dark breathing lead with vibrato, a low saw pad, almost no drums */
   fog:{duck:0.8,dsend:0.18,w:1.6,leg:[.9,.98],acc:[['pad',3]],kick:[[2,3],[3,1]],hat:[4,6],perc:0,lens:[['mode',3],['sus',1.5],['hex',1]],pad:'saw',accWave:'sawtooth',
     look:{trace:'area',marker:'none',width:[2.3,2.8]},
     lead:R=>{ const tilt=rf(R,1.4,1.9), f0=rf(R,2,4), h=[0]; for(let k=1;k<24;k++) h.push(Math.pow(k,-tilt)*(1+1.5*Math.exp(-Math.pow((k-f0)/1.2,2))));
-      return leadBase(R,{arch:'spec',h,kt:rf(R,3,5),q:rf(R,1,2),env:rf(R,1.1,1.4),att:rf(R,.015,.03),dec:rf(R,.3,.5),sus:rf(R,.7,.85),rel:.07,vib:{rate:rf(R,4.5,5.5),depth:rf(R,6,12),delay:.15},uni:2,lv:.2}); },
+      return leadBase(R,{arch:'spec',h,kt:rf(R,5.5,8),q:rf(R,1,2),env:rf(R,1.1,1.4),att:rf(R,.015,.03),dec:rf(R,.3,.5),sus:rf(R,.7,.85),rel:.07,vib:{rate:rf(R,4.5,5.5),depth:rf(R,6,12),delay:.15},uni:2,lv:.2}); },
     bell:R=>({kind:'fm',ratio:rp(R,[2,3]),index:rf(R,.6,1.2),idec:rf(R,.3,.5),dec:rf(R,1.6,2.2),lv:.42})},
 };
 /* the two below extend the palette: memphis cowbell over a hard 808, and a chiptune with a fast arpeggio */
@@ -668,7 +674,7 @@ CHARS.phonk={duck:.7,dsend:.08,w:2.2,leg:[.5,.65],acc:[['bass',3]],kick:[[3,2],[
 CHARS.chip={duck:.8,dsend:.1,w:1.4,leg:[.6,.8],acc:[['arp',3],['bass',1]],kick:[[4,2]],hat:[8],perc:.4,percSnd:['tick'],lens:[['triad',2],['pent',2]],pad:'choir',accWave:'square',
   look:{trace:'dots',marker:'square',width:[1.7,2.1]},
   lead:R=>leadBase(R,{arch:'dual',w1:rp(R,['p12','p25']),w2:rp(R,['p25','square']),iv:rp(R,[0,12]),l2:rf(R,.2,.4),ft:'lowpass',kt:12,q:.5,env:1,drive:0,att:.002,dec:rf(R,.06,.12),sus:rf(R,.6,.8),rel:.02,vib:{rate:rf(R,5.5,7),depth:rf(R,8,14),delay:.12},lv:.16}),
-  bell:R=>({kind:'pluck',damp:rf(R,.4955,.498),bright:rf(R,5000,8000),lv:1.2})};
+  bell:R=>({kind:'pluck',damp:rf(R,.4955,.498),bright:rf(R,3000,4500),lv:1.2})};
 /* chords under the tune use only notes the lens can also play, so harmony and melody never rub */
 const VOICE={mode:[0,4],hex:[0,4],pent:[0,2,4],triad:[0,2,4,7],sus:[0,3,4]};
 /* The session owns the sound: one character, one lead, one bell, one graph style, picked once in sessionBand().
@@ -794,14 +800,14 @@ function makeEngine(ctx,song){
   /* duck: everything that sustains (pads, chords, bells, the room) dips on each kick, so the groove breathes instead of smearing */
   const duck=g(1); duck.connect(out); const mus=g(1); mus.connect(duck); const kicks=[]; let duckDepth=.6;
   const pdl=ctx.createDelay(.1); pdl.delayTime.value=.022;
-  const verb=g(1); ch(verb,bq('highpass',200),bq('lowpass',6500),pdl,conv,g(song.verb.wet*2.2),duck);
+  const verb=g(1); ch(verb,bq('highpass',200),bq('lowpass',6500),pdl,conv,g(song.verb.wet*2.2),out);
   const dly=g(1), dl=ctx.createDelay(2); dl.delayTime.value=song.delay.beats*BT; const dlp=bq('lowpass',3800), fb=g(song.delay.fb), dret=g(.55);
-  ch(dly,dl,bq('highpass',300),dlp,fb,dl); dlp.connect(dret); dret.connect(duck); dret.connect(verb);
+  ch(dly,dl,bq('highpass',300),dlp,fb,dl); dlp.connect(dret); dret.connect(out); dret.connect(verb);
   /* drums share one glue compressor, so kick, clap and hats hit as one kit */
   const drums=g(1), glue=ctx.createDynamicsCompressor(); glue.threshold.value=-16; glue.knee.value=8; glue.ratio.value=3; glue.attack.value=.012; glue.release.value=.14;
   ch(drums,glue,g(1.25),out); const dverb=g(.28); dverb.connect(verb);
   const leadBus=g(1); ch(leadBus,bq('highpass',90),out); const lsend=g(.22); leadBus.connect(lsend); lsend.connect(verb); const ldly=g(0); leadBus.connect(ldly); ldly.connect(dly);
-  const bellBus=g(1); ch(bellBus,bq('highpass',220),duck); const bs1=g(.38), bs2=g(.5); bellBus.connect(bs1); bs1.connect(dly); bellBus.connect(bs2); bs2.connect(verb);
+  const bellBus=g(1); ch(bellBus,bq('highpass',220),bq('lowpass',3600,.6),out); const bs1=g(.38), bs2=g(.5); bellBus.connect(bs1); bs1.connect(dly); bellBus.connect(bs2); bs2.connect(verb);
   const panned=(node,p)=>{ if(!ctx.createStereoPanner) return node; const s=ctx.createStereoPanner(); s.pan.value=p; node.connect(s); return s; };
   const HR=mulberry(song.seed^0x5eed); let hatN=0;
   function applyDuck(){ kicks.sort((a,b)=>a-b); let last=-1; for(const t of kicks){ if(t-last<.09) continue; last=t;
@@ -854,7 +860,7 @@ function makeEngine(ctx,song){
   function e808(t,dur,f,prevF,LL){ const L=LL||song.l808, o=osc('sine',f,t), a=g(0), end=t+dur;
     if(prevF&&L.glide){ o.frequency.setValueAtTime(prevF,t); o.frequency.exponentialRampToValueAtTime(f,t+.07); } else { o.frequency.setValueAtTime(f*2.6,t); o.frequency.exponentialRampToValueAtTime(f,t+L.knock); }
     a.gain.setValueAtTime(0,t); a.gain.linearRampToValueAtTime(1,t+.003); a.gain.setTargetAtTime(.6,t+.02,.3); a.gain.setTargetAtTime(0,end-.01,.025);
-    ch(o,a,g(L.pre),shaper(tanhCurve(L.drive),'2x'),bq('lowpass',L.tone,.9),g(L.lvl),out); const sb=g(L.sub); a.connect(sb); sb.connect(out); o.start(t); o.stop(end+.15); }
+    ch(o,a,g(L.pre*1.35),shaper(tanhCurve(L.drive*1.25),'2x'),bq('lowpass',Math.min(12000,L.tone*1.8),.9),g(L.lvl*.9),duck); const sb=g(L.sub); a.connect(sb); sb.connect(duck); o.start(t); o.stop(end+.15); }
   function wall(t,dur,f){ const m=g(.33), end=t+dur, a=g(0); [-14,0,14].forEach(d=>{ const o=osc('sawtooth',f,t); o.detune.value=d; o.connect(m); o.start(t); o.stop(end+.1); });
     a.gain.setValueAtTime(0,t); a.gain.linearRampToValueAtTime(.08,t+.006); a.gain.setTargetAtTime(.055,t+.02,.1); a.gain.setTargetAtTime(0,end-.01,.02); ch(m,shaper(tanhCurve(2.5)),bq('lowpass',2400,.8),a,mus); }
   /* ---- blank: the continuation an octave up on a bell ---- */
@@ -897,8 +903,8 @@ function makeEngine(ctx,song){
     tail.connect(a); a.connect(leadBus); if(o.echo){ const e=g(.55); a.connect(e); e.connect(dly); }
     srcs.forEach(x=>{ x.start(t); x.stop(stopAt); }); }
   function bellGen(B,t,dur,f,amp=1){ const lv=B.lv*amp;
-    if(B.kind==='partials') B.p.forEach(q=>{ if(f*q.r>sr*.45) return; const o=osc('sine',f*q.r,t), a=g(0); const e=env(a,t,lv*q.a,.002,q.d); ch(o,a,bellBus); o.start(t); o.stop(e+.05); });
-    else if(B.kind==='fm'){ const c=osc('sine',f,t), m=osc('sine',f*B.ratio,t), mg=g(0), a=g(0); mg.gain.setValueAtTime(f*B.index,t); mg.gain.setTargetAtTime(0,t,B.idec); m.connect(mg); mg.connect(c.frequency); const e=env(a,t,lv,.002,B.dec); ch(c,a,bellBus); c.start(t); m.start(t); c.stop(e+.05); m.stop(e+.05); }
+    if(B.kind==='partials') B.p.forEach(q=>{ if(f*q.r>sr*.45) return; const o=osc('sine',f*q.r,t), a=g(0); const e=env(a,t,lv*q.a,.03,q.d); ch(o,a,bellBus); o.start(t); o.stop(e+.05); });
+    else if(B.kind==='fm'){ const c=osc('sine',f,t), m=osc('sine',f*B.ratio,t), mg=g(0), a=g(0); mg.gain.setValueAtTime(f*B.index,t); mg.gain.setTargetAtTime(0,t,B.idec); m.connect(mg); mg.connect(c.frequency); const e=env(a,t,lv,.03,B.dec); ch(c,a,bellBus); c.start(t); m.start(t); c.stop(e+.05); m.stop(e+.05); }
     else { const s=ctx.createBufferSource(), kb=ctx.createBuffer(1,Math.floor(sr*1.4),sr); kb.getChannelData(0).set(ksData(f,sr,B.damp)); s.buffer=kb; const a=g(lv); a.gain.setTargetAtTime(0,t+Math.max(.25,dur*2),.12); ch(s,bq('lowpass',B.bright),a,bellBus); s.start(t); s.stop(t+1.4); } }
   function perc(t,p,amp){ if(p.snd==='tick'){ const o=osc('sine',p.f,t), a=g(0); env(a,t,amp,.001,.03); ch(o,a); panned(a,.3).connect(drums); o.start(t); o.stop(t+.06); }
     else { const n=nz(), a=g(0); env(a,t,amp*(p.snd==='rim'?1.2:.8),.001,p.snd==='rim'?.035:.06); ch(n,bq(p.snd==='rim'?'bandpass':'highpass',p.snd==='rim'?p.f*1.3:6000,p.snd==='rim'?4:.7),a); panned(a,p.snd==='rim'?-.3:.35).connect(drums); n.start(t); n.stop(t+.1); } }
@@ -915,40 +921,47 @@ function makeEngine(ctx,song){
     else { for(let b=t0;b<t1-.01;b+=4*BT){ let j=0; A2.steps.forEach((h,k)=>{ const t=b+k*S; if(!h||t>=t1) return; const s=pitch(j++%3===2?4:0,0)+12, o=osc('triangle',hz(s),t), a=g(0); env(a,t,.16,.004,Math.min(.35,A2.dec*2)); ch(o,shaper(tanhCurve(A2.drive)),bq('lowpass',900),a,mus); o.start(t); o.stop(t+.5); }); } } }
   /* ---- arrangement of one 4-bar cell ---- */
   function hatsLive(t0,beats,lv){ const n16=beats*4;
-    for(let k=0;k<n16;k++){ const t=t0+k*S+(k%2?song.swing*S:0), inBeat=k%4;
-      if(song.hatStyle==='16') hat(t,inBeat===0?.2:inBeat===2?.15:.09,false);
-      else if(song.hatStyle==='8sw'){ if(k%2===0) hat(t0+k*S+(k%4===2?.2*S:0),inBeat===0?.2:.13,false); }
-      else { const lastBeat=(Math.floor(k/4)%4)===3; if(lastBeat&&lv>=1){ const r=inBeat<2?2:3; for(let q=0;q<r;q++) hat(t0+k*S+q*S/r,.08+.04*q,false); } else if(k%2===0) hat(t,inBeat===0?.2:.13,false); } }
-    if(K.open&&lv>=2) for(let b=0;b<beats;b+=2) hat(t0+(b+.5)*BT,.1,true); }
+    for(let k=0;k<n16;k++){ const t=t0+k*S+(k%2?song.swing*S:0), inBeat=k%4, lastBeat=(Math.floor(k/4)%4)===3;
+      if(lastBeat&&inBeat>=2&&song.hatStyle!=='16'){ const r=inBeat===2?2:3; for(let q=0;q<r;q++) hat(t0+k*S+q*S/r,.1+.05*q,false); }
+      else hat(t,inBeat===0?.24:inBeat===2?.18:.12,false); }
+    if(K.open) for(let b=1;b<beats;b+=2) hat(t0+(b+.5)*BT,.11,true); }
+  /* the drone: tonic low, fifth above it through a slow dark filter. It runs under the whole shell, so question and
+     answer stand on one floor (the club drone of Buckshot Roulette); under a live answer it steps back for the 808,
+     under a blank one it opens up and carries the bells */
+  function drone(t0,t1,root,tr,live){ const a=g(0), lp=bq('lowpass',380,.9), lfo=osc('sine',BT>0?1/(BT*4):.5,t0), lg=g(120);
+    a.gain.setValueAtTime(0,t0); a.gain.linearRampToValueAtTime(1,t0+.4); a.gain.setValueAtTime(1,tr-.05); a.gain.linearRampToValueAtTime(live?.35:1.25,tr+.15); a.gain.setValueAtTime(live?.35:1.25,t1-.3); a.gain.linearRampToValueAtTime(0,t1+.2);
+    lp.frequency.setValueAtTime(380,t0); lp.frequency.setValueAtTime(380,tr); lp.frequency.linearRampToValueAtTime(live?300:900,tr+1); lfo.connect(lg); lg.connect(lp.frequency);
+    const s1=osc('sine',hz(root+12),t0), g1=g(.045), s2=osc('sawtooth',hz(root+19),t0), g2=g(.014), s3=osc('sawtooth',hz(root+19),t0), g3=g(.014); s3.detune.value=9;
+    ch(s1,g1,a); ch(s2,g2,lp); ch(s3,g3,lp); lp.connect(a); a.connect(mus); const vs=g(.18); a.connect(vs); vs.connect(verb);
+    [s1,s2,s3,lfo].forEach(o=>{ o.start(t0); o.stop(t1+.3); }); }
   function cell(sh){
-    const layer=Math.min(4,(sh.rs.round||1)+(sh.level>=2?1:0)); duckDepth=sh.th.duck||.8; ldly.gain.value=layer>=3?sh.th.dsend||0:0;
+    const layer=Math.min(4,(sh.rs.round||1)+(sh.level>=2?1:0)); duckDepth=.55; ldly.gain.value=layer>=3?sh.th.dsend||0:0;
     const pre=sh.notes.filter(n=>!n.post), post=sh.notes.filter(n=>n.post), tr=sh.tr, lv=sh.level, st=sh.rs.mode.st, th=sh.th, D=th.drums;
-    const bars=(sh.pre+sh.post)/4, barRoot=b=>degSemi(st,sh.rs.prog[bars===2?b*2:b]);
-    /* question: the theme's own groove (Euclidean kick, hats, a percussion voice), an unresolved harmony, and a last beat that hangs */
-    const qBars=sh.pre/4, stopAt=sh.qEnd==='stop'?tr-BT/2:1e9, qk=(t,a)=>{ if(t<stopAt) kick(t,a); };
-    const qRoot=t=>(qBars>=2?t>=4*BT:t>=2*BT)?sh.qTension:sh.rs.prog[0];
-    const lastBar=Math.max(0,sh.pre-4);
+    const qBars=sh.pre/4, pb=sh.post/4, stopAt=sh.qEnd==='stop'?tr-BT/2:1e9, lastBar=Math.max(0,sh.pre-4);
+    drone(0,sh.len,degSemi(st,sh.rs.prog[0]),tr,sh.out);
+    /* question = the verse: the lead over a light groove; nothing else competes with the tune */
     for(let k=0;k<sh.pre*4;k++){ const st16=k%16, t=k*S+(k%2?song.swing*S:0); if(t>=stopAt) continue;
-      if(D.kick[st16]) qk(k*S,st16===0?.62:.5);
-      if(k>=sh.pre*4-8) hat(t,.05+.12*(k-(sh.pre*4-8))/8,false); else if(D.hat[st16]) hat(t,D.hatAmp*(st16%4===0?1.2:1),false);
-      if(layer>=3&&D.perc&&D.perc.steps[st16]) perc(t,D.perc,.07); }
+      if(D.kick[st16]) kick(k*S,st16===0?.62:.48);
+      if(k>=sh.pre*4-8) hat(t,.05+.12*(k-(sh.pre*4-8))/8,false); else if(D.hat[st16]) hat(t,D.hatAmp*(st16%4===0?1.15:.9),false);
+      if(layer>=3&&D.perc&&D.perc.steps[st16]) perc(t,D.perc,.06); }
     if(sh.crit||sh.qEnd==='riser') riser(lastBar*BT,4*BT,.04+.025*lv+(sh.crit?.04:0));
     if(lv>=2||sh.qEnd==='roll') for(let k=0;k<4;k++) back(tr-BT+k*S,(lv>=2?.1:.06)+.07*k);
     if(sh.qEnd==='swell') swell(tr-2*BT,2*BT);
-    if(lv>=1&&(th.acc.type!=='bass'||layer<2)) for(let b=0;b<qBars;b++) subHit(b*4*BT,degSemi(st,qRoot(b*4*BT)));
-    if(layer>=2||sh.final){ const half=qBars>=2?4*BT:2*BT; accomp(sh,0,half,sh.rs.prog[0]); accomp(sh,half,tr,sh.qTension); }
-    pre.forEach((n,i)=>leadGen(th.lead,n.tr,n.dur,hz(n.s),{open:.8+.5*n.tr/tr,echo:i===pre.length-1,vel:n.vel}));
-    /* answer: live = the same continuation two octaves down on the theme's 808; blank = an octave up on the theme's bell */
-    const pb=sh.post/4;
+    /* one supporting part at most, and only from round 2: a bass locked to the kick, or a quiet arpeggio of the formula */
+    if(layer>=2&&(th.acc.type==='bass'||th.acc.type==='arp')){ const half=qBars>=2?4*BT:2*BT; accomp(sh,0,half,sh.rs.prog[0]); accomp(sh,half,tr,sh.qTension); }
+    pre.forEach((n,i)=>leadGen(th.lead,n.tr,n.dur,hz(n.s),{open:1+.4*n.tr/tr,echo:i===pre.length-1,vel:n.vel}));
+    /* live = the hook: impact, the full kit, the same phrase two octaves down on the 808 (gliding only into downbeats) */
     if(sh.out){ impact(tr);
       for(let b=0;b<pb;b++){ const t0=tr+b*4*BT; KP[song.kickPat].forEach(k=>{ if(b===0&&k===0) return; kick(t0+k*S,.6); }); back(t0+BT,.55); back(t0+3*BT,.55);
-        if(song.perc==='cowbell'&&lv>=1) [3,6,10,13].forEach(k=>cowbell(t0+k*S,.07,hz(48))); }
+        if(song.perc==='cowbell'&&lv>=1) [3,6,10,13].forEach(k=>cowbell(t0+k*S,.06,hz(48))); }
       hatsLive(tr,sh.post,lv);
       const L8={...song.l808,...th.l808};
-      let prev=null; post.forEach(n=>{ const f=hz(n.s); e808(n.tr,n.dur,f,prev,L8); prev=f; if(lv>=2||sh.final) wall(n.tr,n.dur,f*4); });
-    } else { [0,4,7].forEach((d,i)=>bellGen(th.bell,tr+i*.035,.4,hz(48+degSemi(st,d)),.45)); chime(tr,st,true);
-      for(let b=0;b<pb;b++){ const t0=tr+b*4*BT; pad(t0,t0+4*BT,barRoot(sh.pre/4+b),th.pad); if(lv>=2) D.hat.forEach((h,k)=>{ if(h&&k%4) hat(t0+k*S,.045,false); }); if(lv>=3) back(t0+2*BT,.12); }
-      post.forEach(n=>bellGen(th.bell,n.tr,n.dur,hz(n.s),n.vel));
+      let prev=null; post.forEach(n=>{ const f=hz(n.s); e808(n.tr,n.dur,f,prev&&n.k%4===0?prev:null,L8); prev=f; if(lv>=3||sh.final) wall(n.tr,n.dur,f*4); });
+    /* blank = the drop: the drums fall away, the drone opens, the phrase rings an octave up on the bell */
+    } else { [0,4,7].forEach((d,i)=>bellGen(th.bell,tr+i*.035,.4,hz(48+degSemi(st,d)),.45));
+      if(lv>=3) for(let b=0;b<pb;b++) hat(tr+b*4*BT+2*BT,.04,true);
+      /* a repeated note keeps ringing instead of being struck again */
+      post.forEach((n,i)=>{ if(i&&post[i-1].s===n.s) return; const ghost=n.k%2===1; bellGen(th.bell,n.tr,n.dur,hz(n.s),ghost?n.vel*.45:n.vel); });
       if(sh.final) post.forEach(n=>bellGen(th.bell,n.tr+.002,n.dur,hz(n.s+12),.45));
     }
   }
@@ -974,7 +987,7 @@ function queueRender(sr,seconds,song,fn){ const p=renderChain.then(()=>renderWit
 const TAIL=2.6;
 /* per-shell leveller: the question is pulled toward one loudness, the answer toward the live or blank loudness (±4 dB at most),
    with a soft knee on peaks. The question gain is measured on the question alone, so it says nothing about the answer. */
-const LVL={q:-15.5,live:-11,blank:-15};
+const LVL={q:-14.6,live:-12.3,blank:-15.4};   /* measured on the reference video */
 function levelShell(buf,sh){
   const sr=buf.sampleRate, chs=[]; for(let c=0;c<buf.numberOfChannels;c++) chs.push(buf.getChannelData(c));
   const it=Math.min(buf.length,Math.floor(sh.tr*sr)), ie=Math.min(buf.length,Math.floor(sh.len*sr)), xf=Math.floor(.01*sr);
@@ -995,10 +1008,17 @@ function initAudio(){
   try{ AC=new C({latencyHint:'playback'}); }catch(e){ AC=new C(); }
   try{ if(navigator.audioSession) navigator.audioSession.type='playback'; }catch(e){}
   const comp=AC.createDynamicsCompressor(); comp.threshold.value=-8; comp.knee.value=6; comp.ratio.value=4; comp.attack.value=.003; comp.release.value=.2;
-  master=AC.createGain(); master.gain.value=/[?&]mute/.test(location.search)?0:.95; master.connect(comp); comp.connect(AC.destination);
+  master=AC.createGain(); master.gain.value=volGain(); master.connect(comp); comp.connect(AC.destination);
   const b=AC.createBuffer(1,1,AC.sampleRate), s=AC.createBufferSource(); s.buffer=b; s.connect(AC.destination); s.start(0);
   if(AC.resume) AC.resume();
 }
+/* volume: 0..1 from the slider, remembered on this device; ?mute silences everything */
+let VOL=(()=>{ try{ const v=parseFloat(localStorage.getItem('patronnik-vol')); return Number.isFinite(v)?clamp(v,0,1):.8; }catch(e){ return .8; } })(), VOL_LAST=VOL||.8;
+const volGain=()=>/[?&]mute/.test(location.search)?0:.95*VOL*VOL;
+function setVol(v){ VOL=clamp(v,0,1); if(VOL>0) VOL_LAST=VOL; try{ localStorage.setItem('patronnik-vol',String(VOL)); }catch(e){}
+  if(master) master.gain.setTargetAtTime(volGain(),AC.currentTime,.03);
+  const r=document.getElementById('vol'); if(r) r.value=Math.round(VOL*100);
+  const b=document.getElementById('volBtn'); if(b){ b.setAttribute('aria-label',VOL?'Выключить звук':'Включить звук'); document.getElementById('volWaves').toggleAttribute('hidden',!VOL); document.getElementById('volX').toggleAttribute('hidden',!!VOL); } }
 function audioNow(){
   if(!AC) return 0;
   if(AC.getOutputTimestamp){ try{ const ts=AC.getOutputTimestamp(); if(ts&&ts.contextTime>0&&ts.performanceTime>0){ const t=ts.contextTime+(performance.now()-ts.performanceTime)/1000; if(t<=AC.currentTime+.01&&t>AC.currentTime-1) return t; } }catch(e){} }
@@ -1510,6 +1530,7 @@ async function submitScore(acc){
 if(/[?&]debug/.test(location.search)&&/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) window.__pt={gameOver,newRound,diffOf,xscore,levelShell,LB,LB_ID,submitScore,deriveAcct,signStr,pubOf,ghLoad,flushOutbox,renderLB,genFormula,makeTheme,SEEN,makeSong,roundStyle,buildShell,renderWith,drawShell,setFormula,FAM,G,get AC(){return AC;},initAudio};
 
 function boot(){
+  setVol(VOL); $('vol').addEventListener('input',e=>setVol(e.target.value/100)); $('vol').addEventListener('change',e=>e.target.blur()); $('volBtn').addEventListener('click',e=>{ setVol(VOL?0:VOL_LAST); e.currentTarget.blur(); });
   resize(); window.addEventListener('resize',resize);
   if(typeof ResizeObserver==='function') new ResizeObserver(()=>{ const w=Math.round(cv.getBoundingClientRect().width); if(w&&w!==W) resize(); }).observe(cv);
   G.mag=Array(8).fill(0); G.n=8; G.k=4; G.cands=combos(8,4); G.total0=G.cands.length;
