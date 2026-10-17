@@ -1,6 +1,14 @@
 {
- "updated": "2026-10-17T13:32:49+00:00",
+ "updated": "2026-10-17T13:57:48+00:00",
  "scores": [
+  {
+   "id": "kotyan31",
+   "nick": "Kotyan31",
+   "best": 2550,
+   "rounds": 3,
+   "acc": 75,
+   "at": "2026-10-17T13:57:48+00:00"
+  },
   {
    "id": "pro100kotyanlox",
    "nick": "Pro100KotyanLox",
@@ -8,14 +16,6 @@
    "rounds": 2,
    "acc": 60,
    "at": "2026-10-17T13:30:55+00:00"
-  },
-  {
-   "id": "kotyan31",
-   "nick": "Kotyan31",
-   "best": 100,
-   "rounds": 1,
-   "acc": 25,
-   "at": "2026-10-17T13:23:43+00:00"
   }
  ],
  "players": {
@@ -60,6 +60,7 @@
   "3f73f6aa383e0ab02be31ea0": "ok",
   "484c22ab7ba8af8e5f90add4": "ok",
   "769631ac69b5840014cfb9af": "low",
-  "7acff7838eb53c3ae188b2f7": "low"
+  "7acff7838eb53c3ae188b2f7": "low",
+  "1e4a9f36cdf299c942633558": "ok"
  }
 }
