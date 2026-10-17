@@ -1,5 +1,5 @@
 {
- "updated": "2026-10-17T13:00:32+00:00",
+ "updated": "2026-10-17T13:02:01+00:00",
  "scores": [
   {
    "id": "pro100kotyanlox",
@@ -34,20 +34,20 @@
    "at": "2026-10-17T10:12:47+00:00"
   },
   {
+   "id": "ketson",
+   "nick": "ketson",
+   "best": 1175,
+   "rounds": 2,
+   "acc": 69,
+   "at": "2026-10-17T13:02:01+00:00"
+  },
+  {
    "id": "sekret0s",
    "nick": "Sekret0s",
    "best": 400,
    "rounds": 2,
    "acc": 50,
    "at": "2026-10-17T10:55:06+00:00"
-  },
-  {
-   "id": "ketson",
-   "nick": "ketson",
-   "best": 300,
-   "rounds": 1,
-   "acc": 50,
-   "at": "2026-10-17T12:58:25+00:00"
   },
   {
    "id": "kumaq99",
@@ -127,6 +127,7 @@
   "a2078dc280378915757586ee": "ok",
   "b510b4ba8dc7aec56bbffb77": "low",
   "f61d3f67ffe10538cda32051": "low",
-  "989ef2393f785c24aa6d1c7a": "low"
+  "989ef2393f785c24aa6d1c7a": "low",
+  "9f741b439ec736105fe5d30e": "ok"
  }
 }
