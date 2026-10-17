@@ -1,5 +1,5 @@
 {
- "updated": "2026-10-17T10:08:57+00:00",
+ "updated": "2026-10-17T10:11:09+00:00",
  "scores": [
   {
    "id": "kotyan31",
@@ -8,6 +8,14 @@
    "rounds": 2,
    "acc": 67,
    "at": "2026-10-17T07:43:09+00:00"
+  },
+  {
+   "id": "kumaq99",
+   "nick": "kumaq99",
+   "best": 125,
+   "rounds": 1,
+   "acc": 25,
+   "at": "2026-10-17T10:11:09+00:00"
   }
  ],
  "players": {
@@ -15,10 +23,16 @@
    "nick": "Kotyan31",
    "key": "BE1w6YCKdwmwibkSqdc/KaW56d/Pj3cgkZMwxNssI4AU0P61egmEltt17ffdNoLvgFszBQPCUTe/aux516obeuY=",
    "since": "2026-10-17T09:09:50+00:00"
+  },
+  "kumaq99": {
+   "nick": "kumaq99",
+   "key": "BMWgGK4VNZAsQ4QUQ1B1xFLX3v4bJDx5J1dwyFyGfSk9ODxOILtPWKr/sJrOIhxVfEegpoCafiV7TpO0eNH9ytw=",
+   "since": "2026-10-17T10:11:09+00:00"
   }
  },
  "acks": {
   "6ac1f8e65cb64372a80e1497": "low",
-  "d7ed13687ef2bf7c4e5f8e4a": "low"
+  "d7ed13687ef2bf7c4e5f8e4a": "low",
+  "2af82eae70fb9257afaa8174": "ok"
  }
 }
