@@ -1,6 +1,14 @@
 {
- "updated": "2026-10-17T10:29:30+00:00",
+ "updated": "2026-10-17T10:32:13+00:00",
  "scores": [
+  {
+   "id": "eldiavlos",
+   "nick": "ElDiavlos",
+   "best": 22425,
+   "rounds": 8,
+   "acc": 95,
+   "at": "2026-10-17T10:32:13+00:00"
+  },
   {
    "id": "pro100kotyanlox",
    "nick": "Pro100KotyanLox",
@@ -54,6 +62,11 @@
    "nick": "Pro100KotyanLox",
    "key": "BLDSTbYSkcIkQoeCzLJAOj194zc3dLLNcDh5og64GNo8lYiXRju4TDilZgYWpgXl0JogzjufpagM9rvNpjiKj3E=",
    "since": "2026-10-17T10:29:30+00:00"
+  },
+  "eldiavlos": {
+   "nick": "ElDiavlos",
+   "key": "BLDhPk+Qehpc3HBO7N/tttGtDAQ0Xy70RdSxU6ZefxzPRXiGPBlSb/KCh0UtRpPQVm6ZSlht5DCWuOaS+qWtO04=",
+   "since": "2026-10-17T10:32:13+00:00"
   }
  },
  "acks": {
@@ -67,6 +80,7 @@
   "bfc4552ef20af3f9af6b2c87": "low",
   "b41d3d20106e52d7bdc9be7f": "ok",
   "8460d22025e705e9911507df": "low",
-  "47011a0ab2cc87c8175fba56": "ok"
+  "47011a0ab2cc87c8175fba56": "ok",
+  "6012a2326e403d49b74f04dc": "ok"
  }
 }
