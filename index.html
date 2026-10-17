@@ -106,7 +106,7 @@ body{
 .judge small{display:block;font:700 12px var(--f-mono);letter-spacing:.06em;color:var(--fg);text-shadow:none;margin-top:2px}
 .judge.show{animation:pop 1.3s ease-out forwards}
 @keyframes pop{0%{opacity:0;transform:scale(.8)}12%{opacity:1;transform:scale(1.05)}70%{opacity:1;transform:none}100%{opacity:0}}
-.overlay{position:absolute;inset:0;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(3px);display:flex;flex-direction:column;justify-content:safe center;align-items:center;gap:10px;padding:18px 20px;text-align:center;overflow:auto}
+.overlay{position:absolute;inset:0;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(3px);display:flex;flex-direction:column;justify-content:safe center;align-items:center;gap:8px;padding:12px 18px;text-align:center;overflow:auto}
 .overlay[hidden]{display:none}
 .overlay h2{font-family:var(--f-display);font-weight:400;font-size:24px;margin:0;line-height:1.15;text-wrap:balance}
 .overlay h2 .l{color:var(--live)} .overlay h2 .b{color:var(--blank)}
@@ -220,6 +220,10 @@ body{
 .choice .arr{font-size:22px;line-height:1;margin-left:6px}
 .session{font:600 11px var(--f-mono);color:var(--dim);letter-spacing:.06em;text-align:center}
 .session b{color:var(--muted);font-weight:700}
+@media (max-width:360px){.overlay h2{font-size:20px}.overlay p,.overlay ul,.overlay .rule2{font-size:13px}.overlay ul{gap:3px}.overlay .big{font-size:38px}.overlay .meta{font-size:10px}}
+.overlay .rule2{font-size:14px;color:var(--muted);line-height:1.3}
+.overlay .rule2 span{font:900 14px var(--f-display);letter-spacing:.03em;margin-right:6px}
+.overlay .rule2 .l{color:var(--live)} .overlay .rule2 .b{color:var(--blank)}
 .overlay .rule{display:grid;grid-template-columns:auto 1fr;gap:6px 10px;text-align:left;font-size:14px;max-width:42ch;align-items:baseline}
 .overlay .rule .k{font:800 13px var(--f-display);letter-spacing:.03em}
 .overlay .rule .k.l{color:var(--live)} .overlay .rule .k.b{color:var(--blank)}
@@ -448,27 +452,27 @@ const FAM=[
       sub:`${I('k')} = ⌊${NN}/${L}⌋, ${I('j')} = ${NN} mod ${L}; ${rh}; ${mh}`,cap:'σ = −1 переворачивает мотив в зеркале: верх становится низом, минор — мажором'}; }},
   {id:'fib',lv:3,w:3,look:'steps',gen(R){ const m=rp(R,[5,6,7,8,9,10]), p=ri(R,1,2), q=ri(R,1,2); let a=ri(R,0,m-1), b=ri(R,1,m-1); const a0=a,b0=b; const v=A(()=>{ const r=a; [a,b]=[b,(p*b+q*a)%m]; return r; }); const P=periodOf(v,0);
     return {v,html:`${Y} = (${term(p,yk(NN+'−1'))} + ${term(q,yk(NN+'−2'))}) mod ${m}`,sub:`${yk(0)} = ${a0}, ${yk(1)} = ${b0}`,cap:p===1&&q===1?`Фибоначчи по модулю ${m}${P?': период Пизано '+P:''}`:`линейная рекуррента по модулю ${m}${P?', период '+P:''}`}; }},
-  {id:'pow',lv:3,w:2,look:'stems',gen(R){ const m=rp(R,[5,7,9,10,11]), a=ri(R,2,m-1), c=ri(R,1,Math.min(3,m-1)); if(gcd(a,m)!==1||gcd(c,m)!==1) return null; let x=c%m; const v=A(()=>{ const r=x; x=x*a%m; return r; }); const P=periodOf(v,0);
+  {id:'pow',lv:3,w:2,look:'steps',gen(R){ const m=rp(R,[5,7,9,10,11]), a=ri(R,2,m-1), c=ri(R,1,Math.min(3,m-1)); if(gcd(a,m)!==1||gcd(c,m)!==1) return null; let x=c%m; const v=A(()=>{ const r=x; x=x*a%m; return r; }); const P=periodOf(v,0);
     return {v,html:`${Y} = ${c>1?c+'·':''}${a}<sup>${NN}</sup> mod ${m}`,cap:`степени ${a} по модулю ${m} ходят по кругу длины ${P}`}; }},
-  {id:'popc',lv:3,w:2,look:'stems',gen(R){ const c=ri(R,0,40), k=rp(R,[1,1,3,5]); const v=A(n=>popc(k*n+c));
+  {id:'popc',lv:3,w:2,look:'steps',gen(R){ const c=ri(R,0,40), k=rp(R,[1,1,3,5]); const v=A(n=>popc(k*n+c));
     return {v,html:`${Y} = s<sub>2</sub>(${term(k,NN)} + ${c})`,sub:'s₂(x) — число единиц в двоичной записи x',cap:'+1 добавляет единицу, а каждый перенос стирает одну'}; }},
-  {id:'ruler',lv:3,w:1.5,look:'stems',gen(R){ const c=ri(R,1,24); const v=A(n=>nu2(n+c));
+  {id:'ruler',lv:3,w:1.5,look:'steps',gen(R){ const c=ri(R,1,24); const v=A(n=>nu2(n+c));
     return {v,html:`${Y} = ν<sub>2</sub>(${NN} + ${c})`,sub:'ν₂(x) — сколько раз x делится на 2',cap:'линейка: каждое второе — 0, каждое четвёртое — не меньше 2'}; }},
   {id:'digsum',lv:3,w:2,look:'steps',gen(R){ const a=ri(R,2,9), c=ri(R,0,30), m=rp(R,[0,7,9]); const v=A(n=>m?dsum(a*n+c)%m:dsum(a*n+c));
     return {v,html:`${Y} = S(${a}${NN} + ${c})${m?' mod '+m:''}`,sub:'S(x) — сумма десятичных цифр x',cap:m===9?'по модулю 9 сумма цифр равна остатку самого числа':'сумма цифр проваливается на каждом переносе'}; }},
-  {id:'gcd',lv:3,w:1.5,look:'stems',gen(R){ const m=rp(R,[6,8,9,10]), c=ri(R,0,m-1); const v=A(n=>gcd(n+c,m));
+  {id:'gcd',lv:3,w:1.5,look:'steps',gen(R){ const m=rp(R,[6,8,9,10]), c=ri(R,0,m-1); const v=A(n=>gcd(n+c,m));
     return {v,html:`${Y} = НОД(${NN} + ${c}, ${m})`,cap:`НОД с ${m} зависит только от остатка по модулю ${m}`}; }},
   {id:'sqfl',lv:3,w:1.5,look:'steps',gen(R){ const k=ri(R,2,6), m=rp(R,[5,7,8,9]), c=ri(R,0,9); const v=A(n=>Math.floor((n+c)*(n+c)/k)%m);
     return {v,html:`${Y} = ⌊(${NN} + ${c})<sup>2</sup>/${k}⌋ mod ${m}`,cap:'парабола, разрезанная по модулю'}; }},
-  {id:'ndiv',lv:4,w:1.5,look:'stems',gen(R){ const c=ri(R,1,30); const v=A(n=>ndiv(n+c));
+  {id:'ndiv',lv:4,w:1.5,look:'steps',gen(R){ const c=ri(R,1,30); const v=A(n=>ndiv(n+c));
     return {v,html:`${Y} = d(${NN} + ${c})`,sub:'d(x) — число делителей x',cap:'у простых ровно 2 делителя, у квадратов — нечётное число'}; }},
   {id:'beatty',lv:4,w:2,look:'steps',gen(R){ const k=rp(R,Object.keys(ALPHA)), a=ALPHA[k], m=rp(R,[5,6,7,8]), c=ri(R,1,9); const v=A(n=>Math.floor((n+c)*a)%m);
     return {v,html:`${Y} = ⌊(${NN} + ${c})·${k}⌋ mod ${m}`,sub:`${k} ≈ ${a.toFixed(5)}`,cap:`последовательность Битти: шаги ⌊${I('n')}·${k}⌋ бывают только ${Math.floor(a)} и ${Math.floor(a)+1}`}; }},
   {id:'collatz',lv:4,w:1.5,look:'steps',gen(R){ const s0=rp(R,[7,9,11,15,19,25,27,31,41,47,54,73,97]), m=rp(R,[5,6,7,8]); let c=s0; const v=A(()=>{ const r=c; c=c%2?3*c+1:c/2; return r%m; });
     return {v,html:`${I('c')}<sub>${I('n')}+1</sub> = ${I('c')}<sub>${I('n')}</sub>/2 или 3${I('c')}<sub>${I('n')}</sub>+1, &nbsp;${Y} = ${I('c')}<sub>${I('n')}</sub> mod ${m}`,sub:`${I('c')}<sub>0</sub> = ${s0}`,cap:'Коллатц: чётное — пополам, нечётное — 3c + 1'}; }},
-  {id:'prime',lv:4,w:1.5,look:'stems',gen(R){ const m=rp(R,[6,8,10]), c=ri(R,2,30); const v=A(n=>PRIMES[n+c]%m); const s=[...new Set(v)].sort((a,b)=>a-b);
+  {id:'prime',lv:4,w:1.5,look:'steps',gen(R){ const m=rp(R,[6,8,10]), c=ri(R,2,30); const v=A(n=>PRIMES[n+c]%m); const s=[...new Set(v)].sort((a,b)=>a-b);
     return {v,html:`${Y} = ${I('p')}<sub>${I('n')}+${c}</sub> mod ${m}`,sub:`${I('p')}<sub>${I('k')}</sub> — простые: ${I('p')}<sub>0</sub> = 2, ${I('p')}<sub>1</sub> = 3, 5, 7, 11, …`,cap:`большие простые mod ${m} бывают только ${s.join(', ')}`}; }},
-  {id:'gap',lv:4,w:1,look:'stems',gen(R){ const c=ri(R,2,50); const v=A(n=>(PRIMES[n+c+1]-PRIMES[n+c])/2);
+  {id:'gap',lv:4,w:1,look:'steps',gen(R){ const c=ri(R,2,50); const v=A(n=>(PRIMES[n+c+1]-PRIMES[n+c])/2);
     return {v,html:`${Y} = (${I('p')}<sub>${I('n')}+${c+1}</sub> − ${I('p')}<sub>${I('n')}+${c}</sub>) / 2`,sub:`${I('p')}<sub>${I('k')}</sub> — простые: ${I('p')}<sub>0</sub> = 2, ${I('p')}<sub>1</sub> = 3, 5, 7, …`,cap:'половина промежутка между соседними простыми'}; }},
   {id:'recaman',lv:5,w:1,look:'steps',gen(R){ const m=rp(R,[6,7,8,9]); const seen=new Set([0]); let a=0; const v=A(n=>{ if(n>0){ const b=a-n; a=(b>0&&!seen.has(b))?b:a+n; seen.add(a); } return a%m; });
     return {v,html:`${I('a')}<sub>${I('n')}</sub> = ${I('a')}<sub>${I('n')}−1</sub> − ${NN}, если там ещё не были, иначе + ${NN}; &nbsp;${Y} = ${I('a')}<sub>${I('n')}</sub> mod ${m}`,sub:`${I('a')}<sub>0</sub> = 0`,cap:'Рекаман: шаг назад, если можно, иначе вперёд'}; }},
@@ -629,7 +633,7 @@ const CHARS={
     bell:R=>({kind:'pluck',damp:rf(R,.494,.4975),bright:rf(R,2500,5000),lv:1.3})},
   /* music box: hollow clarinet-like lead, an arpeggio, light shaker, music-box chimes */
   box:{w:2,leg:[.45,.6],acc:[['arp',3],['pad',1]],kick:[[2,2],[3,2]],hat:[6,8],perc:.5,percSnd:['shaker','tick'],lens:[['triad',2],['pent',3]],pad:'choir',accWave:'triangle',
-    look:{trace:'stems',marker:'circle',width:[1.4,1.8]},
+    look:{trace:'dots',marker:'diamond',width:[1.6,2]},
     lead:R=>{ const tilt=rf(R,.9,1.3), h=[0]; for(let k=1;k<24;k++) h.push(k%2?Math.pow(k,-tilt):rf(R,0,.06)/k);
       return leadBase(R,{arch:'spec',h,kt:rf(R,6,10),q:rf(R,.6,1.2),env:rf(R,1.2,1.8),att:rf(R,.004,.012),dec:rf(R,.15,.3),sus:rf(R,.45,.65),rel:.04,lv:.2}); },
     bell:R=>{ const d=rf(R,.9,1.4); return {kind:'partials',p:normP([{r:1,a:1,d},{r:3,a:.35,d:d*.4},{r:5.4,a:.18,d:d*.25},{r:8.9,a:.08,d:d*.15}]),lv:.56}; }},
@@ -1026,7 +1030,7 @@ function newRound(){
     <div class="meta">Раунд ${r} · ${G.song.name} ${G.rs.mode.name}</div>
     <h2>${G.n} патронов: <span class="l">${G.k} боев${G.k===1?'ой':'ых'}</span>, <span class="b">${G.n-G.k} холост${G.n-G.k===1?'ой':'ых'}</span></h2>
     <ul>${G.clues.map(c=>`<li>${c.t}</li>`).join('')}</ul>
-    <p>Совместимых раскладов: ${G.cands.length} из ${G.total0}. На ответ — ${G.pre/4} ${plural(G.pre/4,'такт','такта','тактов')}.${r>1?' Формулы становятся хитрее.':''}</p>
+    <p>Совместимых раскладов: ${G.cands.length} из ${G.total0}. На ответ — ${G.pre/4} ${plural(G.pre/4,'такт','такта','тактов')}.</p>
     <button class="go" id="goBtn" type="button"><span>Зарядить</span><kbd>Пробел</kbd></button>`);
   $('goBtn').onclick=startRound; $('goBtn').focus({preventScroll:true});
 }
@@ -1158,7 +1162,7 @@ function setProg(p,late){ const f=$('progFill'); f.style.width=(p*100)+'%'; f.cl
    a live answer lands two octaves below, a blank one an octave above.
    =================================================================================== */
 const cv=$('scope'), X=cv.getContext('2d'); let dpr=1, W=0, H0=0;
-function resize(){ dpr=Math.min(2,window.devicePixelRatio||1); W=Math.round(cv.getBoundingClientRect().width)||cv.clientWidth||320; H0=Math.round(Math.min(window.innerWidth>=980?380:440,Math.max(300,W*.86))); cv.style.height=H0+'px'; cv.width=Math.round(W*dpr); cv.height=Math.round(H0*dpr); }
+function resize(){ dpr=Math.min(2,window.devicePixelRatio||1); W=Math.round(cv.getBoundingClientRect().width)||cv.clientWidth||320; H0=Math.round(Math.min(window.innerWidth>=980?380:440,Math.max(W<330?340:300,W*.86))); cv.style.height=H0+'px'; cv.width=Math.round(W*dpr); cv.height=Math.round(H0*dpr); }
 const FONT=getComputedStyle(document.documentElement).getPropertyValue('--f-display').trim()||'sans-serif';
 const COL={grid:'#15241d',grid2:'#1c2e25',axis:'#8a9bb0',txt:'#6c8a7a',amber:'#ffc845',live:'#ff3d5e',blank:'#55c7ff',tick:'#3f6b50',mirror:'#c9d6cf'};
 const AX_P=14, P_LO=AX_P-17.5, P_HI=AX_P+17.5;   /* the axis is the middle octave line, in the exact centre */
@@ -1169,20 +1173,16 @@ function pathSteps(gm,ns,lim){ const P=new Path2D(); let h=null, pe=-9;
   for(const n of ns){ if(n.tr>lim) break; const x0=gm.x(n.tr), x1=Math.max(x0+1,gm.x(Math.min(n.tr+n.slot,lim))), y=gm.y(n.p);
     if(h&&Math.abs(n.tr-pe)<.003) P.lineTo(x0,y); else P.moveTo(x0,y); P.lineTo(x1,y); h={x:x1,y}; pe=n.tr+n.slot; }
   return {P,h}; }
-function pathStems(gm,ns,lim,base){ const P=new Path2D(); let h=null; const yb=gm.y(base);
-  for(const n of ns){ if(n.tr>lim) break; const x=gm.x(n.tr)+2, y=gm.y(n.p); P.moveTo(x,yb); P.lineTo(x,y); h={x,y}; }
-  return {P,h}; }
 function marker(x,y,kind,col,r){ if(kind==='none') return; X.save(); X.fillStyle=col; X.strokeStyle=col; X.lineWidth=1.4; X.beginPath();
   if(kind==='ring'){ X.arc(x,y,r+.6,0,7); X.stroke(); X.restore(); return; }
   if(kind==='circle') X.arc(x,y,r,0,7); else if(kind==='diamond'){ X.moveTo(x,y-r-1); X.lineTo(x+r+1,y); X.lineTo(x,y+r+1); X.lineTo(x-r-1,y); X.closePath(); } else X.rect(x-r,y-r,2*r,2*r);
   X.fill(); X.restore(); }
-/* one formula, one look: the trace style comes from the shell's character (steps, dots, stems, soft area) */
+/* one formula, one look: the trace style comes from the shell's character (steps, dots, soft area) */
 const PLAIN_LOOK={trace:'steps',marker:'none',width:2.2,glow:1,dash:false};
 function drawTrace(gm,ns,lim,col,mode,th,base){
   const vis=ns.filter(n=>n.tr<=lim); if(!vis.length) return null;
   const Lk=mode==='theme'&&th?th.look:PLAIN_LOOK, tr=mode==='theme'?Lk.trace:mode, w=Lk.width, yb=gm.y(base), last=vis[vis.length-1];
   const cx=n=>gm.x(n.tr), ex=n=>Math.max(cx(n)+1,gm.x(Math.min(n.tr+n.slot,lim))), y=n=>gm.y(n.p);
-  if(tr==='stems'){ const r=pathStems(gm,vis,lim,base); glow(r.P,col,w*.75,.75); vis.forEach(n=>dot(cx(n)+2,y(n),2.7,col,.95)); return r.h; }
   if(tr==='dots'){ const P=new Path2D(); vis.forEach((n,i)=>{ if(!i) P.moveTo(cx(n),y(n)); else P.lineTo(cx(n),y(n)); }); P.lineTo(ex(last),y(last));
     glow(P,col,w*.8,Lk.glow); vis.forEach(n=>marker(cx(n),y(n),Lk.marker==='none'?'circle':Lk.marker,col,2.8)); return {x:ex(last),y:y(last)}; }
   const r=pathSteps(gm,vis,lim);
@@ -1218,7 +1218,7 @@ function drawShell(sh,now,countdown){
   if(look==='walk'&&revealed||look==='walk'&&tau>sh.tr*.5){ const y=gm.y(14+(P.target-sh.lo)+(revealed?shift:0)); X.strokeStyle=revealed?pc:COL.amber; X.globalAlpha=.6; X.setLineDash([2,4]); X.beginPath(); X.moveTo(revealed?xT:gm.x(sh.tr*.5),y); X.lineTo(Rr,y); X.stroke(); X.setLineDash([]); X.fillStyle=X.strokeStyle; X.textAlign='right'; X.fillText(`цель ${P.target}`,Rr-2,y-5); }
   X.restore();
   /* the question */
-  const mode=look==='theme'?'theme':look==='stems'?'stems':'steps';
+  const mode=look==='theme'?'theme':'steps';
   let head=drawTrace(gm,pre,lim,col,mode,sh.th,base);
   /* value labels: two rows above the phrase, like the reference */
   const labels=(ns,top,c)=>{ X.font=`800 9px ${FONT}`; X.textAlign='center'; X.fillStyle=c; let last=[-99,-99];
@@ -1226,8 +1226,8 @@ function drawShell(sh,now,countdown){
   const preTop=Math.max(...pre.map(n=>n.p)); labels(pre,preTop+(look==='mirror'?0:0),col);
   /* the trigger: before — a question mark with both ways out; after — the arrow to where the graph went */
   const lastPre=pre[pre.length-1], firstPost=post[0];
-  if(!revealed&&lastPre&&tau>0){ const y=gm.y(lastPre.p), x=xT+11, pulse=.55+.45*Math.sin(now*6);
-    X.save(); X.globalAlpha=pulse; X.fillStyle=COL.amber; X.font=`900 15px ${FONT}`; X.textAlign='center'; X.fillText('?',x,y+5);
+  if(!revealed&&lastPre&&tau>0){ const y=gm.y(AX_P), x=xT+12, pulse=.7+.3*Math.sin(now*4);
+    X.save(); X.fillStyle='#090f0c'; X.beginPath(); X.arc(x,y,9,0,7); X.fill(); X.globalAlpha=pulse; X.fillStyle=COL.amber; X.font=`900 15px ${FONT}`; X.textAlign='center'; X.fillText('?',x,y+5);
     X.strokeStyle=COL.blank; X.lineWidth=1.6; X.beginPath(); X.moveTo(x-4,y-11); X.lineTo(x,y-16); X.lineTo(x+4,y-11); X.stroke();
     X.strokeStyle=COL.live; X.beginPath(); X.moveTo(x-4,y+11); X.lineTo(x,y+16); X.lineTo(x+4,y+11); X.stroke(); X.restore(); }
   if(revealed&&lastPre&&firstPost){
@@ -1456,7 +1456,7 @@ async function submitScore(acc){
 })();
 
 /* debug hooks for offline checks (only with ?debug in the URL) */
-if(/[?&]debug/.test(location.search)) window.__pt={gameOver,levelShell,LB,LB_ID,submitScore,deriveAcct,signStr,pubOf,ghLoad,flushOutbox,renderLB,genFormula,makeTheme,SEEN,makeSong,roundStyle,buildShell,renderWith,drawShell,setFormula,FAM,G,get AC(){return AC;},initAudio};
+if(/[?&]debug/.test(location.search)) window.__pt={gameOver,newRound,levelShell,LB,LB_ID,submitScore,deriveAcct,signStr,pubOf,ghLoad,flushOutbox,renderLB,genFormula,makeTheme,SEEN,makeSong,roundStyle,buildShell,renderWith,drawShell,setFormula,FAM,G,get AC(){return AC;},initAudio};
 
 function boot(){
   resize(); window.addEventListener('resize',resize);
@@ -1465,10 +1465,10 @@ function boot(){
   renderMag(); hud(); setChance(.5); renderCandCount();
   showOverlay(`
     <h2><span class="l">Боевой</span> или <span class="b">холостой</span>?</h2>
-    <p>Каждый патрон — формула. График показывает её значения до линии спуска. Продолжите его в уме:</p>
-    <div class="rule"><span class="k l">↓ БОЕВОЙ</span><span>следующее значение <b>меньше</b> последнего: график уйдёт вниз, звук — ${I('f')}/4</span>
-      <span class="k b">↑ ХОЛОСТОЙ</span><span>следующее значение <b>больше</b>: график пойдёт вверх, звук — 2${I('f')}</span></div>
-    <ul><li>Не успеваете посчитать — помогут шанс и улики дилера</li><li>В долю: <b>+25</b>. Три ошибки — конец</li><li>Каждая игра — новая музыка и новые формулы</li></ul>
+    <p>Каждый патрон — формула. Угадайте, куда пойдёт график за линией спуска.</p>
+    <div class="rule2"><span class="l">↓ БОЕВОЙ</span> следующее меньше</div>
+    <div class="rule2"><span class="b">↑ ХОЛОСТОЙ</span> следующее больше</div>
+    <p class="small">Три ошибки — конец. Ответ в долю — +25.</p>
     <button class="go" id="goBtn" type="button"><span>Играть</span><kbd>Пробел</kbd></button>`);
   $('goBtn').onclick=()=>{ initAudio(); resetGame(); };
   requestAnimationFrame(frame);
