@@ -382,6 +382,7 @@ function makeSong(seed){
     l808:{drive:rf(R,4,12),pre:rf(R,1.2,2.2),tone:rf(R,2500,6000),glide:R()<.6,knock:rf(R,.03,.06),lvl:.2,sub:.2},
     pad:rp(R,['saw','choir','sub']),
     verb:{dec:rf(R,1.4,2.6),wet:rf(R,.16,.3)}, delay:{beats:rp(R,[.75,.5,1.5]),fb:rf(R,.28,.45)},
+    chars:pickN([['pulse',3],['glass',2.5],['acid',2],['box',2],['fog',1.6]],3),
     qDrums:pickN([['four',3],['heart',2],['clock',2],['half',2]],2), qPads:pickN([['sus',3],['fifth',2],['stab',2],['arp',1.2],['none',1.5]],2), qPadWave:rp(R,['triangle','sawtooth']),
   };
 }
@@ -416,7 +417,7 @@ const SHAPES=[[0,2,4],[0,2,4,7],[0,1,3],[0,2,3,5],[0,3,2,5],[0,1,2,4],[0,4,2,6],
 const FAM=[
   {id:'arith',lv:1,w:3,look:'steps',gen(R){ const m=ri(R,5,9), a=ri(R,1,m-1), b=ri(R,0,m-1), neg=R()<.35; const v=A(n=>mod(b+(neg?-a:a)*n,m));
     return {v,html:`${Y} = (${b} ${neg?'−':'+'} ${term(a,NN)}) mod ${m}`,cap:a===1?`по ${neg?'−':'+'}1 за шаг, по кругу из ${m}: пила со сбросом`:`шаг ${neg?'−':'+'}${a} по кругу из ${m} остатков`}; }},
-  {id:'sine',lv:1,w:4.5,look:'smooth',gen(R,c){ const Am=ri(R,2,4), P=rp(R,[5,6,7,8,9,10,11,12]), ph=ri(R,0,P-1), hide=c.lv>=3&&R()<.6;
+  {id:'sine',lv:1,w:4.5,look:'steps',gen(R,c){ const Am=ri(R,2,4), P=rp(R,[5,6,7,8,9,10,11,12]), ph=ri(R,0,P-1), hide=c.lv>=3&&R()<.6;
     const f=x=>Am*Math.sin(2*Math.PI*(x+ph)/P);
     for(let n=0;n<P;n++){ const fr=Math.abs(f(n))%1; if(Math.abs(fr-.5)<.04) return null; }
     const v=A(n=>Math.round(f(n))+Am), Ph=hide?'<b class="q">P</b>':P;
@@ -603,40 +604,64 @@ function genRhythm(R){
   if(durs.length<8&&R()<.22){ const i=durs.findIndex(d=>d===2); if(i>=0) durs.splice(i,1,1,1); }
   return durs;
 }
-function makeLeadPatch(R){
-  const arch=rw(R,[['spec',3],['fm',3],['dual',2.2],['shape',2]]);
-  const L={id:newSeed(),arch,att:rf(R,.002,.025),dec:rf(R,.06,.35),sus:rf(R,.35,.85),rel:rf(R,.02,.07),swoop:R()<.5?1:1+rf(R,.004,.02),
-    vib:{rate:rf(R,4.5,6.5),depth:R()<.55?rf(R,4,14):0,delay:rf(R,.05,.2)},uni:R()<.4?2:1,det:rf(R,4,14)};
-  if(arch==='spec'){ const tilt=rf(R,.6,1.6), oddOnly=R()<.35, f0=rf(R,2,9), fw=rf(R,.8,3), fg=rf(R,0,2.2);
-    L.h=[0]; for(let k=1;k<28;k++){ let a=Math.pow(R(),.6)*Math.pow(k,-tilt)*(1+fg*Math.exp(-Math.pow((k-f0)/fw,2))); if(oddOnly&&k%2===0) a*=rf(R,0,.25); L.h.push(a); }
-    L.kt=rf(R,4,12); L.q=rf(R,.5,3.5); L.env=rf(R,1,2.6); L.lv=.2; }
-  else if(arch==='fm'){ L.cw=rp(R,['sine','sine','triangle']); L.ratio=R()<.7?rp(R,[.5,1,1,1.5,2,2,3,4,5,7]):ri(R,1,4)/ri(R,1,3); L.index=rf(R,.8,5); L.isus=rf(R,.1,.6); L.idec=rf(R,.05,.4);
-    L.m2=R()<.35?{ratio:rp(R,[2,3,4,7,11])/rp(R,[1,2]),index:rf(R,.3,1.5)}:null; L.lv=.24; }
-  else if(arch==='dual'){ const W=['sawtooth','square','triangle','p25','p12']; L.w1=rp(R,W); L.w2=rp(R,W); L.iv=rp(R,[0,0,12,7,19,-12,5]); L.l2=rf(R,.3,.7);
-    L.ft=R()<.75?'lowpass':'bandpass'; L.kt=rf(R,3,10); L.q=rf(R,.7,7); L.env=rf(R,1.2,3.5); L.drive=R()<.35?rf(R,1.5,4):0; L.lv=.18; }
-  else { L.cheb=[1]; for(let k=2;k<=7;k++) L.cheb.push(R()<.6?rf(R,-.7,.7)/Math.sqrt(k-1):0); L.d0=rf(R,.7,1); L.d1=rf(R,.25,.7); L.wave=R()<.7?'sine':'triangle'; L.lv=.2; }
-  return L;
-}
-function makeBellPatch(R){
-  const kind=rw(R,[['partials',3],['fm',2],['pluck',1]]), B={id:newSeed(),kind};
-  if(kind==='partials'){ const pool=[2,2.756,3,3.5,4.07,5.4,6.8,8.9,11.3], n=ri(R,3,6), base=rf(R,.8,2.2), sl=rf(R,.3,.8);
-    B.p=[{r:1,a:1,d:base}]; for(let i=1;i<n;i++){ const r=(R()<.7?rp(R,pool):rf(R,1.5,9.5))*(1+rf(R,-.02,.02)); B.p.push({r,a:rf(R,.15,.6)/Math.sqrt(i+1),d:base/Math.pow(r,sl)}); }
-    const tot=B.p.reduce((s,q)=>s+q.a,0); B.p.forEach(q=>q.a/=tot); B.lv=.56; }
-  else if(kind==='fm'){ B.ratio=rf(R,2.4,4.6); B.index=rf(R,1,3.2); B.idec=rf(R,.12,.4); B.dec=rf(R,.9,2); B.lv=.4; }
-  else { B.damp=rf(R,.4935,.4985); B.bright=rf(R,2500,8000); B.lv=1.05; }
-  return B;
-}
+/* ===================================================================================
+   CHARACTERS. A shell is one picture: the formula's hash picks a character from the session's palette, and the
+   character decides together what the lead, the groove, the harmony, the answer and the graph are like, so every
+   part is chosen for the others. Inside a character the knobs stay continuous and random, so no two shells match.
+   =================================================================================== */
+const leadBase=(R,o)=>({id:newSeed(),att:.003,dec:.15,sus:.6,rel:.03,swoop:1,vib:{rate:rf(R,4.8,6),depth:0,delay:.15},uni:1,det:rf(R,5,10),...o});
+const normP=p=>{ const t=p.reduce((s,q)=>s+q.a,0); p.forEach(q=>q.a/=t); return p; };
+const CHARS={
+  /* square-wave trap, like the reference: dry pulse lead, bass locked to the kick, glass bell on the answer */
+  pulse:{w:3,leg:[.55,.75],acc:[['bass',3],['stab',2]],kick:[[3,3],[4,2]],hat:[8,8,6],perc:0,lens:[['mode',3],['pent',2]],pad:'saw',accWave:'square',
+    look:{trace:'steps',marker:'none',width:[2.2,2.6]},
+    lead:R=>leadBase(R,{arch:'dual',w1:rp(R,['square','p25']),w2:rp(R,['square','p25','p12']),iv:rp(R,[0,12]),l2:rf(R,.25,.45),ft:'lowpass',kt:rf(R,4,8),q:rf(R,.7,2),env:rf(R,1.5,2.6),drive:0,dec:rf(R,.08,.2),sus:rf(R,.5,.7),swoop:1+rf(R,.004,.012),lv:.18}),
+    bell:R=>({kind:'fm',ratio:rp(R,[3,3.5,4]),index:rf(R,1.2,2.4),idec:rf(R,.15,.3),dec:rf(R,1,1.6),lv:.4})},
+  /* clean FM glass: soft sine lead, a pad or a light arpeggio, few drums, harmonic chimes */
+  glass:{w:2.5,leg:[.8,.95],acc:[['pad',3],['arp',2]],kick:[[2,3],[3,1]],hat:[4,6],perc:.6,percSnd:['tick'],lens:[['pent',3],['triad',2],['sus',1]],pad:'choir',accWave:'triangle',
+    look:{trace:'dots',marker:'circle',width:[1.6,2]},
+    lead:R=>leadBase(R,{arch:'fm',cw:'sine',ratio:rp(R,[1,2,2,3]),index:rf(R,.6,1.8),isus:rf(R,.1,.3),idec:rf(R,.1,.3),m2:null,att:rf(R,.004,.01),dec:rf(R,.2,.4),sus:rf(R,.55,.75),rel:.06,vib:{rate:rf(R,4.8,5.8),depth:rf(R,3,7),delay:.2},lv:.24}),
+    bell:R=>{ const d=rf(R,1.4,2.2), p=[{r:1,a:1,d}]; [2,3,4,6].forEach(r=>{ if(R()<.7) p.push({r:r*(1+rf(R,-.003,.003)),a:rf(R,.2,.5)/r,d:d/Math.sqrt(r)}); }); return {kind:'partials',p:normP(p),lv:.56}; }},
+  /* acid: resonant saw with drive, busy hats and a rim, plucked answer */
+  acid:{w:2,leg:[.55,.8],acc:[['none',2],['stab',2]],kick:[[4,3],[5,1]],hat:[10,12],perc:.7,percSnd:['rim'],lens:[['mode',3],['hex',2]],pad:'sub',accWave:'sawtooth',
+    look:{trace:'steps',marker:'square',width:[1.9,2.3]},
+    lead:R=>leadBase(R,{arch:'dual',w1:'sawtooth',w2:'sawtooth',iv:0,l2:rf(R,.4,.6),ft:'lowpass',kt:rf(R,1.6,3),q:rf(R,6,11),env:rf(R,3,5),drive:rf(R,2,3.5),att:.002,dec:rf(R,.1,.25),sus:rf(R,.4,.6),rel:.025,lv:.16}),
+    bell:R=>({kind:'pluck',damp:rf(R,.494,.4975),bright:rf(R,2500,5000),lv:1.3})},
+  /* music box: hollow clarinet-like lead, an arpeggio, light shaker, music-box chimes */
+  box:{w:2,leg:[.45,.6],acc:[['arp',3],['pad',1]],kick:[[2,2],[3,2]],hat:[6,8],perc:.5,percSnd:['shaker','tick'],lens:[['triad',2],['pent',3]],pad:'choir',accWave:'triangle',
+    look:{trace:'stems',marker:'circle',width:[1.4,1.8]},
+    lead:R=>{ const tilt=rf(R,.9,1.3), h=[0]; for(let k=1;k<24;k++) h.push(k%2?Math.pow(k,-tilt):rf(R,0,.06)/k);
+      return leadBase(R,{arch:'spec',h,kt:rf(R,6,10),q:rf(R,.6,1.2),env:rf(R,1.2,1.8),att:rf(R,.004,.012),dec:rf(R,.15,.3),sus:rf(R,.45,.65),rel:.04,lv:.2}); },
+    bell:R=>{ const d=rf(R,.9,1.4); return {kind:'partials',p:normP([{r:1,a:1,d},{r:3,a:.35,d:d*.4},{r:5.4,a:.18,d:d*.25},{r:8.9,a:.08,d:d*.15}]),lv:.56}; }},
+  /* fog: dark breathing lead with vibrato, a low saw pad, almost no drums */
+  fog:{w:1.6,leg:[.9,.98],acc:[['pad',3]],kick:[[2,3],[3,1]],hat:[4,6],perc:0,lens:[['mode',3],['sus',1.5],['hex',1]],pad:'saw',accWave:'sawtooth',
+    look:{trace:'area',marker:'none',width:[2.3,2.8]},
+    lead:R=>{ const tilt=rf(R,1.4,1.9), f0=rf(R,2,4), h=[0]; for(let k=1;k<24;k++) h.push(Math.pow(k,-tilt)*(1+1.5*Math.exp(-Math.pow((k-f0)/1.2,2))));
+      return leadBase(R,{arch:'spec',h,kt:rf(R,3,5),q:rf(R,1,2),env:rf(R,1.1,1.4),att:rf(R,.015,.03),dec:rf(R,.3,.5),sus:rf(R,.7,.85),rel:.07,vib:{rate:rf(R,4.5,5.5),depth:rf(R,6,12),delay:.15},uni:2,lv:.2}); },
+    bell:R=>({kind:'fm',ratio:rp(R,[2,3]),index:rf(R,.6,1.2),idec:rf(R,.3,.5),dec:rf(R,1.6,2.2),lv:.42})},
+};
+/* chords under the tune use only notes the lens can also play, so harmony and melody never rub */
+const VOICE={mode:[0,4],hex:[0,4],pent:[0,2,4],triad:[0,2,4,7],sus:[0,3,4]};
 function makeTheme(h,song){
-  const R=mulberry(h^0x2545F491), V=[[0,1,4],[0,3,4],[0,4,7],[0,1,4,8],[0,4,6]];
-  return {id:h, lead:makeLeadPatch(R), bell:makeBellPatch(R), leg:rf(R,.5,.95), accEvery:ri(R,2,4), accAmt:rf(R,.55,.85),
-    l808:{glide:R()<.6,drive:song.l808.drive*rf(R,.75,1.35),tone:song.l808.tone*rf(R,.8,1.25),knock:rf(R,.025,.06)},
-    drums:{kick:hitsFrom0(R,rw(R,[[2,2],[3,3],[4,3],[5,1.5]])),hat:euclid(rp(R,[4,6,8,8,10,12]),16,ri(R,0,15)),hatAmp:rf(R,.07,.12),
-      perc:R()<.6?{steps:euclid(rp(R,[3,5,7]),16,ri(R,0,15)),snd:rp(R,['tick','rim','shaker']),f:rf(R,900,2600)}:null},
-    acc:(()=>{ const type=rw(R,[['pad',3],['stab',2],['arp',2],['bass',2.5],['none',1]]);
-      return {type,voice:rp(R,V),wave:rp(R,['triangle','sawtooth','square']),cut0:rf(R,400,800),open:rf(R,1.6,3),steps:hitsFrom0(R,rp(R,[3,4,5,6])),
-        dec:rf(R,.08,.22),rate:R()<.6?2:1,drive:rf(R,1,3),pat:rp(R,['formula','up','updown'])}; })(),
-    look:{trace:rw(R,[['steps',3],['dots',2],['spline',2],['bars',1.5],['area',1.5],['pulse',1.5],['stems',1]]),marker:rp(R,['none','circle','diamond','square','ring']),width:rf(R,1.7,2.7),glow:rf(R,.6,1.1),dash:R()<.3,enter:R()<.6?'sweep':'snap'},
-    lens:rw(R,[['mode',4],['pent',2.2],['hex',1.2],['triad',1.1],['sus',.8]]), pad:R()<.5?song.pad:rp(R,['saw','choir','sub'])};
+  const R=mulberry(h^0x2545F491), pal=song.chars||Object.keys(CHARS), cname=rw(R,pal.map(k=>[k,CHARS[k].w])), C=CHARS[cname];
+  const r2=([a,b])=>rf(R,a,b);
+  return {id:h, char:cname, lead:C.lead(R), bell:{id:newSeed(),...C.bell(R)}, leg:r2(C.leg), accEvery:ri(R,2,4), accAmt:rf(R,.6,.85),
+    l808:{glide:cname!=='acid'&&R()<.7,drive:song.l808.drive*rf(R,.8,1.25),tone:song.l808.tone*rf(R,.85,1.2),knock:rf(R,.025,.06)},
+    drums:{kick:hitsFrom0(R,rw(R,C.kick)),hat:euclid(rp(R,C.hat),16,rp(R,[0,2,2,4])),hatAmp:rf(R,.07,.11),
+      perc:R()<C.perc?{steps:euclid(rp(R,[3,5]),16,ri(R,1,3)),snd:rp(R,C.percSnd),f:rf(R,1000,2400)}:null},
+    acc:{type:rw(R,C.acc),wave:C.accWave,cut0:rf(R,450,750),open:rf(R,1.5,2.4),steps:hitsFrom0(R,rp(R,[3,4,5])),dec:rf(R,.08,.18),rate:2,drive:rf(R,1,2.2),pat:rp(R,['formula','up','updown'])},
+    look:{trace:C.look.trace,marker:C.look.marker,width:r2(C.look.width),glow:rf(R,.75,1),dash:false},
+    lens:rw(R,C.lens), pad:C.pad};
+}
+/* the shell's rhythm decides how busy the rest may be: a dense tune gets sparse drums and no arpeggio */
+function fitArrangement(th,R,pat,patB,lens){
+  const dens=Math.max(pat.length,patB.length), on=new Set(); let k=0; for(const d of pat){ on.add(k); k+=d; }
+  th.acc.voice=VOICE[lens]||VOICE.mode;
+  if(th.acc.type==='arp'&&dens>=6) th.acc.type='pad';
+  if(dens>=7){ th.drums.perc=null; th.drums.hat=Array.from({length:16},(_,i)=>i%4===2?1:0); }
+  if(th.acc.type==='bass') th.acc.steps=th.drums.kick.slice();   /* bass and kick hit together */
+  if(th.acc.type==='stab'){ th.acc.steps=Array(16).fill(0); [6,14,2,10,11,3].filter(q=>!on.has(q)).slice(0,ri(R,2,3)).forEach(q=>th.acc.steps[q]=1); }   /* stabs answer in the tune's gaps */
+  if(th.drums.perc) th.drums.perc.steps=th.drums.perc.steps.map((x,i)=>x&&!on.has(i)?1:0);
 }
 const LVL_W=(f,lv)=>f.lv>lv?0:f.w*(f.lv===lv?1.7:1);
 /* last shell of a round: the walk of the whole magazine. live = step down, blank = step up */
@@ -684,9 +709,10 @@ function buildShell(o){
   const th=makeTheme(hashStr(puz.html+'|'+puz.v.slice(0,24).join(',')),song);
   const win=puz.v.slice(0,N+M), lo=Math.min(...win), st=rs.mode.st, span=Math.max(...win)-lo;
   const lens=final?'mode':(th.lens==='triad'||th.lens==='sus')&&span>6?'pent':th.lens;
+  fitArrangement(th,R,pat,patB,lens);
   notes.forEach(n=>{ const y=puz.v[n.j], d0=14+(y-lo); n.y=y; n.p=n.post?d0+(want?-14:7):d0; n.s=lensSemi(lens,st,y-lo)+(n.post?(want?-24:12):0); n.tr=n.k*s16; n.slot=n.d*s16; n.dur=n.slot*(final?.9:th.leg); n.lab=String(y); n.vel=n.j%th.accEvery===0?1:th.accAmt; });
   return {seed,song,rs,rhythm:pat.join('')+'/'+patB.join(''),lens,notes,N,M,puz,th,lo,out:want,pre,post,bt,s16,len:(pre+post)*bt,tr:pre*bt,level,crit:!!crit,final:!!final,
-    qEnd:rw(R,[['riser',2],['stop',2],['roll',1.5],['swell',2]]),qTension:rp(R,[4,4,1,5,3,6]),
+    qEnd:rw(R,[['riser',2],['stop',2],['roll',1.5],['swell',2]]),qTension:rp(R,[4,4,3]),
     start:0,answer:null,at:0,onbeat:false,resolved:false,pNaive:0,pExact:0};
 }
 
@@ -851,12 +877,12 @@ function makeEngine(ctx,song){
     const lastBar=Math.max(0,sh.pre-4);
     for(let k=0;k<sh.pre*4;k++){ const st16=k%16, t=k*S+(k%2?song.swing*S:0); if(t>=stopAt) continue;
       if(D.kick[st16]) qk(k*S,st16===0?.62:.5);
-      if(k>=lastBar*4) hat(t,.05+.13*(k-lastBar*4)/16,false); else if(D.hat[st16]) hat(t,D.hatAmp*(st16%4===0?1.2:1),false);
+      if(k>=sh.pre*4-8) hat(t,.05+.12*(k-(sh.pre*4-8))/8,false); else if(D.hat[st16]) hat(t,D.hatAmp*(st16%4===0?1.2:1),false);
       if(D.perc&&D.perc.steps[st16]) perc(t,D.perc,.07); }
-    if(lv>=1||sh.crit||sh.qEnd==='riser') riser(lastBar*BT,4*BT,.04+.025*lv+(sh.crit?.04:0));
+    if(sh.crit||sh.qEnd==='riser') riser(lastBar*BT,4*BT,.04+.025*lv+(sh.crit?.04:0));
     if(lv>=2||sh.qEnd==='roll') for(let k=0;k<4;k++) back(tr-BT+k*S,(lv>=2?.1:.06)+.07*k);
     if(sh.qEnd==='swell') swell(tr-2*BT,2*BT);
-    if(lv>=1) for(let b=0;b<qBars;b++) subHit(b*4*BT,degSemi(st,qRoot(b*4*BT)));
+    if(lv>=1&&th.acc.type!=='bass') for(let b=0;b<qBars;b++) subHit(b*4*BT,degSemi(st,qRoot(b*4*BT)));
     { const half=qBars>=2?4*BT:2*BT; accomp(sh,0,half,sh.rs.prog[0]); accomp(sh,half,tr,sh.qTension); }
     pre.forEach((n,i)=>leadGen(th.lead,n.tr,n.dur,hz(n.s),{open:.8+.5*n.tr/tr,echo:i===pre.length-1,vel:n.vel}));
     /* answer: live = the same continuation two octaves down on the theme's 808; blank = an octave up on the theme's bell */
@@ -865,7 +891,6 @@ function makeEngine(ctx,song){
       for(let b=0;b<pb;b++){ const t0=tr+b*4*BT; KP[song.kickPat].forEach(k=>{ if(b===0&&k===0) return; kick(t0+k*S,.6); }); back(t0+BT,.55); back(t0+3*BT,.55);
         if(song.perc==='cowbell'&&lv>=1) [3,6,10,13].forEach(k=>cowbell(t0+k*S,.07,hz(48))); }
       hatsLive(tr,sh.post,lv);
-      if(D.perc&&lv>=1) for(let k=0;k<sh.post*4;k++) if(D.perc.steps[k%16]) perc(tr+k*S+(k%2?song.swing*S:0),D.perc,.06);
       const L8={...song.l808,...th.l808};
       let prev=null; post.forEach(n=>{ const f=hz(n.s); e808(n.tr,n.dur,f,prev,L8); prev=f; if(lv>=2||sh.final) wall(n.tr,n.dur,f*4); });
     } else { [0,4,7].forEach((d,i)=>bellGen(th.bell,tr+i*.035,.4,hz(48+degSemi(st,d)),.45)); chime(tr,st,true);
@@ -1151,25 +1176,18 @@ function marker(x,y,kind,col,r){ if(kind==='none') return; X.save(); X.fillStyle
   if(kind==='ring'){ X.arc(x,y,r+.6,0,7); X.stroke(); X.restore(); return; }
   if(kind==='circle') X.arc(x,y,r,0,7); else if(kind==='diamond'){ X.moveTo(x,y-r-1); X.lineTo(x+r+1,y); X.lineTo(x,y+r+1); X.lineTo(x-r-1,y); X.closePath(); } else X.rect(x-r,y-r,2*r,2*r);
   X.fill(); X.restore(); }
-/* one formula, one look: the trace style comes from the theme (steps, dots, spline, bars, area, pulses, stems) */
+/* one formula, one look: the trace style comes from the shell's character (steps, dots, stems, soft area) */
 const PLAIN_LOOK={trace:'steps',marker:'none',width:2.2,glow:1,dash:false};
-function drawTrace(gm,ns,lim,col,mode,th,base,cap){
+function drawTrace(gm,ns,lim,col,mode,th,base){
   const vis=ns.filter(n=>n.tr<=lim); if(!vis.length) return null;
   const Lk=mode==='theme'&&th?th.look:PLAIN_LOOK, tr=mode==='theme'?Lk.trace:mode, w=Lk.width, yb=gm.y(base), last=vis[vis.length-1];
-  const xl=Lk.enter==='snap'&&cap?cap:lim;   /* snap: a note's whole step appears on its onset; sweep: it grows with time */
-  const cx=n=>gm.x(n.tr), ex=n=>Math.max(cx(n)+1,gm.x(Math.min(n.tr+n.slot,xl))), dx=n=>Math.max(cx(n)+2,gm.x(Math.min(n.tr+n.dur,xl))), y=n=>gm.y(n.p);
-  if(tr==='stems'){ const r=pathStems(gm,vis,lim,base); glow(r.P,col,1.6,.8); vis.forEach(n=>dot(cx(n)+2,y(n),3,col)); return r.h; }
-  if(tr==='dots'||tr==='spline'){ const P=new Path2D();
-    vis.forEach((n,i)=>{ const x=cx(n), yy=y(n); if(!i){ P.moveTo(x,yy); return; } if(tr==='dots'){ P.lineTo(x,yy); return; }
-      const p0=vis[Math.max(0,i-2)], p1=vis[i-1], p3=vis[Math.min(vis.length-1,i+1)];
-      P.bezierCurveTo(cx(p1)+(x-cx(p0))/6,y(p1)+(yy-y(p0))/6,x-(cx(p3)-cx(p1))/6,yy-(y(p3)-y(p1))/6,x,yy); });
-    P.lineTo(ex(last),y(last)); X.save(); if(Lk.dash) X.setLineDash([5,4]); glow(P,col,w*.8,Lk.glow); X.restore();
-    vis.forEach(n=>marker(cx(n),y(n),Lk.marker==='none'?'circle':Lk.marker,col,3)); return {x:ex(last),y:y(last)}; }
-  if(tr==='bars'){ vis.forEach(n=>{ const x0=cx(n), x1=dx(n)-1, yy=y(n); X.save(); X.fillStyle=col; X.globalAlpha=.15; X.fillRect(x0,Math.min(yy,yb),Math.max(1,x1-x0),Math.abs(yb-yy)); X.restore(); const P=new Path2D(); P.moveTo(x0,yy); P.lineTo(x1,yy); glow(P,col,w,Lk.glow); }); return {x:dx(last),y:y(last)}; }
-  if(tr==='pulse'){ const P=new Path2D(); vis.forEach(n=>{ const x0=cx(n), x1=dx(n), yy=y(n); P.moveTo(x0,yb); P.lineTo(x0,yy); P.lineTo(x1,yy); P.lineTo(x1,yb); }); glow(P,col,w*.85,Lk.glow); vis.forEach(n=>marker(cx(n),y(n),Lk.marker,col,2.6)); return {x:dx(last),y:y(last)}; }
-  const r=pathSteps(gm,vis,xl);
-  if(tr==='area'){ const F=new Path2D(); F.moveTo(cx(vis[0]),yb); vis.forEach(n=>{ F.lineTo(cx(n),y(n)); F.lineTo(ex(n),y(n)); }); F.lineTo(ex(last),yb); F.closePath(); X.save(); X.fillStyle=col; X.globalAlpha=.12; X.fill(F); X.restore(); }
-  glow(r.P,col,w,Lk.glow); vis.forEach(n=>marker(cx(n),y(n),Lk.marker,col,2.6)); return r.h;
+  const cx=n=>gm.x(n.tr), ex=n=>Math.max(cx(n)+1,gm.x(Math.min(n.tr+n.slot,lim))), y=n=>gm.y(n.p);
+  if(tr==='stems'){ const r=pathStems(gm,vis,lim,base); glow(r.P,col,w*.75,.75); vis.forEach(n=>dot(cx(n)+2,y(n),2.7,col,.95)); return r.h; }
+  if(tr==='dots'){ const P=new Path2D(); vis.forEach((n,i)=>{ if(!i) P.moveTo(cx(n),y(n)); else P.lineTo(cx(n),y(n)); }); P.lineTo(ex(last),y(last));
+    glow(P,col,w*.8,Lk.glow); vis.forEach(n=>marker(cx(n),y(n),Lk.marker==='none'?'circle':Lk.marker,col,2.8)); return {x:ex(last),y:y(last)}; }
+  const r=pathSteps(gm,vis,lim);
+  if(tr==='area'){ const F=new Path2D(); F.moveTo(cx(vis[0]),yb); vis.forEach(n=>{ F.lineTo(cx(n),y(n)); F.lineTo(ex(n),y(n)); }); F.lineTo(ex(last),yb); F.closePath(); X.save(); X.fillStyle=col; X.globalAlpha=.08; X.fill(F); X.restore(); }
+  glow(r.P,col,w,Lk.glow); vis.forEach(n=>marker(cx(n),y(n),Lk.marker,col,2.4)); return r.h;
 }
 function drawShell(sh,now,countdown){
   X.setTransform(dpr,0,0,dpr,0,0); X.clearRect(0,0,W,H0); X.globalAlpha=1;
@@ -1200,13 +1218,8 @@ function drawShell(sh,now,countdown){
   if(look==='walk'&&revealed||look==='walk'&&tau>sh.tr*.5){ const y=gm.y(14+(P.target-sh.lo)+(revealed?shift:0)); X.strokeStyle=revealed?pc:COL.amber; X.globalAlpha=.6; X.setLineDash([2,4]); X.beginPath(); X.moveTo(revealed?xT:gm.x(sh.tr*.5),y); X.lineTo(Rr,y); X.stroke(); X.setLineDash([]); X.fillStyle=X.strokeStyle; X.textAlign='right'; X.fillText(`цель ${P.target}`,Rr-2,y-5); }
   X.restore();
   /* the question */
-  if(look==='smooth'&&P.curve&&pre.length){ const cp=new Path2D(); const ts=pre.map(n=>n.tr); let first=true;
-    for(let x=gm.x(0);x<=gm.x(lim);x+=2){ const t=(x-L)/(Rr-L)*sh.len; let u; if(t<=ts[0]) u=0; else { let i=ts.findIndex(q=>q>t); if(i<0) i=ts.length; const a=ts[i-1], b2=i<ts.length?ts[i]:sh.tr; u=(i-1)+(t-a)/Math.max(1e-6,b2-a); }
-      const y=gm.y(14+P.curve(u)-sh.lo); if(first){ cp.moveTo(x,y); first=false; } else cp.lineTo(x,y); }
-    X.save(); X.setLineDash([3,4]); glow(cp,col,1.2,.55); X.restore(); }
   const mode=look==='theme'?'theme':look==='stems'?'stems':'steps';
-  let head=drawTrace(gm,pre,lim,col,mode,sh.th,base,sh.tr);
-  if(look==='smooth') pre.forEach(n=>{ if(n.tr<=lim) dot(gm.x(n.tr),gm.y(n.p),2.6,col); });
+  let head=drawTrace(gm,pre,lim,col,mode,sh.th,base);
   /* value labels: two rows above the phrase, like the reference */
   const labels=(ns,top,c)=>{ X.font=`800 9px ${FONT}`; X.textAlign='center'; X.fillStyle=c; let last=[-99,-99];
     ns.forEach((n,i)=>{ if(n.tr>tau) return; const row=i%2, x=gm.x(n.tr)+3, hw=X.measureText(n.lab).width/2; if(x-hw<last[row]+2) return; last[row]=x+hw; X.globalAlpha=.9; X.fillText(n.lab,x,Math.max(T+8,gm.y(top)-10-row*10)); }); X.globalAlpha=1; };
@@ -1220,17 +1233,18 @@ function drawShell(sh,now,countdown){
   if(revealed&&lastPre&&firstPost){
     const u=clamp((tau-sh.tr)/.22,0,1), e=1-Math.pow(1-u,3), y0=gm.y(lastPre.p), y1=gm.y(firstPost.p), yy=y0+(y1-y0)*e, dir=Math.sign(y1-y0);
     const ap=new Path2D(); ap.moveTo(xT,y0); ap.lineTo(xT,yy); ap.moveTo(xT-5,yy-dir*7); ap.lineTo(xT,yy); ap.lineTo(xT+5,yy-dir*7); glow(ap,pc,2.2);
-    X.save(); X.fillStyle=pc; X.font=`800 10px ${FONT}`; X.globalAlpha=u; const ym=(y0+yy)/2+4;
-    if(sh.out){ X.textAlign='right'; X.fillText('f/4 · s = −2',xT-8,ym); } else { X.textAlign='left'; X.fillText('2f · s = +1',xT+8,ym); } X.restore();
     /* the continuation */
     const vis=post.filter(n=>n.tr<=tau);
-    head=drawTrace(gm,post,tau,pc,mode,sh.th,base+shift,sh.len)||head;
+    head=drawTrace(gm,post,tau,pc,mode,sh.th,base+shift)||head;
+    /* the rule, on a dark tag right of the trigger, in the half the answer left empty (top for live, bottom for blank) */
+    { X.save(); X.font=`800 10px ${FONT}`; X.globalAlpha=u; const tx=sh.out?'f/4 · s = −2':'2f · s = +1', tw=X.measureText(tx).width, ly=sh.out?T+22:B-8, lx=xT+9;
+      X.fillStyle='rgba(9,15,12,.88)'; X.fillRect(lx-4,ly-10,tw+8,14); X.fillStyle=pc; X.textAlign='left'; X.fillText(tx,lx,ly); X.restore(); }
     if(!sh.out) vis.forEach(n=>{ const age=now-(sh.start+n.tr); if(age<.6){ X.save(); X.strokeStyle=pc; X.globalAlpha=1-age/.6; X.lineWidth=1.2; X.beginPath(); X.arc(gm.x(n.tr),gm.y(n.p),3+age*18,0,7); X.stroke(); X.restore(); } });
     labels(post,Math.max(...post.map(n=>n.p)),pc);
   }
   if(sh.answer!==null){ const x=gm.x(sh.at-sh.start), c2=sh.answer?COL.live:COL.blank; X.save(); X.strokeStyle=c2; X.globalAlpha=.7; X.lineWidth=1; X.setLineDash([2,4]); X.beginPath(); X.moveTo(x,T+8); X.lineTo(x,B); X.stroke(); X.restore();
     X.fillStyle=c2; X.textAlign=x>xT-60?'right':'left'; X.font=`800 9px ${FONT}`; X.fillText((sh.answer?'БОЕВОЙ ↓':'ХОЛОСТОЙ ↑')+(sh.onbeat?' · в такт':''),x>xT-60?x-4:x+4,B-4); }
-  if(head&&tau<sh.len){ let on=-1; for(const n of sh.notes) if(n.tr<=tau&&n.tr>on) on=n.tr; dot(head.x,head.y,4.2+3*Math.exp(-(tau-on)*9),revealed?pc:COL.amber); }
+  if(head&&tau<sh.len){ let on=-1; for(const n of sh.notes) if(n.tr<=tau&&n.tr>on) on=n.tr; dot(head.x,head.y,4+1.6*Math.exp(-(tau-on)*12),revealed?pc:COL.amber); }
   if(countdown!=null){ X.fillStyle=COL.amber; X.globalAlpha=.9; X.textAlign='center'; X.font=`900 64px ${FONT}`; X.fillText(String(countdown),xT,(T+B)/2+22); X.globalAlpha=1; }
 }
 
