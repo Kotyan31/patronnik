@@ -1338,7 +1338,7 @@ async function ghLoad(){ const repo=repoOf(); let j=null;
   if(repo) try{ const r=await fetch(`https://api.github.com/repos/${repo}/contents/scores.json`,{headers:{Accept:'application/vnd.github.raw'},cache:'no-store'}); if(r.ok) j=await r.json(); }catch(e){}
   if(!j){ const r=await fetch('scores.json?t='+Date.now(),{cache:'no-store'}); if(!r.ok) throw new Error('no table'); j=await r.json(); }
   if(!j||!Array.isArray(j.scores)) throw new Error('bad table');
-  LB.rows=j.scores.filter(r=>r&&r.id).sort((a,b)=>b.best-a.best).slice(0,10); LB.players=j.players||{}; LB.acks=j.acks||{}; LB.updated=j.updated||null;
+  LB.rows=j.scores.filter(r=>r&&(r.id||r.name)).map(r=>r.id?r:{...r,id:normNick(r.name)}).sort((a,b)=>b.best-a.best).slice(0,10); LB.players=j.players||{}; LB.acks=j.acks||{}; LB.updated=j.updated||null;
   const P=LB.pending; if(P&&LB.acks[P.nonce]) settle(P,LB.acks[P.nonce]); }
 const ACK_TEXT={ok:'Рекорд в общей таблице.',low:'Принято. Ваш лучший результат в таблице выше этого.',key:'Этот ник уже занят другим паролем. Войдите заново.',bad:'Сервер не принял результат.'};
 function settle(P,ack){ LB.pending=null; store.set('patronnik-outbox',null); LB.status=ACK_TEXT[ack]||'';
