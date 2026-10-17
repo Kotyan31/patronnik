@@ -1,13 +1,13 @@
 {
- "updated": "2026-10-17T10:58:11+00:00",
+ "updated": "2026-10-17T11:02:12+00:00",
  "scores": [
   {
    "id": "pro100kotyanlox",
    "nick": "Pro100KotyanLox",
-   "best": 75125,
-   "rounds": 26,
-   "acc": 98,
-   "at": "2026-10-17T10:55:06+00:00"
+   "best": 269925,
+   "rounds": 85,
+   "acc": 100,
+   "at": "2026-10-17T11:02:12+00:00"
   },
   {
    "id": "eldiavlos",
@@ -106,6 +106,7 @@
   "c3730df094cb4c9e785998aa": "low",
   "d12e3bd7971d694db36eacb4": "low",
   "95a04cecec0fc94df27cbdb0": "low",
-  "f88a1e41f903c6ef5581a88d": "low"
+  "f88a1e41f903c6ef5581a88d": "low",
+  "3a8f7cc2432d528449823f23": "ok"
  }
 }
