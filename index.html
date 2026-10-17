@@ -46,17 +46,17 @@ body{
   padding-block:16px 24px;
 }
 .app{max-width:540px;margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr);gap:14px;
-  grid-template-areas:"hdr" "hud" "mag" "stage" "formula" "side" "controls"}
+  grid-template-areas:"hdr" "hud" "mag" "stage" "vol" "formula" "side" "controls"}
 .side{grid-area:side;display:grid;gap:14px;align-content:start}
 @media (min-width:980px){
   .app{max-width:980px;grid-template-columns:minmax(0,540px) minmax(0,1fr);column-gap:32px;
-    grid-template-areas:"hdr side" "hud side" "mag side" "stage side" "controls side" "formula side"}
+    grid-template-areas:"hdr side" "hud side" "mag side" "stage side" "vol side" "controls side" "formula side"}
   .controls{position:static;padding-block:0;background:none}
   .side{align-self:start;position:sticky;top:max(16px,env(safe-area-inset-top,0px));margin-top:8px}
 }
 @media (min-width:1180px){
   .app{max-width:none;grid-template-columns:minmax(0,1fr) minmax(0,540px) minmax(0,1fr);
-    grid-template-areas:". hdr side" ". hud side" ". mag side" ". stage side" ". controls side" ". formula side"}
+    grid-template-areas:". hdr side" ". hud side" ". mag side" ". stage side" ". vol side" ". controls side" ". formula side"}
   .side{max-width:400px;width:100%;justify-self:start}
 }
 
@@ -64,7 +64,7 @@ body{
 .hdr{grid-area:hdr;display:grid;justify-items:center;padding-top:2px}
 .pill-main{font-family:var(--f-display);font-size:clamp(28px,8vw,40px);letter-spacing:.02em;line-height:1.1;color:var(--white);background:var(--pill);padding:3px 18px 5px;border-radius:8px;transform:rotate(-1.4deg);box-shadow:0 0 0 1px color-mix(in srgb,var(--white) 12%,transparent) inset,0 8px 30px color-mix(in srgb,var(--pill) 40%,transparent)}
 .pill-sub{font-weight:700;font-size:13.5px;color:var(--ink);background:var(--fg);padding:2px 10px 3px;border-radius:4px;margin-top:-4px;transform:rotate(-1.4deg);transition:background .2s,color .2s}
-.vol{display:flex;align-items:center;gap:8px;margin-top:10px;color:var(--muted)}
+.vol{grid-area:vol;justify-self:center;display:flex;align-items:center;gap:8px;margin-top:-4px;color:var(--muted)}
 .vol-btn{background:none;border:0;padding:4px;color:inherit;cursor:pointer;display:grid;place-items:center;border-radius:6px}
 .vol-btn:focus-visible,.vol input:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
 .vol input{width:130px;accent-color:var(--amber);cursor:pointer}
@@ -265,8 +265,6 @@ body{
   <header class="hdr">
     <div class="pill-main">ПАТРОННИК</div>
     <div class="pill-sub" id="sub">рулетка, но это математика</div>
-    <div class="vol"><button type="button" id="volBtn" class="vol-btn" aria-label="Выключить звук"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path id="volWaves" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path id="volX" d="M16 9l5 6M21 9l-5 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" hidden/></svg></button>
-      <input id="vol" type="range" min="0" max="100" step="1" aria-label="Громкость"></div>
   </header>
 
   <div class="hud" aria-live="polite">
@@ -288,6 +286,9 @@ body{
     <div class="judge" id="judge"></div>
     <div class="overlay" id="overlay"></div>
   </div>
+
+  <div class="vol"><button type="button" id="volBtn" class="vol-btn" aria-label="Выключить звук"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path id="volWaves" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path id="volX" d="M16 9l5 6M21 9l-5 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" hidden/></svg></button>
+    <input id="vol" type="range" min="0" max="100" step="1" aria-label="Громкость"></div>
 
   <div class="formula">
     <div class="f-main" id="fMain"></div>
@@ -325,8 +326,13 @@ body{
 <script>
 (() => {
 const $ = id => document.getElementById(id);
-const rnd = (a,b) => a + Math.floor(Math.random()*(b-a+1));
-const shuffle = a => { a=a.slice(); for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; };
+/* game randomness comes from the browser's crypto generator, taken once at load: replacing Math.random or
+   crypto.getRandomValues from the console later cannot make the magazine predictable */
+const RNG=(()=>{ const c=window.crypto, gv=c&&c.getRandomValues?c.getRandomValues.bind(c):null, u=new Uint32Array(2);
+  if(!gv){ const m=Math.random; return {u32:()=>(m()*4294967296)>>>0, f:()=>m()}; }
+  return {u32:()=>{ gv(u); return u[0]; }, f:()=>{ gv(u); return (u[0]*2097152+(u[1]>>>11))/9007199254740992; }}; })();
+const rnd = (a,b) => a + Math.floor(RNG.f()*(b-a+1));
+const shuffle = a => { a=a.slice(); for(let i=a.length-1;i>0;i--){const j=Math.floor(RNG.f()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; };
 const sum = s => s.reduce((x,y)=>x+y,0);
 function mulberry(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
 const ri=(R,a,b)=>a+Math.floor(R()*(b-a+1));
@@ -338,7 +344,7 @@ const plural=(n,a,b,c)=>{ const m10=n%10,m100=n%100; return m10===1&&m100!==11?a
 const I=s=>`<i>${s}</i>`;
 const gcd=(a,b)=>b?gcd(b,a%b):a;
 const mod=(a,m)=>((a%m)+m)%m;
-const newSeed=()=>{ try{ return crypto.getRandomValues(new Uint32Array(1))[0]; }catch(e){ return (Math.random()*4294967296)>>>0; } };
+const newSeed=()=>RNG.u32();
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 
 /* ===================================================================================
@@ -751,18 +757,17 @@ function pickPuzzle(R,want,c,recent){
 function buildShell(o){
   const {song,rs,seed,want,pre,post,level,crit,final,bits,recent}=o, diff=o.diff!=null?o.diff:3+3*(o.lv-1), lv=lvOfDiff(diff);
   const R=mulberry(seed), bt=60/song.bpm, s16=bt/4;
-  const pat=final?RHY['8']:rs.band&&R()<.75?varyRhythm(R,rs.band.pat):genRhythm(R), patB=final?pat:varyRhythm(R,pat), tot16=(pre+post)*4;
-  const notes=[]; let k16=0, j=0, bar=0;
-  while(k16<tot16){ for(const d of (bar%2?patB:pat)){ if(k16>=tot16) break; notes.push({j:j++,k:k16,d,post:k16>=pre*4}); k16+=d; } bar++; }
+  const rhythm=final?'8':rw(R,song.rhythms), pat=RHY[rhythm], tot16=(pre+post)*4;
+  const notes=[]; let k16=0, j=0;
+  while(k16<tot16){ for(const d of pat){ if(k16>=tot16) break; notes.push({j:j++,k:k16,d,post:k16>=pre*4}); k16+=d; } }
   const N=notes.filter(n=>!n.post).length, M=notes.length-N;
   const puz=final?walkPuzzle(bits,N,M):pickPuzzle(R,want,{lv,diff,N,M},recent||[]);
-  const th=makeTheme(hashStr(puz.html+'|'+puz.v.slice(0,24).join(',')),song,rs);
-  const win=puz.v.slice(0,N+M), lo=Math.min(...win), st=rs.mode.st, span=Math.max(...win)-lo;
-  const lens=final?'mode':(th.lens==='triad'||th.lens==='sus')&&span>6?'pent':th.lens;
-  fitArrangement(th,R,pat,patB,lens);
-  notes.forEach(n=>{ const y=puz.v[n.j], d0=14+(y-lo); n.y=y; n.p=n.post?d0+(want?-14:7):d0; n.s=lensSemi(lens,st,y-lo)+(n.post?(want?-24:12):0); n.tr=n.k*s16; n.slot=n.d*s16; n.dur=n.slot*(final?.9:th.leg); n.lab=String(y); n.vel=n.j%th.accEvery===0?1:th.accAmt; });
-  return {seed,song,rs,rhythm:pat.join('')+'/'+patB.join(''),lens,notes,N,M,puz,th,lo,out:want,pre,post,bt,s16,len:(pre+post)*bt,tr:pre*bt,level,crit:!!crit,final:!!final,
-    qEnd:rw(R,[['riser',2],['stop',2],['roll',1.5],['swell',2]]),qTension:rp(R,[4,4,3]),
+  const th=makeTheme(hashStr(puz.html+'|'+puz.v.slice(0,24).join(',')),song,rs);   /* only the session's graph look is used */
+  const win=puz.v.slice(0,N+M), lo=Math.min(...win), st=rs.mode.st, leg=rhythm==='8'?.9:.82;
+  notes.forEach(n=>{ const y=puz.v[n.j], d0=14+(y-lo); n.y=y; n.p=n.post?d0+(want?-14:7):d0; n.s=degSemi(st,n.p); n.tr=n.k*s16; n.slot=n.d*s16; n.dur=n.slot*leg; n.lab=String(y); });
+  return {seed,song,rs,rhythm,notes,N,M,puz,th,lo,out:want,pre,post,bt,s16,len:(pre+post)*bt,tr:pre*bt,level,crit:!!crit,final:!!final,
+    lead:R()<.75?rs.lead:rs.lead2,bell:rs.bell,
+    qDrum:rp(R,song.qDrums||['four']),qPad:rp(R,song.qPads||['none']),qEnd:rw(R,[['riser',2],['stop',2],['roll',1.5],['swell',2]]),qTension:rp(R,[4,4,1,5,3,6]),qSus:R()<.5?1:3,
     start:0,answer:null,at:0,onbeat:false,resolved:false,pNaive:0,pExact:0};
 }
 
@@ -779,8 +784,8 @@ function irData(song,sr){ const key=song.seed+':'+sr; if(IRC[key]) return IRC[ke
   for(let c=0;c<2;c++){ const d=new Float32Array(len); let lp=0; for(let i=0;i<len;i++){ const u=i/len, w=(R()*2-1)*Math.pow(1-u,2.4)*Math.exp(-u*1.6); lp+=(w-lp)*(1-.45*u); d[i]=lp; }
     for(let e=0;e<7;e++){ const at=Math.floor(sr*(.006+R()*.05)); if(at<len) d[at]+=(R()<.5?-1:1)*(.45-e*.05); } out.push(d); }
   return IRC[key]=out; }
-function ksData(f,sr,damp=.4985){ const key=Math.round(f*8)+':'+sr+':'+damp; if(KSC[key]) return KSC[key]; const R=mulberry(Math.round(f*100)), len=Math.floor(sr*1.4), P=Math.max(2,Math.round(sr/f)), d=new Float32Array(len);
-  for(let i=0;i<P;i++) d[i]=R()*2-1; for(let i=P;i<len;i++) d[i]=damp*(d[i-P]+d[i-P+1]); return KSC[key]=d; }
+function ksData(f,sr){ const key=Math.round(f*8)+':'+sr; if(KSC[key]) return KSC[key]; const R=mulberry(Math.round(f*100)), len=Math.floor(sr*1.4), P=Math.max(2,Math.round(sr/f)), d=new Float32Array(len);
+  for(let i=0;i<P;i++) d[i]=R()*2-1; for(let i=P;i<len;i++) d[i]=.4985*(d[i-P]+d[i-P+1]); return KSC[key]=d; }
 
 function makeEngine(ctx,song){
   const sr=ctx.sampleRate, BT=60/song.bpm, S=BT/4;
@@ -797,25 +802,17 @@ function makeEngine(ctx,song){
   /* buses: everything -> soft clip; sends to a seeded room and a tempo delay */
   const out=g(.6), clip=shaper(tanhCurve(1.3),'2x'); out.connect(clip); clip.connect(ctx.destination);
   const conv=ctx.createConvolver(), ir=irData(song,sr), irb=ctx.createBuffer(2,ir[0].length,sr); irb.getChannelData(0).set(ir[0]); irb.getChannelData(1).set(ir[1]); conv.buffer=irb;
-  /* duck: everything that sustains (pads, chords, bells, the room) dips on each kick, so the groove breathes instead of smearing */
-  const duck=g(1); duck.connect(out); const mus=g(1); mus.connect(duck); const kicks=[]; let duckDepth=.6;
-  const pdl=ctx.createDelay(.1); pdl.delayTime.value=.022;
-  const verb=g(1); ch(verb,bq('highpass',200),bq('lowpass',6500),pdl,conv,g(song.verb.wet*2.2),out);
+  const verb=g(1); ch(verb,bq('highpass',180),bq('lowpass',7000),conv,g(song.verb.wet*2.2),out);
   const dly=g(1), dl=ctx.createDelay(2); dl.delayTime.value=song.delay.beats*BT; const dlp=bq('lowpass',3800), fb=g(song.delay.fb), dret=g(.55);
-  ch(dly,dl,bq('highpass',300),dlp,fb,dl); dlp.connect(dret); dret.connect(out); dret.connect(verb);
-  /* drums share one glue compressor, so kick, clap and hats hit as one kit */
-  const drums=g(1), glue=ctx.createDynamicsCompressor(); glue.threshold.value=-16; glue.knee.value=8; glue.ratio.value=3; glue.attack.value=.012; glue.release.value=.14;
-  ch(drums,glue,g(1.25),out); const dverb=g(.28); dverb.connect(verb);
-  const leadBus=g(1); ch(leadBus,bq('highpass',90),out); const lsend=g(.22); leadBus.connect(lsend); lsend.connect(verb); const ldly=g(0); leadBus.connect(ldly); ldly.connect(dly);
-  const bellBus=g(1); ch(bellBus,bq('highpass',220),bq('lowpass',3600,.6),out); const bs1=g(.38), bs2=g(.5); bellBus.connect(bs1); bs1.connect(dly); bellBus.connect(bs2); bs2.connect(verb);
+  ch(dly,dl,dlp,fb,dl); dlp.connect(dret); dret.connect(out); dret.connect(verb);
+  const drums=g(1); drums.connect(out); const dverb=g(.28); dverb.connect(verb);
+  const leadBus=g(1); leadBus.connect(out); const lsend=g(.22); leadBus.connect(lsend); lsend.connect(verb);
+  const bellBus=g(1); bellBus.connect(out); const bs1=g(.38), bs2=g(.5); bellBus.connect(bs1); bs1.connect(dly); bellBus.connect(bs2); bs2.connect(verb);
   const panned=(node,p)=>{ if(!ctx.createStereoPanner) return node; const s=ctx.createStereoPanner(); s.pan.value=p; node.connect(s); return s; };
-  const HR=mulberry(song.seed^0x5eed); let hatN=0;
-  function applyDuck(){ kicks.sort((a,b)=>a-b); let last=-1; for(const t of kicks){ if(t-last<.09) continue; last=t;
-      duck.gain.setValueAtTime(1,t); duck.gain.linearRampToValueAtTime(duckDepth,t+.008); duck.gain.setTargetAtTime(1,t+.02,.075); } }
 
   /* ---- drums ---- */
   const K=song.kit;
-  function kick(t,amp){ kicks.push(t); const k=K.kick, o=osc('sine',k.f0,t), a=g(0); o.frequency.exponentialRampToValueAtTime(k.f1,t+k.pd); o.frequency.exponentialRampToValueAtTime(k.f1*.92,t+k.dec);
+  function kick(t,amp){ const k=K.kick, o=osc('sine',k.f0,t), a=g(0); o.frequency.exponentialRampToValueAtTime(k.f1,t+k.pd); o.frequency.exponentialRampToValueAtTime(k.f1*.92,t+k.dec);
     a.gain.setValueAtTime(0,t); a.gain.linearRampToValueAtTime(amp,t+.002); a.gain.setTargetAtTime(amp*.6,t+.01,.05); a.gain.setTargetAtTime(0,t+.06,k.dec/4);
     ch(o,shaper(tanhCurve(k.drive)),a,drums); o.start(t); o.stop(t+k.dec*1.4+.1);
     const n=nz(), b=g(0); env(b,t,amp*k.click,.001,.012); ch(n,bq('highpass',1800),b,drums); n.start(t); n.stop(t+.05); }
@@ -824,13 +821,13 @@ function makeEngine(ctx,song){
   function snare(t,amp){ const o=osc('triangle',K.snTone*1.6,t), a=g(0); o.frequency.exponentialRampToValueAtTime(K.snTone,t+.03); env(a,t,amp*.7,.001,.09); ch(o,a,drums); o.start(t); o.stop(t+.16);
     const n=nz(), b=g(0); env(b,t,amp,.001,K.snDec); ch(n,bq('highpass',1400),b,drums); b.connect(dverb); n.start(t); n.stop(t+K.snDec*1.4+.01); }
   const back=(t,amp)=>{ if(K.sn==='clap') clap(t,amp); else if(K.sn==='snare') snare(t,amp); else { clap(t,amp*.8); snare(t,amp*.55); } };
-  function hat(t,amp,open){ t=Math.max(0,t+(HR()-.5)*.004); amp*=.85+.3*HR(); const n=nz(), f2=bq('peaking',K.hp*1.3,1), a=g(0); f2.gain.value=6; const dec=open?.22:K.hdec; env(a,t,amp,.001,dec); ch(n,bq('highpass',K.hp),f2,a); panned(a,(hatN++%2?1:-1)*(open?.3:.18)).connect(drums); n.start(t); n.stop(t+dec*1.4+.02); }
+  function hat(t,amp,open){ const n=nz(), f2=bq('peaking',K.hp*1.3,1), a=g(0); f2.gain.value=6; const dec=open?.22:K.hdec; env(a,t,amp,.001,dec); ch(n,bq('highpass',K.hp),f2,a,drums); n.start(t); n.stop(t+dec*1.4+.02); }
   function cowbell(t,amp,f){ const m=g(.5), a=g(0); [1,1.48].forEach(r=>{ const o=osc('square',f*r,t); o.connect(m); o.start(t); o.stop(t+.45); }); env(a,t,amp,.001,.28); ch(m,bq('bandpass',f*2.2,1.6),a); a.connect(bellBus); }
   function riser(t,dur,amp){ const n=nz(), f=bq('bandpass',400,2.5), a=g(0); f.frequency.setValueAtTime(400,t); f.frequency.exponentialRampToValueAtTime(7000,t+dur);
     a.gain.setValueAtTime(0,t); a.gain.linearRampToValueAtTime(amp,t+dur*.97); a.gain.linearRampToValueAtTime(0,t+dur); ch(n,f,a,out); a.connect(verb); n.start(t); n.stop(t+dur+.02); }
   function impact(t){ kick(t,.75); const n=nz(), a=g(0); env(a,t,.3,.002,.9); ch(n,bq('lowpass',3500),a,out); a.connect(verb); n.start(t); n.stop(t+1.3);
     const o=osc('sine',hz(12),t), b=g(0); o.frequency.exponentialRampToValueAtTime(hz(0),t+.5); env(b,t,.45,.003,1.1); ch(o,shaper(tanhCurve(3)),b,out); o.start(t); o.stop(t+1.5); }
-  function chime(t,st,airOnly){ if(!airOnly) [0,4,7].forEach((d,i)=>bell('glass',t+i*.035,.4,hz(48+degSemi(st,d)),.55));
+  function chime(t,st){ [0,4,7].forEach((d,i)=>bell('glass',t+i*.035,.4,hz(48+degSemi(st,d)),.55));
     const n=nz(), a=g(0); a.gain.setValueAtTime(0,t); a.gain.linearRampToValueAtTime(.05,t+.12); a.gain.setTargetAtTime(0,t+.15,.35); ch(n,bq('highpass',6500),a,out); a.connect(verb); n.start(t); n.stop(t+1.8); }
   function clk(t,amp,f){ const o=osc('sine',f,t), a=g(0); env(a,t,amp,.001,.03); ch(o,a,drums); o.start(t); o.stop(t+.06); }
   function swell(t,dur){ const n=nz(), a=g(0); a.gain.setValueAtTime(.0005,t); a.gain.exponentialRampToValueAtTime(.11,t+dur-.01); a.gain.linearRampToValueAtTime(0,t+dur); ch(n,bq('highpass',3500),a,out); a.connect(verb); n.start(t); n.stop(t+dur+.02); }
@@ -857,120 +854,72 @@ function makeEngine(ctx,song){
       tail=fl; if(P.drive){ const s=shaper(tanhCurve(P.drive)); fl.connect(s); tail=s; } }
     tail.connect(a); a.connect(leadBus); if(o.echo){ const e=g(.55); a.connect(e); e.connect(dly); } }
   /* ---- live: the continuation two octaves down on a distorted 808 ---- */
-  function e808(t,dur,f,prevF,LL){ const L=LL||song.l808, o=osc('sine',f,t), a=g(0), end=t+dur;
+  function e808(t,dur,f,prevF){ const L=song.l808, o=osc('sine',f,t), a=g(0), end=t+dur;
     if(prevF&&L.glide){ o.frequency.setValueAtTime(prevF,t); o.frequency.exponentialRampToValueAtTime(f,t+.07); } else { o.frequency.setValueAtTime(f*2.6,t); o.frequency.exponentialRampToValueAtTime(f,t+L.knock); }
     a.gain.setValueAtTime(0,t); a.gain.linearRampToValueAtTime(1,t+.003); a.gain.setTargetAtTime(.6,t+.02,.3); a.gain.setTargetAtTime(0,end-.01,.025);
-    ch(o,a,g(L.pre*1.35),shaper(tanhCurve(L.drive*1.25),'2x'),bq('lowpass',Math.min(12000,L.tone*1.8),.9),g(L.lvl*.9),duck); const sb=g(L.sub); a.connect(sb); sb.connect(duck); o.start(t); o.stop(end+.15); }
+    ch(o,a,g(L.pre),shaper(tanhCurve(L.drive),'2x'),bq('lowpass',L.tone,.9),g(L.lvl),out); const sb=g(L.sub); a.connect(sb); sb.connect(out); o.start(t); o.stop(end+.15); }
   function wall(t,dur,f){ const m=g(.33), end=t+dur, a=g(0); [-14,0,14].forEach(d=>{ const o=osc('sawtooth',f,t); o.detune.value=d; o.connect(m); o.start(t); o.stop(end+.1); });
-    a.gain.setValueAtTime(0,t); a.gain.linearRampToValueAtTime(.08,t+.006); a.gain.setTargetAtTime(.055,t+.02,.1); a.gain.setTargetAtTime(0,end-.01,.02); ch(m,shaper(tanhCurve(2.5)),bq('lowpass',2400,.8),a,mus); }
+    a.gain.setValueAtTime(0,t); a.gain.linearRampToValueAtTime(.08,t+.006); a.gain.setTargetAtTime(.055,t+.02,.1); a.gain.setTargetAtTime(0,end-.01,.02); ch(m,shaper(tanhCurve(2.5)),bq('lowpass',2400,.8),a,out); }
   /* ---- blank: the continuation an octave up on a bell ---- */
-  function bell(type,t,dur,f,amp=1){ amp*=type==='cowbell'?4.6:2.5;
+  function bell(type,t,dur,f,amp=1){ amp*=type==='cowbell'?3.2:2.2;
     if(type==='glass'){ const c=osc('sine',f,t), m=osc('sine',f*3.5,t), mg=g(0), a=g(0); mg.gain.setValueAtTime(f*2.2,t); mg.gain.setTargetAtTime(0,t,.25); m.connect(mg); mg.connect(c.frequency); env(a,t,.13*amp,.002,1.4); ch(c,a,bellBus); c.start(t); m.start(t); c.stop(t+2); m.stop(t+2);
       const o2=osc('sine',f*2,t), b=g(0); env(b,t,.03*amp,.002,.6); ch(o2,b,bellBus); o2.start(t); o2.stop(t+.9); }
     else if(type==='musicbox'){ [[1,.12,1],[3,.03,.35],[5.4,.016,.18],[8.9,.008,.1]].forEach(([r,p,d])=>{ const o=osc('sine',f*r,t), a=g(0); env(a,t,p*amp,.002,d); ch(o,a,bellBus); o.start(t); o.stop(t+d*1.4+.05); }); }
     else if(type==='vibes'){ const o=osc('sine',f,t), o2=osc('sine',f*4,t), a=g(0), b=g(0), tr=osc('sine',5.5,t), tg=g(.3), tm=g(1); env(a,t,.12*amp,.003,1.6); env(b,t,.03*amp,.002,.3); tr.connect(tg); tg.connect(tm.gain); ch(o,a,tm,bellBus); ch(o2,b,bellBus); [o,o2,tr].forEach(x=>{ x.start(t); x.stop(t+2.2); }); }
-    else if(type==='pluck'){ const s=ctx.createBufferSource(), kb=ctx.createBuffer(1,Math.floor(sr*1.4),sr); kb.getChannelData(0).set(ksData(f,sr)); s.buffer=kb; const a=g(.42*amp); a.gain.setTargetAtTime(0,t+Math.max(.2,dur*2),.1); ch(s,bq('lowpass',6000),a,bellBus); s.start(t); s.stop(t+1.4); }
+    else if(type==='pluck'){ const s=ctx.createBufferSource(), kb=ctx.createBuffer(1,Math.floor(sr*1.4),sr); kb.getChannelData(0).set(ksData(f,sr)); s.buffer=kb; const a=g(.3*amp); a.gain.setTargetAtTime(0,t+Math.max(.2,dur*2),.1); ch(s,bq('lowpass',6000),a,bellBus); s.start(t); s.stop(t+1.4); }
     else cowbell(t,.16*amp,f); }
-  function pad(t0,t1,s,type=song.pad){ const f=hz(s), a=g(0); a.gain.setValueAtTime(0,t0); a.gain.linearRampToValueAtTime(1,t0+.25); a.gain.setValueAtTime(1,Math.max(t0+.26,t1-.12)); a.gain.linearRampToValueAtTime(0,t1+.25); const pg=g(1.3); a.connect(pg); pg.connect(mus); const vs=g(.3); a.connect(vs); vs.connect(verb);
+  function pad(t0,t1,s){ const f=hz(s), a=g(0); a.gain.setValueAtTime(0,t0); a.gain.linearRampToValueAtTime(1,t0+.25); a.gain.setValueAtTime(1,Math.max(t0+.26,t1-.12)); a.gain.linearRampToValueAtTime(0,t1+.25); a.connect(out); const vs=g(.3); a.connect(vs); vs.connect(verb);
     const src=[]; const sub=osc('sine',f,t0), sg=g(.12); ch(sub,sg,a); src.push(sub);
-    if(type==='saw'){ const lpf=bq('lowpass',420,.9), m=g(.025); [-10,0,10].forEach(d=>{ const o=osc('sawtooth',f*2,t0); o.detune.value=d; o.connect(m); src.push(o); }); ch(m,lpf,a); }
-    else if(type==='choir'){ const lpf=bq('lowpass',1500,.7), m=g(.018); [4,6,8].forEach(r=>{ const o=osc('triangle',f*r,t0); o.connect(m); src.push(o); }); ch(m,lpf,a); }
+    if(song.pad==='saw'){ const lpf=bq('lowpass',420,.9), m=g(.025); [-10,0,10].forEach(d=>{ const o=osc('sawtooth',f*2,t0); o.detune.value=d; o.connect(m); src.push(o); }); ch(m,lpf,a); }
+    else if(song.pad==='choir'){ const lpf=bq('lowpass',1500,.7), m=g(.018); [4,6,8].forEach(r=>{ const o=osc('triangle',f*r,t0); o.connect(m); src.push(o); }); ch(m,lpf,a); }
     else { const o=osc('triangle',f*2,t0), m=g(.03); ch(o,m,a); src.push(o); }
     src.forEach(o=>{ o.start(t0); o.stop(t1+.4); }); }
 
-  /* ---- theme voices: patches generated per formula ---- */
-  const pwSpec=new Map(), chebC=new Map();
-  const specWave=L=>{ let w=pwSpec.get(L); if(!w){ w=ctx.createPeriodicWave(new Float32Array(L.h.length),Float32Array.from(L.h)); pwSpec.set(L,w); } return w; };
-  const chebCurve=L=>{ let c=chebC.get(L); if(!c){ const N=2048; c=new Float32Array(N); let mx=0; for(let i=0;i<N;i++){ const x=i/(N-1)*2-1; let t0=1,t1=x,y=L.cheb[0]*x; for(let k=2;k<=L.cheb.length;k++){ const t2=2*x*t1-t0; y+=L.cheb[k-1]*t2; t0=t1; t1=t2; } c[i]=y; mx=Math.max(mx,Math.abs(y)); } for(let i=0;i<N;i++) c[i]/=mx||1; chebC.set(L,c); } return c; };
-  function voiceOsc(wave,f,t,L,srcs,vibG){ const o=ctx.createOscillator();
-    if(wave==='spec') o.setPeriodicWave(specWave(L)); else if(wave==='p25'||wave==='p12') o.setPeriodicWave(pw(wave==='p25'?.25:.125)); else o.type=wave;
-    if(L.swoop>1){ o.frequency.setValueAtTime(f*L.swoop,t); o.frequency.setTargetAtTime(f,t,.012); } else o.frequency.setValueAtTime(f,t);
-    if(vibG) vibG.connect(o.detune); srcs.push(o); return o; }
-  function leadGen(L,t,dur,f,o={}){
-    const end=t+dur, a=g(0), pk=L.lv*(o.vel||1), open=o.open||1, srcs=[], stopAt=end+L.rel*3+.05;
-    a.gain.setValueAtTime(0,t); a.gain.linearRampToValueAtTime(pk,t+L.att); a.gain.setTargetAtTime(pk*L.sus,t+L.att,L.dec/3); a.gain.setTargetAtTime(0,Math.max(t+L.att+.01,end-.01),L.rel/3);
-    let vibG=null; if(L.vib.depth>0){ const lf=osc('sine',L.vib.rate,t); vibG=g(0); vibG.gain.setValueAtTime(0,t+L.vib.delay); vibG.gain.linearRampToValueAtTime(L.vib.depth,t+L.vib.delay+.2); lf.connect(vibG); srcs.push(lf); }
-    let tail;
-    if(L.arch==='spec'||L.arch==='dual'){ const fl=bq(L.ft||'lowpass',1000,L.q), cut=clamp(f*L.kt*open,350,12000); fl.frequency.setValueAtTime(Math.min(16000,cut*L.env),t); fl.frequency.setTargetAtTime(cut,t+.004,.07);
-      if(L.arch==='spec') for(let u=0;u<L.uni;u++){ const o2=voiceOsc('spec',f,t,L,srcs,vibG); if(u) o2.detune.value=L.det; o2.connect(fl); }
-      else { voiceOsc(L.w1,f,t,L,srcs,vibG).connect(fl); const o2=voiceOsc(L.w2,f*Math.pow(2,L.iv/12),t,L,srcs,vibG), l2=g(L.l2); if(L.iv===0) o2.detune.value=L.det; o2.connect(l2); l2.connect(fl); }
-      tail=fl; if(L.drive){ const s=shaper(tanhCurve(L.drive)); fl.connect(s); tail=s; } }
-    else if(L.arch==='fm'){ const c=voiceOsc(L.cw,f,t,L,srcs,vibG), m=osc('sine',f*L.ratio,t), mg=g(0); srcs.push(m);
-      mg.gain.setValueAtTime(f*L.index,t); mg.gain.setTargetAtTime(f*L.index*L.isus,t,L.idec); m.connect(mg); mg.connect(c.frequency);
-      if(L.m2){ const m2=osc('sine',f*L.m2.ratio,t), g2=g(f*L.m2.index); m2.connect(g2); g2.connect(m.frequency); srcs.push(m2); }
-      tail=ch(c,bq('lowpass',9000)); }
-    else { const s=voiceOsc(L.wave,f,t,L,srcs,vibG), dr=g(0); dr.gain.setValueAtTime(L.d0,t); dr.gain.setTargetAtTime(L.d1,t,.12); tail=ch(s,dr,shaper(chebCurve(L)),bq('lowpass',8000)); }
-    tail.connect(a); a.connect(leadBus); if(o.echo){ const e=g(.55); a.connect(e); e.connect(dly); }
-    srcs.forEach(x=>{ x.start(t); x.stop(stopAt); }); }
-  function bellGen(B,t,dur,f,amp=1){ const lv=B.lv*amp;
-    if(B.kind==='partials') B.p.forEach(q=>{ if(f*q.r>sr*.45) return; const o=osc('sine',f*q.r,t), a=g(0); const e=env(a,t,lv*q.a,.03,q.d); ch(o,a,bellBus); o.start(t); o.stop(e+.05); });
-    else if(B.kind==='fm'){ const c=osc('sine',f,t), m=osc('sine',f*B.ratio,t), mg=g(0), a=g(0); mg.gain.setValueAtTime(f*B.index,t); mg.gain.setTargetAtTime(0,t,B.idec); m.connect(mg); mg.connect(c.frequency); const e=env(a,t,lv,.03,B.dec); ch(c,a,bellBus); c.start(t); m.start(t); c.stop(e+.05); m.stop(e+.05); }
-    else { const s=ctx.createBufferSource(), kb=ctx.createBuffer(1,Math.floor(sr*1.4),sr); kb.getChannelData(0).set(ksData(f,sr,B.damp)); s.buffer=kb; const a=g(lv); a.gain.setTargetAtTime(0,t+Math.max(.25,dur*2),.12); ch(s,bq('lowpass',B.bright),a,bellBus); s.start(t); s.stop(t+1.4); } }
-  function perc(t,p,amp){ if(p.snd==='tick'){ const o=osc('sine',p.f,t), a=g(0); env(a,t,amp,.001,.03); ch(o,a); panned(a,.3).connect(drums); o.start(t); o.stop(t+.06); }
-    else { const n=nz(), a=g(0); env(a,t,amp*(p.snd==='rim'?1.2:.8),.001,p.snd==='rim'?.035:.06); ch(n,bq(p.snd==='rim'?'bandpass':'highpass',p.snd==='rim'?p.f*1.3:6000,p.snd==='rim'?4:.7),a); panned(a,p.snd==='rim'?-.3:.35).connect(drums); n.start(t); n.stop(t+.1); } }
-  /* question accompaniment of the theme: pad / stabs / an arpeggio that reads the formula / a bass ostinato */
-  function accomp(sh,t0,t1,deg){ if(t1-t0<.05) return; const A2=sh.th.acc, st=sh.rs.mode.st; if(A2.type==='none') return;
-    const pitch=(x,base=12)=>{ let p=base+degSemi(st,deg+x); while(p>base+18) p-=12; return p; };
-    if(A2.type==='pad'){ const m=g(0), lpf=bq('lowpass',A2.cut0,.8); m.gain.setValueAtTime(0,t0); m.gain.linearRampToValueAtTime(1,t0+Math.min(.5,(t1-t0)*.4)); m.gain.setValueAtTime(1,Math.max(t0+.05,t1-.08)); m.gain.linearRampToValueAtTime(0,t1+.06);
-      lpf.frequency.setValueAtTime(A2.cut0,t0); lpf.frequency.linearRampToValueAtTime(A2.cut0*A2.open,t1); ch(m,lpf,mus); const vs=g(.35); lpf.connect(vs); vs.connect(verb);
-      const lvl={sawtooth:.011,square:.009,triangle:.028}[A2.wave];
-      A2.voice.forEach((x,i)=>[-6,6].forEach(d=>{ const o=osc(A2.wave,hz(pitch(x)),t0), a=g(lvl); o.detune.value=d+i; ch(o,a,m); o.start(t0); o.stop(t1+.12); })); }
-    else if(A2.type==='stab'){ for(let b=t0;b<t1-.01;b+=4*BT) A2.steps.forEach((h,k)=>{ const t=b+k*S; if(!h||t>=t1) return; const m=g(0); env(m,t,.04,.002,A2.dec); A2.voice.forEach(x=>{ const o=osc(A2.wave==='triangle'?'sawtooth':A2.wave,hz(pitch(x)+12),t); o.connect(m); o.start(t); o.stop(t+A2.dec*1.4+.05); }); ch(m,bq('lowpass',1500,1),mus); m.connect(dverb); }); }
-    else if(A2.type==='arp'){ let j=0; const ys=sh.puz.v; for(let k=0;k*S<t1-t0;k+=A2.rate){ if(A2.rate===1&&k%4<2) continue; const t=t0+k*S, vi=A2.pat==='formula'?mod(ys[j%ys.length],A2.voice.length):A2.pat==='up'?j%A2.voice.length:[0,1,2,1][j%4]%A2.voice.length; j++;
-        const o=osc('triangle',hz(pitch(A2.voice[vi])+24),t), a=g(0); env(a,t,.028,.002,.09); ch(o,bq('lowpass',3000),a); panned(a,j%2?.35:-.35).connect(mus); a.connect(dly); o.start(t); o.stop(t+.15); } }
-    else { for(let b=t0;b<t1-.01;b+=4*BT){ let j=0; A2.steps.forEach((h,k)=>{ const t=b+k*S; if(!h||t>=t1) return; const s=pitch(j++%3===2?4:0,0)+12, o=osc('triangle',hz(s),t), a=g(0); env(a,t,.16,.004,Math.min(.35,A2.dec*2)); ch(o,shaper(tanhCurve(A2.drive)),bq('lowpass',900),a,mus); o.start(t); o.stop(t+.5); }); } } }
   /* ---- arrangement of one 4-bar cell ---- */
   function hatsLive(t0,beats,lv){ const n16=beats*4;
-    for(let k=0;k<n16;k++){ const t=t0+k*S+(k%2?song.swing*S:0), inBeat=k%4, lastBeat=(Math.floor(k/4)%4)===3;
-      if(lastBeat&&inBeat>=2&&song.hatStyle!=='16'){ const r=inBeat===2?2:3; for(let q=0;q<r;q++) hat(t0+k*S+q*S/r,.1+.05*q,false); }
-      else hat(t,inBeat===0?.24:inBeat===2?.18:.12,false); }
-    if(K.open) for(let b=1;b<beats;b+=2) hat(t0+(b+.5)*BT,.11,true); }
-  /* the drone: tonic low, fifth above it through a slow dark filter. It runs under the whole shell, so question and
-     answer stand on one floor (the club drone of Buckshot Roulette); under a live answer it steps back for the 808,
-     under a blank one it opens up and carries the bells */
-  function drone(t0,t1,root,tr,live){ const a=g(0), lp=bq('lowpass',380,.9), lfo=osc('sine',BT>0?1/(BT*4):.5,t0), lg=g(120);
-    a.gain.setValueAtTime(0,t0); a.gain.linearRampToValueAtTime(1,t0+.4); a.gain.setValueAtTime(1,tr-.05); a.gain.linearRampToValueAtTime(live?.35:1.25,tr+.15); a.gain.setValueAtTime(live?.35:1.25,t1-.3); a.gain.linearRampToValueAtTime(0,t1+.2);
-    lp.frequency.setValueAtTime(380,t0); lp.frequency.setValueAtTime(380,tr); lp.frequency.linearRampToValueAtTime(live?300:900,tr+1); lfo.connect(lg); lg.connect(lp.frequency);
-    const s1=osc('sine',hz(root+12),t0), g1=g(.045), s2=osc('sawtooth',hz(root+19),t0), g2=g(.014), s3=osc('sawtooth',hz(root+19),t0), g3=g(.014); s3.detune.value=9;
-    ch(s1,g1,a); ch(s2,g2,lp); ch(s3,g3,lp); lp.connect(a); a.connect(mus); const vs=g(.18); a.connect(vs); vs.connect(verb);
-    [s1,s2,s3,lfo].forEach(o=>{ o.start(t0); o.stop(t1+.3); }); }
+    for(let k=0;k<n16;k++){ const t=t0+k*S+(k%2?song.swing*S:0), inBeat=k%4;
+      if(song.hatStyle==='16') hat(t,inBeat===0?.2:inBeat===2?.15:.09,false);
+      else if(song.hatStyle==='8sw'){ if(k%2===0) hat(t0+k*S+(k%4===2?.2*S:0),inBeat===0?.2:.13,false); }
+      else { const lastBeat=(Math.floor(k/4)%4)===3; if(lastBeat&&lv>=1){ const r=inBeat<2?2:3; for(let q=0;q<r;q++) hat(t0+k*S+q*S/r,.08+.04*q,false); } else if(k%2===0) hat(t,inBeat===0?.2:.13,false); } }
+    if(K.open&&lv>=2) for(let b=0;b<beats;b+=2) hat(t0+(b+.5)*BT,.1,true); }
   function cell(sh){
-    const layer=Math.min(4,(sh.rs.round||1)+(sh.level>=2?1:0)); duckDepth=.55; ldly.gain.value=layer>=3?sh.th.dsend||0:0;
-    const pre=sh.notes.filter(n=>!n.post), post=sh.notes.filter(n=>n.post), tr=sh.tr, lv=sh.level, st=sh.rs.mode.st, th=sh.th, D=th.drums;
-    const qBars=sh.pre/4, pb=sh.post/4, stopAt=sh.qEnd==='stop'?tr-BT/2:1e9, lastBar=Math.max(0,sh.pre-4);
-    drone(0,sh.len,degSemi(st,sh.rs.prog[0]),tr,sh.out);
-    /* question = the verse: the lead over a light groove; nothing else competes with the tune */
-    for(let k=0;k<sh.pre*4;k++){ const st16=k%16, t=k*S+(k%2?song.swing*S:0); if(t>=stopAt) continue;
-      if(D.kick[st16]) kick(k*S,st16===0?.62:.48);
-      if(k>=sh.pre*4-8) hat(t,.05+.12*(k-(sh.pre*4-8))/8,false); else if(D.hat[st16]) hat(t,D.hatAmp*(st16%4===0?1.15:.9),false);
-      if(layer>=3&&D.perc&&D.perc.steps[st16]) perc(t,D.perc,.06); }
-    if(sh.crit||sh.qEnd==='riser') riser(lastBar*BT,4*BT,.04+.025*lv+(sh.crit?.04:0));
+    const pre=sh.notes.filter(n=>!n.post), post=sh.notes.filter(n=>n.post), tr=sh.tr, lv=sh.level, st=sh.rs.mode.st;
+    const bars=(sh.pre+sh.post)/4, barRoot=b=>degSemi(st,sh.rs.prog[bars===2?b*2:b]);
+    /* question: same groove family, but each shell asks differently — drum feel, an unresolved chord, and how the last beat hangs */
+    const qBars=sh.pre/4, stopAt=sh.qEnd==='stop'?tr-BT/2:1e9, qk=(t,a)=>{ if(t<stopAt) kick(t,a); };
+    const qRoot=t=>(qBars>=2?t>=4*BT:t>=2*BT)?sh.qTension:sh.rs.prog[0];
+    for(let b=0;b<sh.pre;b++){ const t=b*BT, ib=b%4;
+      if(sh.qDrum==='heart'){ if(ib===0||ib===2){ qk(t,.6); qk(t+S,.34); } }
+      else if(sh.qDrum==='clock'){ if(ib===0) qk(t,.6); else if(ib===2) qk(t,.4); for(let h=0;h<2;h++) if(t+h*BT/2<stopAt) clk(t+h*BT/2,h?.045:.06,h?1350:1800); }
+      else if(sh.qDrum==='half'){ if(ib===0) qk(t,.6); if(ib===2){ qk(t+2*S,.45); if(t<stopAt) back(t,.18); } }
+      else qk(t,ib===0?.6:.52); }
+    const lastBar=Math.max(0,sh.pre-4);
+    for(let k=0;k<sh.pre*4;k++){ const t=k*S+(k%2?song.swing*S:0); if(t>=stopAt) continue;
+      if(k>=lastBar*4) hat(t,.05+.13*(k-lastBar*4)/16,false); else if(lv>=1&&k%4===2) hat(t,.12,false); }
+    if(lv>=1||sh.crit||sh.qEnd==='riser') riser(lastBar*BT,4*BT,.04+.025*lv+(sh.crit?.04:0));
     if(lv>=2||sh.qEnd==='roll') for(let k=0;k<4;k++) back(tr-BT+k*S,(lv>=2?.1:.06)+.07*k);
     if(sh.qEnd==='swell') swell(tr-2*BT,2*BT);
-    /* one supporting part at most, and only from round 2: a bass locked to the kick, or a quiet arpeggio of the formula */
-    if(layer>=2&&(th.acc.type==='bass'||th.acc.type==='arp')){ const half=qBars>=2?4*BT:2*BT; accomp(sh,0,half,sh.rs.prog[0]); accomp(sh,half,tr,sh.qTension); }
-    pre.forEach((n,i)=>leadGen(th.lead,n.tr,n.dur,hz(n.s),{open:1+.4*n.tr/tr,echo:i===pre.length-1,vel:n.vel}));
-    /* live = the hook: impact, the full kit, the same phrase two octaves down on the 808 (gliding only into downbeats) */
+    if(lv>=1) for(let b=0;b<qBars;b++) subHit(b*4*BT,degSemi(st,qRoot(b*4*BT)));
+    if(sh.qPad!=='none'){ const half=qBars>=2?4*BT:2*BT; qChord(0,half,sh.rs.prog[0],sh); qChord(half,tr,sh.qTension,sh); }
+    pre.forEach((n,i)=>lead(sh.lead,n.tr,n.dur,hz(n.s),{open:.8+.5*n.tr/tr,echo:i===pre.length-1}));
+    /* answer */
+    const pb=sh.post/4;
     if(sh.out){ impact(tr);
       for(let b=0;b<pb;b++){ const t0=tr+b*4*BT; KP[song.kickPat].forEach(k=>{ if(b===0&&k===0) return; kick(t0+k*S,.6); }); back(t0+BT,.55); back(t0+3*BT,.55);
-        if(song.perc==='cowbell'&&lv>=1) [3,6,10,13].forEach(k=>cowbell(t0+k*S,.06,hz(48))); }
+        if(song.perc==='cowbell'&&lv>=1) [3,6,10,13].forEach(k=>cowbell(t0+k*S,.07,hz(48))); }
       hatsLive(tr,sh.post,lv);
-      const L8={...song.l808,...th.l808};
-      let prev=null; post.forEach(n=>{ const f=hz(n.s); e808(n.tr,n.dur,f,prev&&n.k%4===0?prev:null,L8); prev=f; if(lv>=3||sh.final) wall(n.tr,n.dur,f*4); });
-    /* blank = the drop: the drums fall away, the drone opens, the phrase rings an octave up on the bell */
-    } else { [0,4,7].forEach((d,i)=>bellGen(th.bell,tr+i*.035,.4,hz(48+degSemi(st,d)),.45));
-      if(lv>=3) for(let b=0;b<pb;b++) hat(tr+b*4*BT+2*BT,.04,true);
-      /* a repeated note keeps ringing instead of being struck again */
-      post.forEach((n,i)=>{ if(i&&post[i-1].s===n.s) return; const ghost=n.k%2===1; bellGen(th.bell,n.tr,n.dur,hz(n.s),ghost?n.vel*.45:n.vel); });
-      if(sh.final) post.forEach(n=>bellGen(th.bell,n.tr+.002,n.dur,hz(n.s+12),.45));
+      let prev=null; post.forEach(n=>{ const f=hz(n.s); e808(tr+n.tr-tr,n.dur,f,prev); prev=f; if(lv>=2||sh.final) wall(n.tr,n.dur,f*4); });
+    } else { chime(tr,st);
+      for(let b=0;b<pb;b++){ const t0=tr+b*4*BT; pad(t0,t0+4*BT,barRoot(sh.pre/4+b)); if(lv>=2) for(let q=0;q<8;q++) if(q%2) hat(t0+q*BT/2,.05,false); if(lv>=3) back(t0+2*BT,.12); }
+      post.forEach(n=>bell(sh.bell,n.tr,n.dur,hz(n.s)));
+      if(sh.final) post.forEach(n=>bell('musicbox',n.tr+.002,n.dur,hz(n.s+12),.5));
     }
   }
   function countIn(beats){ for(let b=0;b<beats;b++){ kick(b*BT,.55+.12*b); hat(b*BT+BT/2,.1,false); } riser(0,beats*BT,.09); }
   function intro(){ riser(0,8*BT,.12); for(let b=0;b<4;b++) kick(b*BT,.6); for(let k=0;k<4;k++) kick(4*BT+k*BT/2,.55); for(let k=0;k<8;k++) kick(6*BT+k*BT/4,.35+k*.03); impact(8*BT); }
   function ding(){ [4,7].forEach((d,i)=>bell('glass',i*.06,.3,hz(48+degSemi(MODES[0].st,d)),.7)); }
   function bang(){ const n=nz(), a=g(0); env(a,0,.5,.002,.45); ch(n,bq('lowpass',1400),a,out); n.start(0); n.stop(.7); const o=osc('sine',90,0), b=g(0); o.frequency.exponentialRampToValueAtTime(40,.25); env(b,0,.5,.002,.35); ch(o,b,out); o.start(0); o.stop(.6); }
-  /* ducking is written once all kicks of a render are known */
-  return {cell:sh=>{ cell(sh); applyDuck(); },countIn:b=>{ countIn(b); applyDuck(); },intro:()=>{ intro(); applyDuck(); },ding,bang};
+  return {cell,countIn,intro,ding,bang};
 }
 /* render speed is measured on every job; a slow phone drops to a lower internal rate and renders further ahead */
 const PERF={ratio:0,low:false};
@@ -996,7 +945,7 @@ function levelShell(buf,sh){
   for(const d of chs) for(let i=0;i<d.length;i++){ const u=clamp((i-(it-2*xf))/(2*xf),0,1); let x=d[i]*(gq+(ga-gq)*u); const ax=x<0?-x:x; if(ax>.92) x=(x<0?-1:1)*(.92+.08*Math.tanh((ax-.92)/.08)); d[i]=x; }
   sh.gain=[gq,ga]; return buf;
 }
-const renderShell=(sh,sr)=>queueRender(sr,sh.len+TAIL,sh.song,E=>E.cell(sh)).then(b=>levelShell(b,sh));
+const renderShell=(sh,sr)=>queueRender(sr,sh.len+TAIL,sh.song,E=>E.cell(sh));
 
 /* ===================================================================================
    LIVE AUDIO: one context, a master bus, and buffers. Visual time follows what is heard.
