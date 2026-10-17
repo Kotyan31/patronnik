@@ -1,6 +1,14 @@
 {
- "updated": "2026-10-17T10:52:08+00:00",
+ "updated": "2026-10-17T10:55:06+00:00",
  "scores": [
+  {
+   "id": "pro100kotyanlox",
+   "nick": "Pro100KotyanLox",
+   "best": 75125,
+   "rounds": 26,
+   "acc": 98,
+   "at": "2026-10-17T10:55:06+00:00"
+  },
   {
    "id": "eldiavlos",
    "nick": "ElDiavlos",
@@ -8,14 +16,6 @@
    "rounds": 8,
    "acc": 95,
    "at": "2026-10-17T10:32:13+00:00"
-  },
-  {
-   "id": "pro100kotyanlox",
-   "nick": "Pro100KotyanLox",
-   "best": 7700,
-   "rounds": 4,
-   "acc": 90,
-   "at": "2026-10-17T10:29:30+00:00"
   },
   {
    "id": "ник фурри",
@@ -32,6 +32,14 @@
    "rounds": 3,
    "acc": 79,
    "at": "2026-10-17T10:12:47+00:00"
+  },
+  {
+   "id": "sekret0s",
+   "nick": "Sekret0s",
+   "best": 400,
+   "rounds": 2,
+   "acc": 50,
+   "at": "2026-10-17T10:55:06+00:00"
   },
   {
    "id": "kumaq99",
@@ -67,6 +75,11 @@
    "nick": "ElDiavlos",
    "key": "BLDhPk+Qehpc3HBO7N/tttGtDAQ0Xy70RdSxU6ZefxzPRXiGPBlSb/KCh0UtRpPQVm6ZSlht5DCWuOaS+qWtO04=",
    "since": "2026-10-17T10:32:13+00:00"
+  },
+  "sekret0s": {
+   "nick": "Sekret0s",
+   "key": "BA0eaPq25uSuoPOAqK1i7Hye2oMBl+9IYJ6np7zXm+uE/hLBHTTik+zkIuWk5ffN4QaX4KkWVz8jTwzBCd6j2TY=",
+   "since": "2026-10-17T10:55:06+00:00"
   }
  },
  "acks": {
@@ -83,6 +96,8 @@
   "47011a0ab2cc87c8175fba56": "ok",
   "6012a2326e403d49b74f04dc": "ok",
   "ca31472e2be10cbd4a68b822": "low",
-  "d7f5da53d5dab217835398ba": "low"
+  "d7f5da53d5dab217835398ba": "low",
+  "0cac27b06a5b9e1f91fdac96": "ok",
+  "ffb107a1d7e74ea18e214d18": "ok"
  }
 }
