@@ -6,6 +6,10 @@ name: scores
 on:
   issue_comment:
     types: [created]
+  # a new page version: learn its code fingerprint at once, so its first results are not turned away as "old"
+  push:
+    branches: [main]
+    paths: [index.html]
   workflow_dispatch:
 
 permissions:
