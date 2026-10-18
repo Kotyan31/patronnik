@@ -335,7 +335,7 @@ body.sheet-clues .side .board,body.sheet-top .side .clues{display:none}
 
   <section class="magbox" aria-label="Магазин">
     <div class="mag" id="mag"></div>
-    <div class="maginfo"><div class="chance"><b id="chance">50 %</b> шанс, что боевой</div>
+    <div class="maginfo"><div class="chance"><b id="chance">50 %</b> <span id="chanceT">шанс, что боевой</span></div>
     <div class="badge" id="badge">#1/8 боевой или холостой?</div></div>
     <div class="prog"><i id="progFill"></i><b id="progKnob"></b></div>
   </section>
@@ -1197,9 +1197,12 @@ function enterShell(i){
   G.cur=i; const sh=G.shells[i], seen=G.mag.slice(0,i), liveLeft=G.k-sum(seen), left=G.n-i;
   prepShell(i+1); if(PERF.low) prepShell(i+2);
   sh.pNaive=liveLeft/left; sh.pExact=G.cands.length?G.cands.filter(s=>s[i]===1).length/G.cands.length:sh.pNaive;
-  setChance(sh.pNaive); $('badge').className='badge'; $('badge').textContent=`#${i+1}/${G.n} боевой или холостой?`;
+  /* the chance shown is the exact one from the dealer's clues and the shells already fired: everything a solver could
+     work out from the screen, every player sees right here */
+  setChance(sh.pExact,true); $('badge').className='badge'; $('badge').textContent=`#${i+1}/${G.n} боевой или холостой?`;
   setFormula(sh,false); renderMag();
-  if(i===G.n-1&&sh.pNaive===1) setSub('последний — боевой',true);
+  if(sh.pExact===1) setSub('по уликам — точно боевой',true);
+  else if(sh.pExact===0) setSub('по уликам — точно холостой',true);
   else if(i===G.n-1) setSub('последний патрон',true);
   else if(sh.pNaive===1) setSub('остались только боевые',true);
   else if(sh.pNaive===0) setSub('остались только холостые',true);
@@ -1283,7 +1286,7 @@ function renderMag(){
 }
 function renderClues(){ $('clueList').innerHTML=G.clues.length?G.clues.map(c=>`<li>${c.t}</li>`).join(''):'<li>В этом раунде без улик: только счёт.</li>'; renderCandCount(); }
 function renderCandCount(){ $('cands').textContent=`раскладов: ${G.cands.length} из ${G.total0}`; $('meter').style.width=Math.max(4,100*G.cands.length/G.total0)+'%'; }
-function setChance(p){ $('chance').textContent=Math.round(p*100)+' %'; }
+function setChance(p,clues){ $('chance').textContent=p===1?'точно':p===0?'точно не':Math.round(p*100)+' %'; const t=$('chanceT'); if(t) t.textContent=p===1?'боевой (по уликам)':p===0?'боевой (по уликам)':clues?'шанс по уликам, что боевой':'шанс, что боевой'; }
 function setSub(t,hot){ const s=$('sub'); s.textContent=t; s.classList.toggle('hot',!!hot); }
 const idxOf=(sh,j)=>sh.puz.idx?sh.puz.idx(j):j;
 function setFormula(sh,rev){
