@@ -1,5 +1,5 @@
 {
- "updated": "2026-10-18T17:38:20+00:00",
+ "updated": "2026-10-18T17:39:08+00:00",
  "scores": [
   {
    "id": "kotyan31",
@@ -244,7 +244,8 @@
   "4fea4b84c9e1bb72209fc6e9": "bad",
   "3eff1d287f4e34e9a8784a11": "bad",
   "cd82e57b83d6c2b5a9c6d27d": "low",
-  "ce2cb9bdf0bc42f6affe5582": "ok"
+  "ce2cb9bdf0bc42f6affe5582": "ok",
+  "6fd334261a80d89229075ddf": "low"
  },
  "code": [
   "575361e7ce8a4b4073d58a9deb105fc7",
@@ -704,7 +705,8 @@
   },
   "9f09b6551b776831295b5ee2": {
    "gk": "BJZkbyjoNgrlUMs86t/LxZd9GHFid+8Ah0QcED+/wNOI9DqEFdKnqK/HuK+jXMiaj/5CitJ1q/o+OmoJKsdGbyM=",
-   "at": 1792345101.0
+   "at": 1792345101.0,
+   "used": true
   }
  }
 }
