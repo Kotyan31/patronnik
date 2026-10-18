@@ -1,5 +1,5 @@
 {
- "updated": "2026-10-18T17:39:35+00:00",
+ "updated": "2026-10-18T17:40:19+00:00",
  "scores": [
   {
    "id": "kotyan31",
@@ -68,10 +68,10 @@
   {
    "id": "скибоб",
    "nick": "скибоб",
-   "best": 250,
+   "best": 300,
    "rounds": 1,
-   "acc": 40,
-   "at": "2026-10-18T17:38:20+00:00"
+   "acc": 50,
+   "at": "2026-10-18T17:40:19+00:00"
   },
   {
    "id": "11",
@@ -246,7 +246,8 @@
   "cd82e57b83d6c2b5a9c6d27d": "low",
   "ce2cb9bdf0bc42f6affe5582": "ok",
   "6fd334261a80d89229075ddf": "low",
-  "6c10ede353bd88713cd281b1": "low"
+  "6c10ede353bd88713cd281b1": "low",
+  "637176d8a36d125122348a4e": "ok"
  },
  "code": [
   "575361e7ce8a4b4073d58a9deb105fc7",
@@ -712,7 +713,12 @@
   },
   "ca7e0cf0ce242f2aecdf15e8": {
    "gk": "BBL3ZyQzTse6Y+lfUUKQl6sOKxDBPxWcI+AAdY0CxXB2ykjrCGc3iCdZmJDy7WOYUARMwV9Rt/5rl2kUwP8ceOU=",
-   "at": 1792345165.0
+   "at": 1792345165.0,
+   "used": true
+  },
+  "73b143a38ba182c2ba791901": {
+   "gk": "BGhH255lwU7xGtPeasLdN/7fhq2efLs+Zqzr74cOFXXxztYfFNsGFGoi2sWEBrqvvRCDTs26i/8+3mdNkYdlTfM=",
+   "at": 1792345211.0
   }
  }
 }
