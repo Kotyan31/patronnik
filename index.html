@@ -315,7 +315,7 @@ body.sheet-clues .side .board,body.sheet-top .side .clues{display:none}
 /* page-wide effects: the tension flicker and the streak aura around the screen edge, the sparks of every shot */
 .edge,.aura,.fxc{position:fixed;inset:0;pointer-events:none;z-index:45}
 .fxc{width:100%;height:100%;z-index:48}
-.edge{opacity:0;box-shadow:inset 0 0 14vmin 2vmin #ff5a1f}
+.edge{opacity:0;box-shadow:inset 0 0 14vmin 2vmin var(--ec,#ff5a1f)}
 .aura{opacity:0;box-shadow:inset 0 0 90px 10px var(--amber);transition:opacity .4s}
 .app.shake{animation:shake .35s linear}
 .app.glitch{animation:glitch .28s steps(3)}
@@ -1319,7 +1319,7 @@ function pickedUI(c){ $('btnLive').classList.toggle('picked',c===1); $('btnBlank
 function judge(text,small,color,quick){ const j=$('judge'); j.style.color=color; j.innerHTML=text+(small?`<small>${small}</small>`:''); j.classList.remove('show'); void j.offsetWidth; j.classList.add('show'); j.style.animationDuration=quick?'.6s':''; }
 function flash(kind,hard){ const f=$('flash'); f.className='flash'; void f.offsetWidth; f.className='flash '+kind; const s=document.querySelector('.app'); s.classList.remove('shake','glitch'); void s.offsetWidth; s.classList.add(hard?'shake':'glitch'); }
 /* ---- page-wide effects ---- */
-const FXS={kick:0,edge:0,cam:1,org:'50% 50%',parts:[],last:0,w:0,h:0,dpr:1};
+const FXS={kick:0,edge:0,ec:'#ff5a1f',cam:1,org:'50% 50%',parts:[],last:0,w:0,h:0,dpr:1};
 const fxc=$('fx'), FXX=fxc.getContext('2d'), CALM=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
 function fxResize(){ FXS.dpr=Math.min(2,window.devicePixelRatio||1); FXS.w=innerWidth; FXS.h=innerHeight; fxc.width=Math.round(FXS.w*FXS.dpr); fxc.height=Math.round(FXS.h*FXS.dpr); }
 /* sparks from the trigger point across the whole page: a fountain falling down for live, rising for blank, a red spray for a miss */
@@ -1329,7 +1329,7 @@ function burst(sh,ok){ if(CALM) return; const r=cv.getBoundingClientRect(), x=r.
 function fxFrame(){ const t=performance.now()/1000, dt=Math.min(.05,t-(FXS.last||t)); FXS.last=t;
   if(FXS.w!==innerWidth||FXS.h!==innerHeight) fxResize();
   const play=G.phase==='play', app=document.querySelector('.app'), z=play&&!CALM?FXS.cam:1;
-  $('edge').style.opacity=(play?.6*FXS.edge:0).toFixed(3); FXS.kick*=.9; FXS.edge=0; FXS.cam=1;
+  const ed=$('edge'); ed.style.opacity=(play?Math.min(.72,.6*FXS.edge):0).toFixed(3); ed.style.setProperty('--ec',FXS.ec); FXS.kick*=.9; FXS.edge=0; FXS.cam=1;
   /* the camera zooms the whole page about the trigger point (the graph centre); the point is taken while the page is at rest */
   if(Math.abs(z-1)<.0005){ if(app.style.scale){ app.style.scale=''; } const c=cv.getBoundingClientRect(), a=app.getBoundingClientRect(); FXS.org=`${(c.left+c.width/2-a.left).toFixed(1)}px ${(c.top+c.height/2-a.top).toFixed(1)}px`; }
   else { app.style.transformOrigin=FXS.org; app.style.scale=z.toFixed(4); }
@@ -1391,8 +1391,12 @@ function drawShell(sh,now,countdown){
   const nb=Math.max(1,Math.min(4,Math.round(sh.tr/sh.bt/2))), w0=sh.tr-nb*sh.bt;
   if(tau>=w0&&tau<sh.tr){ const e=(tau-w0)/sh.bt, j=Math.floor(e), ph=(e-j)*sh.bt, left=sh.tr-tau;
     FXS.edge=(nb>1?.2+.8*j/(nb-1):1)*Math.min(1,Math.exp(-ph/.09)+(ph>.12?.5*Math.exp(-(ph-.12)/.1):0));
-    FXS.cam=1+.014*Math.exp(-ph/.1)+(left<.16?.02*(1-left/.16):0); }
-  else if(tau>=sh.tr&&tau<sh.len){ const d=tau-sh.tr; FXS.cam=sh.out?1+.085*Math.exp(-d/.12):1-.028*Math.exp(-d/.4); }
+    FXS.cam=1+.014*Math.exp(-ph/.1)+(left<.16?.02*(1-left/.16):0); FXS.ec='#ff5a1f'; }
+  else if(tau>=sh.tr&&tau<sh.len){ const d=tau-sh.tr, ph=mod(d,sh.bt), on=d>sh.bt*.75;
+    /* the answer, in time with the music: a live shell keeps hitting on every beat (camera punch + edge flash), a blank one floats:
+       the camera stays pulled back and the edge breathes slowly over a bar */
+    if(sh.out){ FXS.cam=1+.085*Math.exp(-d/.12)+(on?.016*Math.exp(-ph/.1):0); FXS.edge=on?1.15*Math.exp(-ph/.12):0; FXS.ec=COL.live; }
+    else { FXS.cam=1-.028*Math.exp(-d/.4)-.006; FXS.edge=Math.min(1,d/.4)*(.38+.14*Math.sin(2*Math.PI*d/(4*sh.bt))); FXS.ec=COL.blank; } }
   const fade=(x0,y0,x1,y1,c)=>{ const g=X.createLinearGradient(x0,y0,x1,y1); g.addColorStop(0,'rgba(0,0,0,0)'); g.addColorStop(.2,c); g.addColorStop(.8,c); g.addColorStop(1,'rgba(0,0,0,0)'); return g; };
   const gV1=fade(0,T,0,B,COL.grid), gV2=fade(0,T,0,B,COL.grid2), gH=fade(L,0,Rr,0,COL.grid2);
   for(let i=1;i<16;i++){ const x=Math.round(L+(Rr-L)*i/16)+.5; X.strokeStyle=i%4===0?gV2:gV1; X.globalAlpha=(i%4===0?1:.85+.15*kickP)*Math.min(1,Math.min(i,16-i)/3); X.beginPath(); X.moveTo(x,T); X.lineTo(x,B); X.stroke(); }
