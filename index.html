@@ -40,7 +40,7 @@
 html,body{background:var(--bg);color:var(--fg)}
 body{
   font-family:var(--f-body);font-size:15px;line-height:1.45;
-  background:radial-gradient(ellipse 75% 60% at 50% 35%,transparent 0%,var(--bg) 85%) fixed,repeating-linear-gradient(0deg,var(--gridline) 0 1px,transparent 1px 46px) fixed,repeating-linear-gradient(90deg,var(--gridline) 0 1px,transparent 1px 46px) fixed,radial-gradient(ellipse 70% 45% at 50% 30%,var(--bg-glow) 0%,var(--bg) 75%) fixed,var(--bg);
+  background:radial-gradient(ellipse 70% 55% at 50% 40%,var(--bg-glow) 0%,var(--bg) 75%) fixed;   /* one background: the only grid is the graph's own */ fixed,var(--bg);
   padding-left:max(16px,env(safe-area-inset-left,0px));
   padding-right:max(16px,env(safe-area-inset-right,0px));
   padding-block:16px 24px;
@@ -280,7 +280,7 @@ body{box-sizing:border-box;padding-block:max(6px,env(safe-area-inset-top,0px)) 0
 .mag{min-height:38px;gap:7px}
 .shell .body{height:24px}.shell .base{height:8px}
 .maginfo{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap}
-.badge{font-size:12px;padding:3px 10px 4px}
+.badge{display:none}
 .chance{font-size:11px}
 .stage{grid-area:stage;min-height:0;display:flex;align-items:center;justify-content:center}
 .stage canvas{max-height:100%}
@@ -312,6 +312,14 @@ body.sheet-clues .side .board,body.sheet-top .side .clues{display:none}
   .app{grid-template-columns:minmax(0,1fr) minmax(0,540px) minmax(0,1fr);grid-template-areas:". hdr side" ". hud side" ". mag side" ". stage side" ". vol side" ". formula side" ". controls side"}
   .overlay{grid-column:2}
 }
+/* page-wide effects: the beat pulse, the streak aura around the screen edge and the sparks of every shot */
+.pulse,.aura,.fxc{position:fixed;inset:0;pointer-events:none;z-index:45}
+.fxc{width:100%;height:100%;z-index:48}
+.pulse{opacity:0;background:radial-gradient(ellipse 80% 70% at 50% 45%,var(--pc,var(--amber)) 0%,transparent 70%);mix-blend-mode:screen}
+.aura{opacity:0;box-shadow:inset 0 0 90px 10px var(--amber);transition:opacity .4s}
+.app.shake{animation:shake .35s linear}
+.app.glitch{animation:glitch .28s steps(3)}
+@media (prefers-reduced-motion:reduce){.app.shake,.app.glitch{animation:none}.pulse,.fxc{display:none}}
 /* too short for one screen (a phone on its side): let the page scroll instead of squeezing the graph to nothing */
 @media (max-height:520px){ html,body{overflow:auto} .app{height:auto} .stage{min-height:300px} }
 </style>
@@ -335,7 +343,7 @@ body.sheet-clues .side .board,body.sheet-top .side .clues{display:none}
 
   <section class="magbox" aria-label="Магазин">
     <div class="mag" id="mag"></div>
-    <div class="maginfo"><div class="chance"><b id="chance">50 %</b> <span id="chanceT">шанс, что боевой</span></div>
+    <div class="maginfo"><div class="chance"><b id="chance">50 %</b> шанс, что боевой</div>
     <div class="badge" id="badge">#1/8 боевой или холостой?</div></div>
     <div class="prog"><i id="progFill"></i><b id="progKnob"></b></div>
   </section>
@@ -380,6 +388,9 @@ body.sheet-clues .side .board,body.sheet-top .side .clues{display:none}
     <button class="choice blank" id="btnBlank" type="button"><span>ХОЛОСТОЙ<span class="arr">↑</span></span><small>→ ↑ или D</small></button>
   </div>
 </div>
+<div class="aura" id="aura"></div>
+<div class="pulse" id="pulse"></div>
+<canvas class="fxc" id="fx"></canvas>
 <div class="flash" id="flash"></div>
 
 <script>
@@ -1197,12 +1208,9 @@ function enterShell(i){
   G.cur=i; const sh=G.shells[i], seen=G.mag.slice(0,i), liveLeft=G.k-sum(seen), left=G.n-i;
   prepShell(i+1); if(PERF.low) prepShell(i+2);
   sh.pNaive=liveLeft/left; sh.pExact=G.cands.length?G.cands.filter(s=>s[i]===1).length/G.cands.length:sh.pNaive;
-  /* the chance shown is the exact one from the dealer's clues and the shells already fired: everything a solver could
-     work out from the screen, every player sees right here */
-  setChance(sh.pExact,true); $('badge').className='badge'; $('badge').textContent=`#${i+1}/${G.n} боевой или холостой?`;
+  setChance(sh.pNaive); $('badge').className='badge'; $('badge').textContent=`#${i+1}/${G.n} боевой или холостой?`;
   setFormula(sh,false); renderMag();
-  if(sh.pExact===1) setSub('по уликам — точно боевой',true);
-  else if(sh.pExact===0) setSub('по уликам — точно холостой',true);
+  if(i===G.n-1&&sh.pNaive===1) setSub('последний — боевой',true);
   else if(i===G.n-1) setSub('последний патрон',true);
   else if(sh.pNaive===1) setSub('остались только боевые',true);
   else if(sh.pNaive===0) setSub('остались только холостые',true);
@@ -1228,7 +1236,7 @@ function resolve(sh){
   else { G.lives--; G.streak=0; judge(sh.answer===null?'НЕ УСПЕЛ':'МИМО',hint,'var(--live)'); if(!sh.sfx) playBuf(G.aud.bangB,AC.currentTime,.8); G.mood=Math.max(-1,G.mood-.6); }
   { const a=sh.answer===null?2:sh.answer; G.log+=(a*4+sh.out*2+(ok&&sh.onbeat?1:0)).toString(36)+(sh.answer===null?'z':Math.round(clamp((sh.at-sh.start)/sh.tr,0,1)*35).toString(36)); }
   if(G.lives===1) G.mood=Math.min(G.mood,-.5);
-  flash(sh.out?'live':'blank',!ok);
+  flash(sh.out?'live':'blank',!ok); burst(sh,ok);
   $('badge').className='badge '+(sh.out?'live':'blank'); $('badge').textContent=`#${sh.i+1}/${G.n} ${sh.out?'боевой':'холостой'}`;
   setSub(ok?(G.streak>=3?`серия: ${G.streak}`:'верно'):'минус жизнь',!ok);
   setFormula(sh,true); renderMag(); hud(); renderCandCount();
@@ -1286,7 +1294,7 @@ function renderMag(){
 }
 function renderClues(){ $('clueList').innerHTML=G.clues.length?G.clues.map(c=>`<li>${c.t}</li>`).join(''):'<li>В этом раунде без улик: только счёт.</li>'; renderCandCount(); }
 function renderCandCount(){ $('cands').textContent=`раскладов: ${G.cands.length} из ${G.total0}`; $('meter').style.width=Math.max(4,100*G.cands.length/G.total0)+'%'; }
-function setChance(p,clues){ $('chance').textContent=p===1?'точно':p===0?'точно не':Math.round(p*100)+' %'; const t=$('chanceT'); if(t) t.textContent=p===1?'боевой (по уликам)':p===0?'боевой (по уликам)':clues?'шанс по уликам, что боевой':'шанс, что боевой'; }
+function setChance(p){ $('chance').textContent=Math.round(p*100)+' %'; }
 function setSub(t,hot){ const s=$('sub'); s.textContent=t; s.classList.toggle('hot',!!hot); }
 const idxOf=(sh,j)=>sh.puz.idx?sh.puz.idx(j):j;
 function setFormula(sh,rev){
@@ -1309,7 +1317,24 @@ function fitFormula(){ const el=$('fMain'); el.style.fontSize=''; let fs=parseFl
 function clearFormula(){ ['fMain','fSub1','fSub2'].forEach(id=>$(id).innerHTML=''); $('caption').innerHTML='формула появится на первом патроне'; }
 function pickedUI(c){ $('btnLive').classList.toggle('picked',c===1); $('btnBlank').classList.toggle('picked',c===0); document.querySelector('.controls').classList.toggle('chosen',c===0||c===1); }
 function judge(text,small,color,quick){ const j=$('judge'); j.style.color=color; j.innerHTML=text+(small?`<small>${small}</small>`:''); j.classList.remove('show'); void j.offsetWidth; j.classList.add('show'); j.style.animationDuration=quick?'.6s':''; }
-function flash(kind,hard){ const f=$('flash'); f.className='flash'; void f.offsetWidth; f.className='flash '+kind; const s=$('stage'); s.classList.remove('shake','glitch'); void s.offsetWidth; s.classList.add(hard?'shake':'glitch'); }
+function flash(kind,hard){ const f=$('flash'); f.className='flash'; void f.offsetWidth; f.className='flash '+kind; const s=document.querySelector('.app'); s.classList.remove('shake','glitch'); void s.offsetWidth; s.classList.add(hard?'shake':'glitch'); }
+/* ---- page-wide effects ---- */
+const FXS={kick:0,col:'#ffc845',parts:[],last:0,w:0,h:0,dpr:1};
+const fxc=$('fx'), FXX=fxc.getContext('2d'), CALM=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+function fxResize(){ FXS.dpr=Math.min(2,window.devicePixelRatio||1); FXS.w=innerWidth; FXS.h=innerHeight; fxc.width=Math.round(FXS.w*FXS.dpr); fxc.height=Math.round(FXS.h*FXS.dpr); }
+/* sparks from the trigger point across the whole page: a fountain falling down for live, rising for blank, a red spray for a miss */
+function burst(sh,ok){ if(CALM) return; const r=cv.getBoundingClientRect(), x=r.left+r.width/2, y=r.top+r.height/2, col=ok?(sh.out?COL.live:COL.blank):COL.live, up=sh.out?1:-1, n=ok?46:26;
+  for(let k=0;k<n;k++){ const a=ok?(Math.random()-.5)*Math.PI*1.1+(up>0?Math.PI/2:-Math.PI/2):Math.random()*Math.PI*2, sp=ok?260+520*Math.random():180+380*Math.random();
+    FXS.parts.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,g:ok?up*420:600,life:0,max:.7+.6*Math.random(),r:1.2+2.2*Math.random(),col:k%5===0?COL.amber:col}); } }
+function fxFrame(){ const t=performance.now()/1000, dt=Math.min(.05,t-(FXS.last||t)); FXS.last=t;
+  if(FXS.w!==innerWidth||FXS.h!==innerHeight) fxResize();
+  const pu=$('pulse'); pu.style.setProperty('--pc',FXS.col); pu.style.opacity=(G.phase==='play'?.16*FXS.kick:0).toFixed(3); FXS.kick*=.9;
+  const au=$('aura'), st=G.phase==='play'?G.streak:0; au.style.opacity=st>=3?Math.min(.55,.12+.05*(st-3))*(.75+.25*FXS.kick*3):0;
+  FXX.setTransform(FXS.dpr,0,0,FXS.dpr,0,0); FXX.clearRect(0,0,FXS.w,FXS.h);
+  FXS.parts=FXS.parts.filter(q=>(q.life+=dt)<q.max);
+  for(const q of FXS.parts){ q.vy+=q.g*dt; q.vx*=.985; q.x+=q.vx*dt; q.y+=q.vy*dt; const a=1-q.life/q.max;
+    FXX.globalAlpha=a; FXX.strokeStyle=q.col; FXX.lineWidth=q.r; FXX.lineCap='round'; FXX.beginPath(); FXX.moveTo(q.x,q.y); FXX.lineTo(q.x-q.vx*.03,q.y-q.vy*.03); FXX.stroke(); }
+  FXX.globalAlpha=1; }
 function showOverlay(html){ const o=$('overlay'); o.innerHTML=html; o.hidden=false; }
 function hideOverlay(){ $('overlay').hidden=true; }
 function setProg(p,late){ const f=$('progFill'); f.style.width=(p*100)+'%'; f.classList.toggle('late',late); $('progKnob').style.left=(p*100)+'%'; }
@@ -1354,11 +1379,13 @@ function drawShell(sh,now,countdown){
   const revealed=tau>=sh.tr, pc=sh.out?COL.live:COL.blank, col=COL.amber;
   /* grid; it breathes with the beat: barely in the question, fully under a live answer, softly under a blank one */
   const bph=tau>0&&tau<sh.len?mod(tau/sh.bt,1):1, beatN=Math.floor(tau/sh.bt), kickP=Math.exp(-bph*7)*(revealed?(sh.out?1:.45):.3)*(beatN%4===0?1:.6);
-  X.lineWidth=1;
-  for(let i=0;i<=16;i++){ const x=Math.round(L+(Rr-L)*i/16)+.5; X.strokeStyle=i%4===0?COL.grid2:COL.grid; X.globalAlpha=i%4===0?1:.85+.15*kickP; X.beginPath(); X.moveTo(x,T); X.lineTo(x,B); X.stroke(); }
-  X.globalAlpha=1; if(kickP>.02){ const gr=X.createRadialGradient(xT,gm.y(AX_Y),0,xT,gm.y(AX_Y),(Rr-L)*.6); gr.addColorStop(0,revealed?pc:COL.amber); gr.addColorStop(1,'transparent'); X.save(); X.globalAlpha=.07*kickP; X.fillStyle=gr; X.fillRect(L,T,Rr-L,B-T); X.restore(); }
+  X.lineWidth=1; FXS.kick=kickP; FXS.col=revealed?pc:COL.amber;
+  const fade=(x0,y0,x1,y1,c)=>{ const g=X.createLinearGradient(x0,y0,x1,y1); g.addColorStop(0,'rgba(0,0,0,0)'); g.addColorStop(.2,c); g.addColorStop(.8,c); g.addColorStop(1,'rgba(0,0,0,0)'); return g; };
+  const gV1=fade(0,T,0,B,COL.grid), gV2=fade(0,T,0,B,COL.grid2), gH=fade(L,0,Rr,0,COL.grid2);
+  for(let i=1;i<16;i++){ const x=Math.round(L+(Rr-L)*i/16)+.5; X.strokeStyle=i%4===0?gV2:gV1; X.globalAlpha=(i%4===0?1:.85+.15*kickP)*Math.min(1,Math.min(i,16-i)/3); X.beginPath(); X.moveTo(x,T); X.lineTo(x,B); X.stroke(); }
+  X.globalAlpha=1;
   X.font=`800 10px ${FONT}`; X.textAlign='right';
-  for(let k=0;k<5;k++){ const y=Math.round(gm.y(7*k))+.5; X.strokeStyle=COL.grid2; X.beginPath(); X.moveTo(L,y); X.lineTo(Rr,y); X.stroke(); X.fillStyle=COL.txt; X.fillText(sh.song.name+(k+1),L-5,y+3); }
+  for(let k=0;k<5;k++){ const y=Math.round(gm.y(7*k))+.5; X.strokeStyle=gH; X.beginPath(); X.moveTo(L,y); X.lineTo(Rr,y); X.stroke(); X.fillStyle=COL.txt; X.fillText(sh.song.name+(k+1),L-5,y+3); }
   const ay=gm.y(AX_Y); X.strokeStyle=COL.axis; X.lineWidth=1.3+1.2*kickP;
   X.beginPath(); X.moveTo(L-4,ay); X.lineTo(Rr+6,ay); X.moveTo(Rr-1,ay-4); X.lineTo(Rr+6,ay); X.lineTo(Rr-1,ay+4); X.stroke();
   X.beginPath(); X.moveTo(xT,B+6); X.lineTo(xT,T-2); X.moveTo(xT-4,T+5); X.lineTo(xT,T-2); X.lineTo(xT+4,T+5); X.stroke();
@@ -1385,12 +1412,14 @@ function drawShell(sh,now,countdown){
     X.font=`700 10px ${FONT}`; X.globalAlpha=.8; X.fillText('считай по формуле',(L+xT)/2,gm.y(AX_Y)+18); X.fillText('и слушай мелодию',(L+xT)/2,gm.y(AX_Y)+31); X.restore(); }
   /* value labels: two rows above the phrase, like the reference */
   const labels=(ns,top,c)=>{ X.font=`800 9px ${FONT}`; X.textAlign='center'; X.fillStyle=c; let last=[-99,-99];
-    ns.forEach((n,i)=>{ if(n.tr>tau) return; const row=i%2, x=gm.x(n.tr)+3, hw=X.measureText(n.lab).width/2; if(x-hw<last[row]+2) return; last[row]=x+hw; X.globalAlpha=.9; X.fillText(n.lab,x,Math.max(T+8,gm.y(top)-10-row*10)); }); X.globalAlpha=1; };
+    ns.forEach((n,i)=>{ if(n.tr>tau) return; const row=i%2, hw=X.measureText(n.lab).width/2; let x=gm.x(n.tr)+3;
+      if(Math.abs(x-xT)<hw+3) x=x<xT?xT-hw-3:xT+hw+3;   /* a number never sits on the trigger line */
+      if(x-hw<last[row]+2) return; last[row]=x+hw; X.globalAlpha=.9; X.fillText(n.lab,x,Math.max(T+8,gm.y(top)-10-row*10)); }); X.globalAlpha=1; };
   const preTop=Math.max(...pre.map(n=>n.p)); if(!hide) labels(pre,preTop+(look==='mirror'?0:0),col);
   /* the trigger: before — a question mark with both ways out; after — the arrow to where the graph went */
   const lastPre=pre[pre.length-1], firstPost=post[0];
   if(!revealed&&lastPre&&tau>0){ const y=gm.y(AX_Y), x=xT+12, pulse=.7+.3*Math.sin(now*4);
-    X.save(); X.fillStyle='#090f0c'; X.beginPath(); X.arc(x,y,9,0,7); X.fill(); X.globalAlpha=pulse; X.fillStyle=COL.amber; X.font=`900 15px ${FONT}`; X.textAlign='center'; X.fillText('?',x,y+5);
+    X.save(); X.globalAlpha=pulse; X.fillStyle=COL.amber; X.font=`900 15px ${FONT}`; X.textAlign='center'; X.fillText('?',x,y+5);
     X.strokeStyle=COL.blank; X.lineWidth=1.6; X.beginPath(); X.moveTo(x-4,y-11); X.lineTo(x,y-16); X.lineTo(x+4,y-11); X.stroke();
     X.strokeStyle=COL.live; X.beginPath(); X.moveTo(x-4,y+11); X.lineTo(x,y+16); X.lineTo(x+4,y+11); X.stroke(); X.restore(); }
   if(revealed&&lastPre&&firstPost){
@@ -1405,9 +1434,9 @@ function drawShell(sh,now,countdown){
     /* the continuation */
     const vis=post.filter(n=>n.tr<=tau);
     head=drawTrace(gm,post,tau,pc,mode,sh.th,base+shift)||head;
-    /* the rule, on a dark tag right of the trigger, in the half the answer left empty (top for live, bottom for blank) */
+    /* the rule, right of the trigger, in the half the answer left empty (top for live, bottom for blank) */
     { X.save(); X.font=`800 10px ${FONT}`; X.globalAlpha=u; const tx=sh.out?'боевой: на 2 октавы ниже':'холостой: на октаву выше', tw=X.measureText(tx).width, ly=sh.out?T+22:B-8, lx=xT+9;
-      X.fillStyle='rgba(9,15,12,.88)'; X.fillRect(lx-4,ly-10,tw+8,14); X.fillStyle=pc; X.textAlign='left'; X.fillText(tx,lx,ly); X.restore(); }
+      X.fillStyle=pc; X.textAlign='left'; X.fillText(tx,lx,ly); X.restore(); }
     if(!sh.out) vis.forEach(n=>{ const age=now-(sh.start+n.tr); if(age<.6){ X.save(); X.strokeStyle=pc; X.globalAlpha=1-age/.6; X.lineWidth=1.2; X.beginPath(); X.arc(gm.x(n.tr),gm.y(n.p),3+age*18,0,7); X.stroke(); X.restore(); } });
     labels(post,Math.max(...post.map(n=>n.p)),pc);
   }
@@ -1451,6 +1480,7 @@ function frame(){
     } else { const sh=G.shells[Math.max(0,G.cur)]; if(sh) drawShell(sh,Math.min(now,sh.start+sh.len)); }
   } else if(ph==='loading'||ph==='intro'){ const sh=G.shells[0]; if(sh) drawShell(sh,sh.start-.001,ph==='loading'?4:null); }
   else if(ph!=='debug') demoFrame();
+  fxFrame();
   requestAnimationFrame(frame);
 }
 
