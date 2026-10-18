@@ -1,5 +1,5 @@
 {
- "updated": "2026-10-18T11:58:12+00:00",
+ "updated": "2026-10-18T12:03:29+00:00",
  "scores": [
   {
    "id": "kotyan31",
@@ -56,6 +56,14 @@
    "rounds": 2,
    "acc": 60,
    "at": "2026-10-17T13:30:55+00:00"
+  },
+  {
+   "id": "colinki",
+   "nick": "colinki",
+   "best": 200,
+   "rounds": 1,
+   "acc": 40,
+   "at": "2026-10-18T12:03:29+00:00"
   },
   {
    "id": "11",
@@ -121,6 +129,11 @@
    "nick": "Clowerchik",
    "key": "BBOBIHyLYz1SMUuv20L2NRdtESBAgSHA9Eapt0D1r6vscHW4B6ReqAlC/p3clhNscrr8CPAeTkTT9/1YebfA5fs=",
    "since": "2026-10-17T21:12:38+00:00"
+  },
+  "colinki": {
+   "nick": "colinki",
+   "key": "BI0DlBwTW6dR03CpnAs/fZa+9D0QsL4LCKi3aztRvgx9dNLK8J0OKW/LsxermwTQ7tho1QDb4+HvGKNWWYlZgn4=",
+   "since": "2026-10-18T12:03:29+00:00"
   }
  },
  "acks": {
@@ -207,7 +220,8 @@
   "1efd024869e6aedbed6bfc50": "low",
   "5143eba3779b42bda787d908": "ok",
   "c7c9c32115b13e4a5fc45864": "low",
-  "14476ccdca393e224647b580": "low"
+  "14476ccdca393e224647b580": "low",
+  "7481866d90bf174ffb233de2": "ok"
  },
  "code": [
   "575361e7ce8a4b4073d58a9deb105fc7",
@@ -586,7 +600,8 @@
   },
   "6fd95b3920dc91b5eefae7bd": {
    "gk": "BBxg1rD9AnFLZYeLtGdrD+W2l2IXa6oeZ8DP/W2y/I8B76ISUcrrL4rz23kU3C8QBILuMguWuF2J7A/6FKpe9rQ=",
-   "at": 1792324963.0
+   "at": 1792324963.0,
+   "used": true
   }
  }
 }
