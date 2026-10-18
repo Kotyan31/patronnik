@@ -1,5 +1,5 @@
 {
- "updated": "2026-10-18T12:04:25+00:00",
+ "updated": "2026-10-18T12:06:34+00:00",
  "scores": [
   {
    "id": "kotyan31",
@@ -8,6 +8,14 @@
    "rounds": 4,
    "acc": 84,
    "at": "2026-10-17T14:12:28+00:00"
+  },
+  {
+   "id": "ник фурри",
+   "nick": "ник фурри",
+   "best": 3775,
+   "rounds": 5,
+   "acc": 78,
+   "at": "2026-10-18T12:06:34+00:00"
   },
   {
    "id": "eldiavlos",
@@ -40,14 +48,6 @@
    "rounds": 3,
    "acc": 71,
    "at": "2026-10-17T21:24:04+00:00"
-  },
-  {
-   "id": "ник фурри",
-   "nick": "ник фурри",
-   "best": 1450,
-   "rounds": 3,
-   "acc": 67,
-   "at": "2026-10-18T11:56:08+00:00"
   },
   {
    "id": "pro100kotyanlox",
@@ -222,7 +222,8 @@
   "c7c9c32115b13e4a5fc45864": "low",
   "14476ccdca393e224647b580": "low",
   "7481866d90bf174ffb233de2": "ok",
-  "2c2f0cd87096c60659e0c26e": "low"
+  "2c2f0cd87096c60659e0c26e": "low",
+  "6ad541ad955f382979a63a19": "ok"
  },
  "code": [
   "575361e7ce8a4b4073d58a9deb105fc7",
@@ -585,7 +586,8 @@
   },
   "19ecd271e06baf3200cf690a": {
    "gk": "BG4Dvwh1AZuRmOYaXznkH7jg0hpKxg1m/vORWfRc+DQN2AQu9sNIbWil7+Z73F9C9vjArF+DeZzN/qyFmBctIn4=",
-   "at": 1792324716.0
+   "at": 1792324716.0,
+   "used": true
   },
   "6d3a10516ce4561b936caff8": {
    "gk": "BEOLL6ZLhCtZd8tY8vO/CikPgH4d1lZ0XGOxzsf+O723xI2rKQGm452RwR4pWh4GoQWrL3EDd7ikLCynLjL2xho=",
