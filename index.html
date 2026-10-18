@@ -312,14 +312,14 @@ body.sheet-clues .side .board,body.sheet-top .side .clues{display:none}
   .app{grid-template-columns:minmax(0,1fr) minmax(0,540px) minmax(0,1fr);grid-template-areas:". hdr side" ". hud side" ". mag side" ". stage side" ". vol side" ". formula side" ". controls side"}
   .overlay{grid-column:2}
 }
-/* page-wide effects: the beat pulse, the streak aura around the screen edge and the sparks of every shot */
-.pulse,.aura,.fxc{position:fixed;inset:0;pointer-events:none;z-index:45}
+/* page-wide effects: the tension flicker and the streak aura around the screen edge, the sparks of every shot */
+.edge,.aura,.fxc{position:fixed;inset:0;pointer-events:none;z-index:45}
 .fxc{width:100%;height:100%;z-index:48}
-.pulse{opacity:0;background:radial-gradient(ellipse 80% 70% at 50% 45%,var(--pc,var(--amber)) 0%,transparent 70%);mix-blend-mode:screen}
+.edge{opacity:0;box-shadow:inset 0 0 46px 2px var(--amber),inset 0 0 0 1px var(--amber)}
 .aura{opacity:0;box-shadow:inset 0 0 90px 10px var(--amber);transition:opacity .4s}
 .app.shake{animation:shake .35s linear}
 .app.glitch{animation:glitch .28s steps(3)}
-@media (prefers-reduced-motion:reduce){.app.shake,.app.glitch{animation:none}.pulse,.fxc{display:none}}
+@media (prefers-reduced-motion:reduce){.app.shake,.app.glitch{animation:none}.edge,.fxc{display:none}}
 /* too short for one screen (a phone on its side): let the page scroll instead of squeezing the graph to nothing */
 @media (max-height:520px){ html,body{overflow:auto} .app{height:auto} .stage{min-height:300px} }
 </style>
@@ -389,7 +389,7 @@ body.sheet-clues .side .board,body.sheet-top .side .clues{display:none}
   </div>
 </div>
 <div class="aura" id="aura"></div>
-<div class="pulse" id="pulse"></div>
+<div class="edge" id="edge"></div>
 <canvas class="fxc" id="fx"></canvas>
 <div class="flash" id="flash"></div>
 
@@ -1319,7 +1319,7 @@ function pickedUI(c){ $('btnLive').classList.toggle('picked',c===1); $('btnBlank
 function judge(text,small,color,quick){ const j=$('judge'); j.style.color=color; j.innerHTML=text+(small?`<small>${small}</small>`:''); j.classList.remove('show'); void j.offsetWidth; j.classList.add('show'); j.style.animationDuration=quick?'.6s':''; }
 function flash(kind,hard){ const f=$('flash'); f.className='flash'; void f.offsetWidth; f.className='flash '+kind; const s=document.querySelector('.app'); s.classList.remove('shake','glitch'); void s.offsetWidth; s.classList.add(hard?'shake':'glitch'); }
 /* ---- page-wide effects ---- */
-const FXS={kick:0,col:'#ffc845',parts:[],last:0,w:0,h:0,dpr:1};
+const FXS={kick:0,ten:0,e8:0,parts:[],last:0,w:0,h:0,dpr:1};
 const fxc=$('fx'), FXX=fxc.getContext('2d'), CALM=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
 function fxResize(){ FXS.dpr=Math.min(2,window.devicePixelRatio||1); FXS.w=innerWidth; FXS.h=innerHeight; fxc.width=Math.round(FXS.w*FXS.dpr); fxc.height=Math.round(FXS.h*FXS.dpr); }
 /* sparks from the trigger point across the whole page: a fountain falling down for live, rising for blank, a red spray for a miss */
@@ -1328,7 +1328,7 @@ function burst(sh,ok){ if(CALM) return; const r=cv.getBoundingClientRect(), x=r.
     FXS.parts.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,g:ok?up*420:600,life:0,max:.7+.6*Math.random(),r:1.2+2.2*Math.random(),col:k%5===0?COL.amber:col}); } }
 function fxFrame(){ const t=performance.now()/1000, dt=Math.min(.05,t-(FXS.last||t)); FXS.last=t;
   if(FXS.w!==innerWidth||FXS.h!==innerHeight) fxResize();
-  const pu=$('pulse'); pu.style.setProperty('--pc',FXS.col); pu.style.opacity=(G.phase==='play'?.16*FXS.kick:0).toFixed(3); FXS.kick*=.9;
+  $('edge').style.opacity=(G.phase==='play'?FXS.ten*(.12+.5*FXS.e8):0).toFixed(3); FXS.kick*=.9; FXS.ten=0;
   const au=$('aura'), st=G.phase==='play'?G.streak:0; au.style.opacity=st>=3?Math.min(.55,.12+.05*(st-3))*(.75+.25*FXS.kick*3):0;
   FXX.setTransform(FXS.dpr,0,0,FXS.dpr,0,0); FXX.clearRect(0,0,FXS.w,FXS.h);
   FXS.parts=FXS.parts.filter(q=>(q.life+=dt)<q.max);
@@ -1379,7 +1379,13 @@ function drawShell(sh,now,countdown){
   const revealed=tau>=sh.tr, pc=sh.out?COL.live:COL.blank, col=COL.amber;
   /* grid; it breathes with the beat: barely in the question, fully under a live answer, softly under a blank one */
   const bph=tau>0&&tau<sh.len?mod(tau/sh.bt,1):1, beatN=Math.floor(tau/sh.bt), kickP=Math.exp(-bph*7)*(revealed?(sh.out?1:.45):.3)*(beatN%4===0?1:.6);
-  X.lineWidth=1; FXS.kick=kickP; FXS.col=revealed?pc:COL.amber;
+  X.lineWidth=1; FXS.kick=kickP;
+  /* tension like the video: from the middle of the question the camera pushes in a little on every beat and the screen edge
+     flickers on the eighths, both growing until the trigger; after the shot the camera lets go. Same for both answers. */
+  const ten=CALM||tau<0?0:tau<sh.tr?Math.pow(clamp((tau/sh.tr-.5)/.5,0,1),2):Math.pow(Math.max(0,1-(tau-sh.tr)/.3),2),
+    punch=tau<sh.tr?Math.exp(-bph*8):1, zm=1+ten*(.035+.025*punch), zy=(T+B)/2;
+  X.setTransform(dpr*zm,0,0,dpr*zm,dpr*xT*(1-zm),dpr*zy*(1-zm));
+  if(tau<sh.tr){ const e=tau/(sh.bt/2), r=mod(Math.sin(Math.floor(e)*12.9898)*43758.5453,1); FXS.ten=ten; FXS.e8=Math.exp(-mod(e,1)*9)*(.4+.6*r); }
   const fade=(x0,y0,x1,y1,c)=>{ const g=X.createLinearGradient(x0,y0,x1,y1); g.addColorStop(0,'rgba(0,0,0,0)'); g.addColorStop(.2,c); g.addColorStop(.8,c); g.addColorStop(1,'rgba(0,0,0,0)'); return g; };
   const gV1=fade(0,T,0,B,COL.grid), gV2=fade(0,T,0,B,COL.grid2), gH=fade(L,0,Rr,0,COL.grid2);
   for(let i=1;i<16;i++){ const x=Math.round(L+(Rr-L)*i/16)+.5; X.strokeStyle=i%4===0?gV2:gV1; X.globalAlpha=(i%4===0?1:.85+.15*kickP)*Math.min(1,Math.min(i,16-i)/3); X.beginPath(); X.moveTo(x,T); X.lineTo(x,B); X.stroke(); }
