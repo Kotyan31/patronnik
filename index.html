@@ -316,12 +316,21 @@ body.sheet-clues .side .board,body.sheet-top .side .clues{display:none}
 .edge,.aura,.fxc{position:fixed;inset:0;pointer-events:none;z-index:45}
 .fxc{width:100%;height:100%;z-index:48}
 .edge{opacity:0;box-shadow:inset 0 0 14vmin 2vmin var(--ec,#ff5a1f)}
+.app.cam{will-change:transform,scale}   /* the page is one GPU layer while the camera moves: zooming it never repaints the text */
 .loadfx{position:fixed;inset:0;pointer-events:none;z-index:46}
-.loadfx .shell{position:fixed;transform-origin:50% 50%;will-change:transform;transition:none}
-.aim{position:fixed;width:34px;height:34px;margin:-17px 0 0 -17px;border:2px solid var(--amber);border-radius:50%;opacity:0;box-shadow:0 0 12px var(--amber),inset 0 0 8px var(--amber);transition:left .07s ease-out,top .07s ease-out,opacity .15s}
+.loadfx .shell{position:fixed;transform-origin:50% 60%;will-change:transform,opacity;transition:none;filter:drop-shadow(0 6px 10px rgba(0,0,0,.55))}
+.loadfx .shell.hot{filter:drop-shadow(0 0 8px var(--amber)) drop-shadow(0 6px 10px rgba(0,0,0,.5))}
+.aim{position:fixed;width:34px;height:34px;margin:-17px 0 0 -17px;border:2px solid var(--amber);border-radius:50%;opacity:0;box-shadow:0 0 12px var(--amber),inset 0 0 8px var(--amber);transition:left .06s ease-out,top .06s ease-out,opacity .15s}
+.aim::before,.aim::after{content:"";position:absolute;background:var(--amber);border-radius:1px}
+.aim::before{left:50%;top:-7px;width:2px;height:7px;margin-left:-1px;box-shadow:0 41px 0 var(--amber)}
+.aim::after{top:50%;left:-7px;height:2px;width:7px;margin-top:-1px;box-shadow:41px 0 0 var(--amber)}
 .aim.on{opacity:.9}
-.shell.land{animation:land .28s ease-out}
-@keyframes land{0%{transform:translateY(-7px) scale(1.3);filter:brightness(2)}100%{transform:none;filter:none}}
+.aim.hit{animation:aimhit .16s ease-out}
+@keyframes aimhit{0%{transform:scale(.7)}100%{transform:none}}
+.shell.land{animation:land .3s cubic-bezier(.2,.9,.3,1)}
+@keyframes land{0%{transform:translateY(-3px) scale(1.25,.72);filter:brightness(2.4)}40%{transform:translateY(1px) scale(.9,1.12);filter:brightness(1.4)}100%{transform:none;filter:none}}
+.shell.rack{animation:rack .32s cubic-bezier(.3,1.6,.5,1)}
+@keyframes rack{0%{transform:none}35%{transform:translateY(-6px)}100%{transform:none}}
 .aura{opacity:0;box-shadow:inset 0 0 90px 10px var(--amber);transition:opacity .4s}
 .app.shake{animation:shake .35s linear}
 .app.glitch{animation:glitch .28s steps(3)}
@@ -1314,30 +1323,46 @@ function renderMag(){
 }
 /* loading the magazine, like the opening of the reference video: the shells stand big over the graph showing what is inside,
    flip to unknown, shuffle, line up and fly one by one into the magazine slots under a sight ring */
+/* brass sparks where a shell lands in its slot */
+function sparkAt(x,y,col,n){ if(CALM) return; for(let k=0;k<n;k++){ const a=-Math.PI/2+(Math.random()-.5)*Math.PI*1.3, sp=90+170*Math.random();
+  FXS.parts.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,g:650,life:0,max:.22+.2*Math.random(),r:1+1.3*Math.random(),col}); } }
 function loadAnim(B,delay){
   const slots=[...$('mag').children], n=slots.length; if(CALM||!n||!document.body.animate) return;
   const st=cv.getBoundingClientRect(), R=slots.map(s=>s.getBoundingClientRect()), w=R[0].width, h=R[0].height;
   const k=clamp(st.width*.8/(n*(w+8)),1.4,2.6), gap=(w+8)*k, cx=st.left+st.width/2, cy=st.top+st.height*.45;
-  /* times in beats of the count-in: the shells appear on beat 1 with the sub hit, flip into beat 2, hop twice on its sixteenths,
-     line up, then one shell per sixteenth from beat 2.5, each landing on its click */
-  const S=B/4, land=q=>1.5*B+(q+1)*S, ms=(land(n-1)+.05)*1000, f=t=>clamp(t*1000/ms,0,1);
+  /* times in beats of the count-in, each move landing on its sound: the shells drop in on beat 1 with the sub hit and settle with a
+     bounce, flip over in 3D into beat 2, hop twice in arcs on its sixteenths and line up; from beat 2.5 one shell per sixteenth
+     swings up along an arc, accelerating, and slams into its slot on its click (squash, sparks, the sight jumps on); the slide
+     rack at the end shakes the full magazine */
+  const S=B/4, land=q=>1.5*B+(q+1)*S, rackAt=1.5*B+(n+2)*S, end=land(n-1)+.05, ms=end*1000, f=t=>clamp(t/end,0,1);
+  const OUT='cubic-bezier(.2,.9,.25,1)', IN='cubic-bezier(.55,0,.9,.4)', IO='cubic-bezier(.45,0,.25,1)', LIN='linear';
   const sorted=[...G.mag].sort((a,b)=>b-a), perm=shuffle([...Array(n).keys()]);
   const layer=document.createElement('div'); layer.className='loadfx'; document.body.appendChild(layer);
   const ring=document.createElement('div'); ring.className='aim'; layer.appendChild(ring);
   const place=q=>{ ring.style.left=(R[q].left+w/2)+'px'; ring.style.top=(R[q].top+h/2)+'px'; };
+  const brass=getComputedStyle(document.documentElement).getPropertyValue('--brass-1').trim()||COL.amber;
   G.loadUntil=performance.now()+delay+ms; slots.forEach(s=>s.style.visibility='hidden');
   sorted.forEach((x,i)=>{ const q=perm[i], d=document.createElement('div'); d.className='shell '+(x?'live':'blank');
     d.innerHTML='<div class="body">?</div><div class="base"></div>'; Object.assign(d.style,{left:R[q].left+'px',top:R[q].top+'px',width:w+'px',height:h+'px'}); layer.appendChild(d);
-    const at=j=>[cx+(j-(n-1)/2)*gap-(R[q].left+w/2), cy-(R[q].top+h/2)], [ax,ay]=at(i), [bx,by]=at(q), jx=()=>(Math.random()-.5)*gap*2.2, jy=()=>(Math.random()-.5)*h*k*1.1, rr=()=>(Math.random()-.5)*50;
-    const tf=(x,y,sx,sy,r=0)=>`translate(${x.toFixed(1)}px,${y.toFixed(1)}px) rotate(${r.toFixed(1)}deg) scale(${sx},${sy})`;
-    const K=[[tf(ax,ay,0,0),0],[tf(ax,ay,k*1.15,k*1.15),.08*B+.012*B*i],[tf(ax,ay,k,k),.2*B+.012*B*i],[tf(ax,ay,k,k),.75*B],[tf(ax,ay,0,k),.875*B],[tf(ax,ay,k,k),B],
-      [tf(ax+jx(),ay+jy(),k,k,rr()),B+.12*S],[tf(ax+jx(),ay+jy(),k,k,rr()),B+S],[tf(bx+jx(),by+jy(),k,k,rr()),B+S+.12*S],[tf(bx,by,k,k),1.5*B],
-      [tf(bx,by,k,k),land(q)-S],[tf(0,0,1,1),land(q)],[tf(0,0,1,1),ms/1000]];
-    d.animate(K.map(([transform,t])=>({transform,offset:f(t)})),{duration:ms,delay,easing:'linear',fill:'both'});
+    const at=j=>[cx+(j-(n-1)/2)*gap-(R[q].left+w/2), cy-(R[q].top+h/2)], [ax,ay]=at(i), [bx,by]=at(q), rnd=()=>Math.random()-.5;
+    const p1=[ax+rnd()*gap*2.4, ay+rnd()*h*k*.5], lift=h*k*.55, side=(q-(n-1)/2)*gap*.35, t0=.035*B*i;
+    const tf=(x,y,sx,sy=sx,r=0,ry=0)=>`translate(${x.toFixed(1)}px,${y.toFixed(1)}px) perspective(400px) rotateY(${ry.toFixed(1)}deg) rotate(${r.toFixed(1)}deg) scale(${sx.toFixed(3)},${sy.toFixed(3)})`;
+    const K=[ // [transform, time in s, easing of the move that starts here, opacity]
+      [tf(ax,ay-h*k*1.6,k*.7,k*.7,rnd()*40),0,LIN,0],[tf(ax,ay-h*k*1.6,k*.7,k*.7,rnd()*40),t0,IN,0],
+      [tf(ax,ay,k*1.12,k*.82),t0+.16*B,OUT,1],[tf(ax,ay,k*.96,k*1.06),t0+.24*B,OUT,1],[tf(ax,ay,k),t0+.34*B,LIN,1],
+      [tf(ax,ay,k),.72*B,IN,1],[tf(ax,ay-lift*.25,k*1.05,k*1.05,0,90),.875*B,LIN,1],[tf(ax,ay-lift*.25,k*1.05,k*1.05,0,-90),.876*B,OUT,1],[tf(ax,ay,k),B,IO,1],
+      [tf((ax+p1[0])/2,Math.min(ay,p1[1])-lift,k*1.08,k*1.08,rnd()*30),B+.5*S,IN,1],[tf(p1[0],p1[1],k*1.1,k*.88,rnd()*12),B+S,OUT,1],
+      [tf((p1[0]+bx)/2,Math.min(p1[1],by)-lift,k*1.08,k*1.08,rnd()*30),B+1.5*S,IN,1],[tf(bx,by,k*1.1,k*.88),B+2*S,OUT,1],[tf(bx,by,k),1.5*B,LIN,1],
+      [tf(bx,by,k),land(q)-S,OUT,1],[tf(bx+side,by+h*k*.12,k*1.04,k*.9),land(q)-.85*S,IO,1],
+      [tf(bx*.4+side*1.4,by*.55-lift*.3,(k+1)*.62,(k+1)*.62,q%2?14:-14),land(q)-.45*S,IN,1],[tf(0,0,1.2,.78),land(q),LIN,1],[tf(0,0,1.2,.78),end,LIN,1]];
+    d.animate(K.map(([transform,t,easing,opacity])=>({transform,offset:f(t),easing,opacity})),{duration:ms,delay,fill:'both'});
     setTimeout(()=>d.classList.remove('live','blank'),delay+.875*B*1000);
-    setTimeout(()=>{ d.remove(); const s=$('mag').children[q]; if(s){ s.style.visibility=''; s.classList.add('land'); } if(q+1<n) place(q+1); },delay+land(q)*1000); });
+    setTimeout(()=>d.classList.add('hot'),delay+(land(q)-S)*1000);
+    setTimeout(()=>{ d.remove(); const s=$('mag').children[q]; if(s){ s.style.visibility=''; s.classList.remove('land'); void s.offsetWidth; s.classList.add('land'); const r=s.getBoundingClientRect(); sparkAt(r.left+r.width/2,r.top+r.height*.3,brass,9); }
+      ring.classList.remove('hit'); void ring.offsetWidth; ring.classList.add('hit'); if(q+1<n) place(q+1); else ring.classList.remove('on'); },delay+land(q)*1000); });
   setTimeout(()=>{ place(0); ring.classList.add('on'); },delay+1.45*B*1000);
-  setTimeout(()=>{ layer.remove(); [...$('mag').children].forEach(s=>s.style.visibility=''); },delay+ms+80);
+  setTimeout(()=>{ layer.remove(); [...$('mag').children].forEach(s=>s.style.visibility=''); },delay+ms+120);
+  if(rackAt<4*B-.06) setTimeout(()=>[...$('mag').children].forEach((s,i)=>setTimeout(()=>{ s.classList.remove('land','rack'); void s.offsetWidth; s.classList.add('rack'); },i*22)),delay+(rackAt+.08)*1000);
 }
 function renderClues(){ $('clueList').innerHTML=G.clues.length?G.clues.map(c=>`<li>${c.t}</li>`).join(''):'<li>В этом раунде без улик: только счёт.</li>'; renderCandCount(); }
 function renderCandCount(){ $('cands').textContent=`раскладов: ${G.cands.length} из ${G.total0}`; $('meter').style.width=Math.max(4,100*G.cands.length/G.total0)+'%'; }
@@ -1375,11 +1400,14 @@ function burst(sh,ok){ if(CALM) return; const r=cv.getBoundingClientRect(), x=r.
     FXS.parts.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,g:ok?up*420:600,life:0,max:.7+.6*Math.random(),r:1.2+2.2*Math.random(),col:k%5===0?COL.amber:col}); } }
 function fxFrame(){ const t=performance.now()/1000, dt=Math.min(.05,t-(FXS.last||t)); FXS.last=t;
   if(FXS.w!==innerWidth||FXS.h!==innerHeight) fxResize();
-  const play=G.phase==='play', app=document.querySelector('.app'), z=play&&!CALM?FXS.cam:1;
+  const play=G.phase==='play', app=document.querySelector('.app'), zt=play&&!CALM?FXS.cam:1;
+  /* the camera chases its target: a hit gets there in ~15 ms, letting go takes ~0.13 s, so nothing ever jumps */
+  const zs=FXS.zs||1, away=Math.abs(zt-1)>Math.abs(zs-1)+1e-4; FXS.zs=zs+(zt-zs)*(1-Math.exp(-dt/(away?.015:.13))); const z=FXS.zs;
   const ed=$('edge'); FXS.eo=Math.max(play?Math.min(.72,.6*FXS.edge):0,(FXS.eo||0)*Math.exp(-dt/.09)); ed.style.opacity=FXS.eo.toFixed(3); ed.style.setProperty('--ec',FXS.ec); FXS.kick*=.9; FXS.edge=0; FXS.cam=1;
   /* the camera zooms the whole page about the trigger point (the graph centre); the point is taken while the page is at rest */
-  if(Math.abs(z-1)<.0005){ if(app.style.scale){ app.style.scale=''; } const c=cv.getBoundingClientRect(), a=app.getBoundingClientRect(); FXS.org=`${(c.left+c.width/2-a.left).toFixed(1)}px ${(c.top+c.height/2-a.top).toFixed(1)}px`; }
+  if(Math.abs(z-1)<.0005){ app.style.scale=play?'1':''; const c=cv.getBoundingClientRect(), a=app.getBoundingClientRect(); FXS.org=`${(c.left+c.width/2-a.left).toFixed(1)}px ${(c.top+c.height/2-a.top).toFixed(1)}px`; }
   else { app.style.transformOrigin=FXS.org; app.style.scale=z.toFixed(4); }
+  app.classList.toggle('cam',play&&!CALM);
   const au=$('aura'), st=G.phase==='play'?G.streak:0; au.style.opacity=st>=3?Math.min(.55,.12+.05*(st-3))*(.75+.25*FXS.kick*3):0;
   FXX.setTransform(FXS.dpr,0,0,FXS.dpr,0,0); FXX.clearRect(0,0,FXS.w,FXS.h);
   FXS.parts=FXS.parts.filter(q=>(q.life+=dt)<q.max);
@@ -1435,7 +1463,7 @@ function drawShell(sh,now,countdown){
      screen edge flashes red-orange on every beat (with a short second flicker), growing 20 → 100 %, and the whole page punches in
      ~1.4 % on each beat (40 ms rise, ~0.3 s fall), creeping 2 % closer in the last 0.16 s. The shot throws the camera 8.5 % in on
      a live shell (fast drop, slow tail), and a live answer keeps punching on every beat; a blank one pulls the camera 3 % back and
-     lets it float home over a second while the edge breathes. Each shell ends with a short push before the cut to the next.
+     lets it float home over a second while the edge breathes.
      Nothing before the trigger depends on the answer. */
   const hit=(dt,a)=>dt<0?0:a*(dt<.04?dt/.04:Math.exp(-(dt-.04)/.15));
   /* on the beat, like the video: a punch on every beat, stronger where a drum hits it, plus a punch on every drum hit between the
@@ -1456,7 +1484,7 @@ function drawShell(sh,now,countdown){
       for(const [t,k] of hitsIn(sh.tr+sh.bt*.75,sh.len)){ const dt=tau-t; if(dt<0||dt>.7) continue; cam=Math.max(cam,hit(dt,.018*k)); ed=Math.max(ed,1.15*k*Math.exp(-dt/.12)); }
       FXS.cam=1+.045*Math.exp(-d/.07)+.04*Math.exp(-d/.28)+cam; FXS.edge=ed; FXS.ec=COL.live; }
     else { FXS.cam=1-(1-Math.exp(-d/.03))*(.026*Math.exp(-d/.3)+.004*Math.max(0,1-d/1.2)); FXS.edge=Math.min(1,d/.4)*end*end*(3-2*end)*(.38+.14*Math.sin(2*Math.PI*d/(4*sh.bt))); FXS.ec=COL.blank; }
-    if(sh.len-tau<.09) FXS.cam=Math.max(FXS.cam,1.018); }
+  }
   const fade=(x0,y0,x1,y1,c)=>{ const g=X.createLinearGradient(x0,y0,x1,y1); g.addColorStop(0,'rgba(0,0,0,0)'); g.addColorStop(.2,c); g.addColorStop(.8,c); g.addColorStop(1,'rgba(0,0,0,0)'); return g; };
   const gV1=fade(0,T,0,B,COL.grid), gV2=fade(0,T,0,B,COL.grid2), gH=fade(L,0,Rr,0,COL.grid2);
   for(let i=1;i<16;i++){ const x=Math.round(L+(Rr-L)*i/16)+.5; X.strokeStyle=i%4===0?gV2:gV1; X.globalAlpha=(i%4===0?1:.85+.15*kickP)*Math.min(1,Math.min(i,16-i)/3); X.beginPath(); X.moveTo(x,T); X.lineTo(x,B); X.stroke(); }
@@ -1552,7 +1580,7 @@ function frame(){
     const now=audioNow();
     if(ph==='play'){
       const sh=G.shells[Math.max(0,G.cur)];
-      if(G.cur<0&&sh){ const cd=4-Math.floor((now-G.t0)/beat()); drawShell(sh,sh.start-.001,performance.now()<G.loadUntil?null:clamp(cd,1,4)); { const c=now-G.t0, left=sh.start-now; FXS.cam=1+(c>=0?.04*Math.exp(-c/.07)+.025*Math.exp(-c/.28):0)+(left<.1?.03*(1-left/.1):0); } setProg(0,false); }
+      if(G.cur<0&&sh){ const cd=4-Math.floor((now-G.t0)/beat()); drawShell(sh,sh.start-.001,performance.now()<G.loadUntil?null:clamp(cd,1,4)); { const c=now-G.t0, left=sh.start-now; FXS.cam=1+(c>=0?.04*Math.exp(-c/.07)+.025*Math.exp(-c/.28):0); } setProg(0,false); }
       else if(sh){ drawShell(sh,now); const p=(now-sh.start)/sh.tr; setProg(clamp(p,0,1),p>.75); }
     } else { const sh=G.shells[Math.max(0,G.cur)]; if(sh) drawShell(sh,Math.min(now,sh.start+sh.len)); }
   } else if(ph==='loading'||ph==='intro'){ const sh=G.shells[0]; if(sh) drawShell(sh,sh.start-.001,ph==='loading'?4:null); }
