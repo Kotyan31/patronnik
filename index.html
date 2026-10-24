@@ -940,8 +940,8 @@ function makeEngine(ctx,song){
   if(FX.air){ const sh=bq('highshelf',7000); sh.gain.value=2.5; out.disconnect(clip); ch(out,sh,clip); }
 
   /* ---- drums ---- */
-  const K=song.kit;
-  function kick(t,amp){ const k=K.kick, o=osc('sine',k.f0,t), a=g(0); o.frequency.exponentialRampToValueAtTime(k.f1,t+k.pd); o.frequency.exponentialRampToValueAtTime(k.f1*.92,t+k.dec);
+  const K=song.kit; let REC=null;   /* while a shell is built: its drum hits [time, level, 0 kick / 1 snare-clap], so the camera can hit with them */
+  function kick(t,amp){ if(REC) REC.push([t,amp,0]); const k=K.kick, o=osc('sine',k.f0,t), a=g(0); o.frequency.exponentialRampToValueAtTime(k.f1,t+k.pd); o.frequency.exponentialRampToValueAtTime(k.f1*.92,t+k.dec);
     a.gain.setValueAtTime(0,t); a.gain.linearRampToValueAtTime(amp,t+.002); a.gain.setTargetAtTime(amp*.6,t+.01,.05); a.gain.setTargetAtTime(0,t+.06,k.dec/4);
     ch(o,shaper(tanhCurve(k.drive)),a,drums); o.start(t); o.stop(t+k.dec*1.4+.1);
     const n=nz(), b=g(0); env(b,t,amp*k.click,.001,.012); ch(n,bq('highpass',1800),b,drums); n.start(t); n.stop(t+.05); }
@@ -949,7 +949,7 @@ function makeEngine(ctx,song){
     a.gain.setValueAtTime(amp*.9,t+.033); a.gain.setTargetAtTime(0,t+.034,K.snDec/4); ch(n,bq('bandpass',K.clapF,1.3),a,drums); a.connect(dverb); n.start(t); n.stop(t+.04+K.snDec*1.4); }
   function snare(t,amp){ const o=osc('triangle',K.snTone*1.6,t), a=g(0); o.frequency.exponentialRampToValueAtTime(K.snTone,t+.03); env(a,t,amp*.7,.001,.09); ch(o,a,drums); o.start(t); o.stop(t+.16);
     const n=nz(), b=g(0); env(b,t,amp,.001,K.snDec); ch(n,bq('highpass',1400),b,drums); b.connect(dverb); n.start(t); n.stop(t+K.snDec*1.4+.01); }
-  const back=(t,amp)=>{ if(K.sn==='clap') clap(t,amp); else if(K.sn==='snare') snare(t,amp); else { clap(t,amp*.8); snare(t,amp*.55); } };
+  const back=(t,amp)=>{ if(REC) REC.push([t,amp,1]); if(K.sn==='clap') clap(t,amp); else if(K.sn==='snare') snare(t,amp); else { clap(t,amp*.8); snare(t,amp*.55); } };
   function hat(t,amp,open){ const n=nz(), f2=bq('peaking',K.hp*1.3,1), a=g(0); f2.gain.value=6; const dec=open?.22:K.hdec; env(a,t,amp,.001,dec); ch(n,bq('highpass',K.hp),f2,a); (FX.space?panned(a,nextSide(.3)):a).connect(drums); n.start(t); n.stop(t+dec*1.4+.02); }
   function cowbell(t,amp,f){ const m=g(.5), a=g(0); [1,1.48].forEach(r=>{ const o=osc('square',f*r,t); o.connect(m); o.start(t); o.stop(t+.45); }); env(a,t,amp,.001,.28); ch(m,bq('bandpass',f*2.2,1.6),a); a.connect(bellBus); }
   function riser(t,dur,amp){ const n=nz(), f=bq('bandpass',400,2.5), a=g(0); f.frequency.setValueAtTime(400,t); f.frequency.exponentialRampToValueAtTime(7000,t+dur);
@@ -1011,7 +1011,7 @@ function makeEngine(ctx,song){
       else if(song.hatStyle==='8sw'){ if(k%2===0) hat(t0+k*S+(k%4===2?.2*S:0),inBeat===0?.2:.13,false); }
       else { const lastBeat=(Math.floor(k/4)%4)===3; if(lastBeat&&lv>=1){ const r=inBeat<2?2:3; for(let q=0;q<r;q++) hat(t0+k*S+q*S/r,.08+.04*q,false); } else if(k%2===0) hat(t,inBeat===0?.2:.13,false); } }
     if(K.open&&lv>=2) for(let b=0;b<beats;b+=2) hat(t0+(b+.5)*BT,.1,true); }
-  function cell(sh){
+  function cell(sh){ REC=[];
     const pre=sh.notes.filter(n=>!n.post), post=sh.notes.filter(n=>n.post), tr=sh.tr, st=sh.rs.mode.st;
     const lv=FX.streak?Math.min(3,sh.level+(sh.streak>=8?2:sh.streak>=4?1:0)):sh.level;
     const bars=(sh.pre+sh.post)/4, barRoot=b=>degSemi(st,sh.rs.prog[bars===2?b*2:b]);
@@ -1048,6 +1048,7 @@ function makeEngine(ctx,song){
       post.forEach(n=>bell(sh.bell,n.tr,n.dur,hz(n.s)));
       if(sh.final) post.forEach(n=>bell('musicbox',n.tr+.002,n.dur,hz(n.s+12),.5));
     }
+    sh.hits=REC.sort((a,b)=>a[0]-b[0]); REC=null;
   }
   function countIn(beats){ for(let b=0;b<beats;b++){ kick(b*BT,.55+.12*b); hat(b*BT+BT/2,.1,false); } riser(0,beats*BT,.09); }
   function intro(){ riser(0,8*BT,.12); for(let b=0;b<4;b++) kick(b*BT,.6); for(let k=0;k<4;k++) kick(4*BT+k*BT/2,.55); for(let k=0;k<8;k++) kick(6*BT+k*BT/4,.35+k*.03); impact(8*BT); }
@@ -1056,7 +1057,19 @@ function makeEngine(ctx,song){
   function ding(step=0){ const st=song.modes[0].st, T=[4,7,9,11,14,16,18], k=FX.vary?Math.min(step,5):0;   /* up the tonic chord, two neighbouring chord tones: always consonant */
     [T[k],T[k+1]].forEach((d,i)=>bell('glass',i*.06,.3,hz(48+degSemi(st,d)),.7)); }
   function bang(k=0){ const n=nz(), a=g(0); env(a,0,.5,.002,.45); ch(n,bq('lowpass',[1400,1100,1750][k%3]),a,out); n.start(0); n.stop(.7); const o=osc('sine',[90,82,100][k%3],0), b=g(0); o.frequency.exponentialRampToValueAtTime(40,.25); env(b,0,.5,.002,.35); ch(o,b,out); o.start(0); o.stop(.6); }
-  return {cell,countIn,intro,ding,bang};
+  /* loading the magazine, after the opening of the reference video, on the count-in grid: a sub hit as the shells appear, a whip
+     as they flip, tumbling clacks while they shuffle, a metal click for every shell on the sixteenths, then the slide racked */
+  function clack(t,amp,f){ const n=nz(), a=g(0); env(a,t,amp,.001,.02); ch(n,bq('bandpass',f,2.2),a,out); n.start(t); n.stop(t+.08);
+    const o=osc('triangle',f*.31,t), b=g(0); env(b,t,amp*.35,.001,.035); ch(o,b,out); o.start(t); o.stop(t+.1); }
+  function thump(t,amp,f){ const o=osc('sine',f*1.7,t), a=g(0); o.frequency.exponentialRampToValueAtTime(f,t+.03); env(a,t,amp,.001,.08); ch(o,a,out); o.start(t); o.stop(t+.3); }
+  function loadFx(n){
+    const o=osc('sine',95,0), a=g(0); o.frequency.exponentialRampToValueAtTime(42,.4); env(a,0,.6,.002,.5); ch(o,shaper(tanhCurve(2)),a,out); o.start(0); o.stop(1.3); clack(0,.22,2400);
+    const w=nz(), f=bq('bandpass',700,1.4), b=g(0); f.frequency.setValueAtTime(700,.75*BT); f.frequency.exponentialRampToValueAtTime(4500,BT);
+    b.gain.setValueAtTime(0,.75*BT); b.gain.linearRampToValueAtTime(.16,.97*BT); b.gain.linearRampToValueAtTime(0,BT+.02); ch(w,f,b,out); w.start(.75*BT); w.stop(BT+.06);
+    for(let k=0;k<2;k++){ clack(BT+k*S,.24,1500+k*350); thump(BT+k*S,.32,105+k*10); }
+    for(let q=0;q<n;q++){ const t=1.5*BT+(q+1)*S; clack(t,.3,3100*(1+.012*q)); clack(t+.011,.17,1850); thump(t,.2,135); }
+    const r=1.5*BT+(n+2)*S; if(r<4*BT-.06){ clack(r,.3,1150); clack(r+.08,.34,2700); thump(r+.08,.28,92); } }
+  return {cell,countIn,intro,ding,bang,loadFx};
 }
 /* render speed is measured on every job; a slow phone drops to a lower internal rate and renders further ahead */
 const PERF={ratio:0,low:false};
@@ -1200,14 +1213,15 @@ function newRound(){
 async function startRound(){
   if(G.phase!=='intro') return;
   initAudio(); G.phase='loading'; const rid=G.rid, btn=$('goBtn'); if(btn){ btn.disabled=true; btn.classList.add('wait'); }
-  await Promise.all([G.shells[0].bufP,G.aud.count]).catch(()=>{}); if(rid!==G.rid) return;
+  const lp=renderWith(AC.sampleRate,4*beat()+1,G.song,E=>E.loadFx(G.n)).then(b=>G.loadB=b).catch(()=>{ G.loadB=null; });
+  await Promise.all([G.shells[0].bufP,G.aud.count,lp]).catch(()=>{}); if(rid!==G.rid) return;
   hideOverlay();
   const t0=AC.currentTime+.12; G.t0=t0;
   G.shells.forEach((sh,i)=>{ if(sh) sh.start=t0+4*beat()+i*sh.len; });
-  playBuf(G.aud.countB,t0);
+  playBuf(G.aud.countB,t0); if(G.loadB) playBuf(G.loadB,t0,1.25);
   const s0=G.shells[0]; if(s0.buf&&!s0.src) s0.src=playBuf(s0.buf,s0.start);
   prepShell(1);
-  G.phase='play'; renderMag(); loadAnim(Math.min(1.6,4*beat()*.8));
+  G.phase='play'; renderMag(); loadAnim(beat(),Math.max(0,(t0-audioNow())*1000));
   if(G.round===1) markStart();
 }
 function enterShell(i){
@@ -1300,26 +1314,30 @@ function renderMag(){
 }
 /* loading the magazine, like the opening of the reference video: the shells stand big over the graph showing what is inside,
    flip to unknown, shuffle, line up and fly one by one into the magazine slots under a sight ring */
-function loadAnim(total){
+function loadAnim(B,delay){
   const slots=[...$('mag').children], n=slots.length; if(CALM||!n||!document.body.animate) return;
   const st=cv.getBoundingClientRect(), R=slots.map(s=>s.getBoundingClientRect()), w=R[0].width, h=R[0].height;
   const k=clamp(st.width*.8/(n*(w+8)),1.4,2.6), gap=(w+8)*k, cx=st.left+st.width/2, cy=st.top+st.height*.45;
-  const sorted=[...G.mag].sort((a,b)=>b-a), perm=shuffle([...Array(n).keys()].map(i=>i)), step=.4/n, fly=.08, ms=total*1000;
+  /* times in beats of the count-in: the shells appear on beat 1 with the sub hit, flip into beat 2, hop twice on its sixteenths,
+     line up, then one shell per sixteenth from beat 2.5, each landing on its click */
+  const S=B/4, land=q=>1.5*B+(q+1)*S, ms=(land(n-1)+.05)*1000, f=t=>clamp(t*1000/ms,0,1);
+  const sorted=[...G.mag].sort((a,b)=>b-a), perm=shuffle([...Array(n).keys()]);
   const layer=document.createElement('div'); layer.className='loadfx'; document.body.appendChild(layer);
   const ring=document.createElement('div'); ring.className='aim'; layer.appendChild(ring);
   const place=q=>{ ring.style.left=(R[q].left+w/2)+'px'; ring.style.top=(R[q].top+h/2)+'px'; };
-  G.loadUntil=performance.now()+ms; slots.forEach(s=>s.style.visibility='hidden');
+  G.loadUntil=performance.now()+delay+ms; slots.forEach(s=>s.style.visibility='hidden');
   sorted.forEach((x,i)=>{ const q=perm[i], d=document.createElement('div'); d.className='shell '+(x?'live':'blank');
     d.innerHTML='<div class="body">?</div><div class="base"></div>'; Object.assign(d.style,{left:R[q].left+'px',top:R[q].top+'px',width:w+'px',height:h+'px'}); layer.appendChild(d);
     const at=j=>[cx+(j-(n-1)/2)*gap-(R[q].left+w/2), cy-(R[q].top+h/2)], [ax,ay]=at(i), [bx,by]=at(q), jx=()=>(Math.random()-.5)*gap*2.2, jy=()=>(Math.random()-.5)*h*k*1.1, rr=()=>(Math.random()-.5)*50;
-    const tf=(x,y,sx,sy,r=0)=>`translate(${x.toFixed(1)}px,${y.toFixed(1)}px) rotate(${r.toFixed(1)}deg) scale(${sx},${sy})`, ls=.5+q*step;
-    d.animate([{transform:tf(ax,ay,0,0),offset:0},{transform:tf(ax,ay,k,k),offset:.06+.012*i},{transform:tf(ax,ay,k,k),offset:.22},{transform:tf(ax,ay,0,k),offset:.27},
-      {transform:tf(ax,ay,k,k),offset:.32},{transform:tf(ax+jx(),ay+jy(),k,k,rr()),offset:.38},{transform:tf(bx+jx(),by+jy(),k,k,rr()),offset:.44},{transform:tf(bx,by,k,k),offset:.5},
-      {transform:tf(bx,by,k,k),offset:ls},{transform:tf(0,0,1,1),offset:ls+fly},{transform:tf(0,0,1,1),offset:1}],{duration:ms,easing:'linear',fill:'forwards'});
-    setTimeout(()=>d.classList.remove('live','blank'),.27*ms);
-    setTimeout(()=>{ d.remove(); const s=$('mag').children[q]; if(s){ s.style.visibility=''; s.classList.add('land'); } if(q+1<n) place(q+1); },(ls+fly)*ms); });
-  setTimeout(()=>{ place(0); ring.classList.add('on'); },.48*ms);
-  setTimeout(()=>{ layer.remove(); [...$('mag').children].forEach(s=>s.style.visibility=''); },ms+80);
+    const tf=(x,y,sx,sy,r=0)=>`translate(${x.toFixed(1)}px,${y.toFixed(1)}px) rotate(${r.toFixed(1)}deg) scale(${sx},${sy})`;
+    const K=[[tf(ax,ay,0,0),0],[tf(ax,ay,k*1.15,k*1.15),.08*B+.012*B*i],[tf(ax,ay,k,k),.2*B+.012*B*i],[tf(ax,ay,k,k),.75*B],[tf(ax,ay,0,k),.875*B],[tf(ax,ay,k,k),B],
+      [tf(ax+jx(),ay+jy(),k,k,rr()),B+.12*S],[tf(ax+jx(),ay+jy(),k,k,rr()),B+S],[tf(bx+jx(),by+jy(),k,k,rr()),B+S+.12*S],[tf(bx,by,k,k),1.5*B],
+      [tf(bx,by,k,k),land(q)-S],[tf(0,0,1,1),land(q)],[tf(0,0,1,1),ms/1000]];
+    d.animate(K.map(([transform,t])=>({transform,offset:f(t)})),{duration:ms,delay,easing:'linear',fill:'both'});
+    setTimeout(()=>d.classList.remove('live','blank'),delay+.875*B*1000);
+    setTimeout(()=>{ d.remove(); const s=$('mag').children[q]; if(s){ s.style.visibility=''; s.classList.add('land'); } if(q+1<n) place(q+1); },delay+land(q)*1000); });
+  setTimeout(()=>{ place(0); ring.classList.add('on'); },delay+1.45*B*1000);
+  setTimeout(()=>{ layer.remove(); [...$('mag').children].forEach(s=>s.style.visibility=''); },delay+ms+80);
 }
 function renderClues(){ $('clueList').innerHTML=G.clues.length?G.clues.map(c=>`<li>${c.t}</li>`).join(''):'<li>В этом раунде без улик: только счёт.</li>'; renderCandCount(); }
 function renderCandCount(){ $('cands').textContent=`раскладов: ${G.cands.length} из ${G.total0}`; $('meter').style.width=Math.max(4,100*G.cands.length/G.total0)+'%'; }
@@ -1419,13 +1437,24 @@ function drawShell(sh,now,countdown){
      a live shell (fast drop, slow tail), and a live answer keeps punching on every beat; a blank one pulls the camera 3 % back and
      lets it float home over a second while the edge breathes. Each shell ends with a short push before the cut to the next.
      Nothing before the trigger depends on the answer. */
-  const hit=(ph,a)=>a*(ph<.04?ph/.04:Math.exp(-(ph-.04)/.15));
-  const nb=Math.max(1,Math.min(4,Math.round(sh.tr/sh.bt/2))), w0=sh.tr-nb*sh.bt;
-  if(tau>=w0&&tau<sh.tr){ const e=(tau-w0)/sh.bt, j=Math.floor(e), ph=(e-j)*sh.bt, left=sh.tr-tau;
-    FXS.edge=(nb>1?.2+.8*j/(nb-1):1)*Math.min(1,Math.exp(-ph/.09)+(ph>.12?.5*Math.exp(-(ph-.12)/.1):0));
-    FXS.cam=1+hit(ph,.014)+(left<.16?.02*(1-left/.16):0); FXS.ec='#ff5a1f'; }
-  else if(tau>=sh.tr&&tau<sh.len){ const d=tau-sh.tr, ph=mod(d,sh.bt), on=d>sh.bt*.75, end=clamp((sh.len-tau)/.5,0,1);
-    if(sh.out){ FXS.cam=1+.045*Math.exp(-d/.07)+.04*Math.exp(-d/.28)+(on?hit(ph,.018):0); FXS.edge=on?1.15*Math.exp(-ph/.12):0; FXS.ec=COL.live; }
+  const hit=(dt,a)=>dt<0?0:a*(dt<.04?dt/.04:Math.exp(-(dt-.04)/.15));
+  /* on the beat, like the video: a punch on every beat, stronger where a drum hits it, plus a punch on every drum hit between the
+     beats (a snare roll before the trigger becomes a burst of punches). Weights: drum on the beat 1, bare beat .6, off-beat hit .7 */
+  const HS=sh.hits||[], hitsIn=(a,b)=>{ const key=a.toFixed(3)+b.toFixed(3); if(sh._pk===key) return sh._pv;
+    const P=[], hs=HS.filter(h=>h[0]>=a-.001&&h[0]<b), lvl=h=>h[2]?1:clamp(h[1]/.55,.45,1);
+    for(let t=Math.ceil(a/sh.bt-.001)*sh.bt;t<b-.001;t+=sh.bt){ const on=hs.filter(h=>Math.abs(h[0]-t)<.06); P.push([t,on.length?Math.max(...on.map(lvl)):.6]); }
+    hs.forEach(h=>{ if(!P.some(q=>Math.abs(q[0]-h[0])<.06)) P.push([h[0],.7*lvl(h)]); });
+    P.sort((x,y)=>x[0]-y[0]); sh._pk=key; sh._pv=P; return P; };
+  const nb=Math.max(1,Math.min(4,Math.round(sh.tr/sh.bt))), w0=sh.tr-nb*sh.bt;
+  if(tau>=w0&&tau<sh.tr){ const left=sh.tr-tau, grow=t=>.2+.8*clamp((t-w0)/Math.max(sh.bt,sh.tr-w0-sh.bt),0,1);
+    let cam=0, ed=0;
+    for(const [t,k] of hitsIn(w0,sh.tr)){ const dt=tau-t; if(dt<0||dt>.7) continue;
+      cam=Math.max(cam,hit(dt,.014*k)); ed=Math.max(ed,grow(t)*k*Math.min(1,Math.exp(-dt/.09)+(dt>.12?.5*Math.exp(-(dt-.12)/.1):0))); }
+    FXS.edge=ed; FXS.cam=1+cam+(left<.16?.02*(1-left/.16):0); FXS.ec='#ff5a1f'; }
+  else if(tau>=sh.tr&&tau<sh.len){ const d=tau-sh.tr, ph=mod(d,sh.bt), end=clamp((sh.len-tau)/.5,0,1);
+    if(sh.out){ let cam=0, ed=0;
+      for(const [t,k] of hitsIn(sh.tr+sh.bt*.75,sh.len)){ const dt=tau-t; if(dt<0||dt>.7) continue; cam=Math.max(cam,hit(dt,.018*k)); ed=Math.max(ed,1.15*k*Math.exp(-dt/.12)); }
+      FXS.cam=1+.045*Math.exp(-d/.07)+.04*Math.exp(-d/.28)+cam; FXS.edge=ed; FXS.ec=COL.live; }
     else { FXS.cam=1-(1-Math.exp(-d/.03))*(.026*Math.exp(-d/.3)+.004*Math.max(0,1-d/1.2)); FXS.edge=Math.min(1,d/.4)*end*end*(3-2*end)*(.38+.14*Math.sin(2*Math.PI*d/(4*sh.bt))); FXS.ec=COL.blank; }
     if(sh.len-tau<.09) FXS.cam=Math.max(FXS.cam,1.018); }
   const fade=(x0,y0,x1,y1,c)=>{ const g=X.createLinearGradient(x0,y0,x1,y1); g.addColorStop(0,'rgba(0,0,0,0)'); g.addColorStop(.2,c); g.addColorStop(.8,c); g.addColorStop(1,'rgba(0,0,0,0)'); return g; };
@@ -1523,7 +1552,7 @@ function frame(){
     const now=audioNow();
     if(ph==='play'){
       const sh=G.shells[Math.max(0,G.cur)];
-      if(G.cur<0&&sh){ const cd=4-Math.floor((now-G.t0)/beat()); drawShell(sh,sh.start-.001,performance.now()<G.loadUntil?null:clamp(cd,1,4)); setProg(0,false); }
+      if(G.cur<0&&sh){ const cd=4-Math.floor((now-G.t0)/beat()); drawShell(sh,sh.start-.001,performance.now()<G.loadUntil?null:clamp(cd,1,4)); { const c=now-G.t0, left=sh.start-now; FXS.cam=1+(c>=0?.04*Math.exp(-c/.07)+.025*Math.exp(-c/.28):0)+(left<.1?.03*(1-left/.1):0); } setProg(0,false); }
       else if(sh){ drawShell(sh,now); const p=(now-sh.start)/sh.tr; setProg(clamp(p,0,1),p>.75); }
     } else { const sh=G.shells[Math.max(0,G.cur)]; if(sh) drawShell(sh,Math.min(now,sh.start+sh.len)); }
   } else if(ph==='loading'||ph==='intro'){ const sh=G.shells[0]; if(sh) drawShell(sh,sh.start-.001,ph==='loading'?4:null); }
@@ -1721,7 +1750,7 @@ async function submitScore(acc){
 })();
 
 /* debug hooks for offline checks (only with ?debug in the URL) */
-if(/[?&]debug/.test(location.search)&&/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) window.__pt={FX,gameOver,newRound,diffOf,xscore,levelShell,LB,LB_ID,submitScore,deriveAcct,signStr,pubOf,ghLoad,flushOutbox,renderLB,genFormula,makeTheme,SEEN,makeSong,roundStyle,buildShell,renderWith,drawShell,setFormula,FAM,G,get AC(){return AC;},initAudio};
+if(/[?&]debug/.test(location.search)&&/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) window.__pt={FX,gameOver,newRound,diffOf,xscore,levelShell,LB,LB_ID,submitScore,deriveAcct,signStr,pubOf,ghLoad,flushOutbox,renderLB,genFormula,makeTheme,SEEN,makeSong,roundStyle,buildShell,renderWith,drawShell,setFormula,FAM,G,FXS,loadAnim,get AC(){return AC;},initAudio};
 
 function boot(){
   setVol(VOL); $('vol').addEventListener('input',e=>setVol(e.target.value/100)); $('vol').addEventListener('change',e=>e.target.blur()); $('volBtn').addEventListener('click',e=>{ setVol(VOL?0:VOL_LAST); e.currentTarget.blur(); });
