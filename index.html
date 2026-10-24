@@ -316,6 +316,12 @@ body.sheet-clues .side .board,body.sheet-top .side .clues{display:none}
 .edge,.aura,.fxc{position:fixed;inset:0;pointer-events:none;z-index:45}
 .fxc{width:100%;height:100%;z-index:48}
 .edge{opacity:0;box-shadow:inset 0 0 14vmin 2vmin var(--ec,#ff5a1f)}
+.loadfx{position:fixed;inset:0;pointer-events:none;z-index:46}
+.loadfx .shell{position:fixed;transform-origin:50% 50%;will-change:transform;transition:none}
+.aim{position:fixed;width:34px;height:34px;margin:-17px 0 0 -17px;border:2px solid var(--amber);border-radius:50%;opacity:0;box-shadow:0 0 12px var(--amber),inset 0 0 8px var(--amber);transition:left .07s ease-out,top .07s ease-out,opacity .15s}
+.aim.on{opacity:.9}
+.shell.land{animation:land .28s ease-out}
+@keyframes land{0%{transform:translateY(-7px) scale(1.3);filter:brightness(2)}100%{transform:none;filter:none}}
 .aura{opacity:0;box-shadow:inset 0 0 90px 10px var(--amber);transition:opacity .4s}
 .app.shake{animation:shake .35s linear}
 .app.glitch{animation:glitch .28s steps(3)}
@@ -1146,7 +1152,7 @@ function pickClues(b,k,want,minRemain){
 
 /* ================= game ================= */
 const URLSEED=(()=>{ try{ const s=new URLSearchParams(location.search).get('seed'); return s?(parseInt(s,16)>>>0):0; }catch(e){ return 0; } })();
-const G={phase:'title',round:0,lives:3,score:0,streak:0,correct:0,total:0,onbeat:0,n:8,k:4,mag:[],clues:[],cands:[],total0:1,shells:[],cur:-1,pre:8,post:8,t0:0,mood:-.15,introDone:false,
+const G={loadUntil:0,phase:'title',round:0,lives:3,score:0,streak:0,correct:0,total:0,onbeat:0,n:8,k:4,mag:[],clues:[],cands:[],total0:1,shells:[],cur:-1,pre:8,post:8,t0:0,mood:-.15,introDone:false,
   song:null,rs:null,aud:null,rid:0,recent:[],lv:2};
 const mult=()=>Math.min(4,1+Math.floor(Math.max(0,G.streak-1)/3));
 const beat=()=>60/G.song.bpm;
@@ -1201,7 +1207,7 @@ async function startRound(){
   playBuf(G.aud.countB,t0);
   const s0=G.shells[0]; if(s0.buf&&!s0.src) s0.src=playBuf(s0.buf,s0.start);
   prepShell(1);
-  G.phase='play'; renderMag();
+  G.phase='play'; renderMag(); loadAnim(Math.min(1.6,4*beat()*.8));
   if(G.round===1) markStart();
 }
 function enterShell(i){
@@ -1292,6 +1298,29 @@ function renderMag(){
     d.className='shell'+(rev?(x?' live':' blank'):'')+(i===G.cur&&!(sh&&sh.resolved)&&G.phase==='play'?' cur':'');
     d.innerHTML='<div class="body">?</div><div class="base"></div>'; el.appendChild(d); });
 }
+/* loading the magazine, like the opening of the reference video: the shells stand big over the graph showing what is inside,
+   flip to unknown, shuffle, line up and fly one by one into the magazine slots under a sight ring */
+function loadAnim(total){
+  const slots=[...$('mag').children], n=slots.length; if(CALM||!n||!document.body.animate) return;
+  const st=cv.getBoundingClientRect(), R=slots.map(s=>s.getBoundingClientRect()), w=R[0].width, h=R[0].height;
+  const k=clamp(st.width*.8/(n*(w+8)),1.4,2.6), gap=(w+8)*k, cx=st.left+st.width/2, cy=st.top+st.height*.45;
+  const sorted=[...G.mag].sort((a,b)=>b-a), perm=shuffle([...Array(n).keys()].map(i=>i)), step=.4/n, fly=.08, ms=total*1000;
+  const layer=document.createElement('div'); layer.className='loadfx'; document.body.appendChild(layer);
+  const ring=document.createElement('div'); ring.className='aim'; layer.appendChild(ring);
+  const place=q=>{ ring.style.left=(R[q].left+w/2)+'px'; ring.style.top=(R[q].top+h/2)+'px'; };
+  G.loadUntil=performance.now()+ms; slots.forEach(s=>s.style.visibility='hidden');
+  sorted.forEach((x,i)=>{ const q=perm[i], d=document.createElement('div'); d.className='shell '+(x?'live':'blank');
+    d.innerHTML='<div class="body">?</div><div class="base"></div>'; Object.assign(d.style,{left:R[q].left+'px',top:R[q].top+'px',width:w+'px',height:h+'px'}); layer.appendChild(d);
+    const at=j=>[cx+(j-(n-1)/2)*gap-(R[q].left+w/2), cy-(R[q].top+h/2)], [ax,ay]=at(i), [bx,by]=at(q), jx=()=>(Math.random()-.5)*gap*2.2, jy=()=>(Math.random()-.5)*h*k*1.1, rr=()=>(Math.random()-.5)*50;
+    const tf=(x,y,sx,sy,r=0)=>`translate(${x.toFixed(1)}px,${y.toFixed(1)}px) rotate(${r.toFixed(1)}deg) scale(${sx},${sy})`, ls=.5+q*step;
+    d.animate([{transform:tf(ax,ay,0,0),offset:0},{transform:tf(ax,ay,k,k),offset:.06+.012*i},{transform:tf(ax,ay,k,k),offset:.22},{transform:tf(ax,ay,0,k),offset:.27},
+      {transform:tf(ax,ay,k,k),offset:.32},{transform:tf(ax+jx(),ay+jy(),k,k,rr()),offset:.38},{transform:tf(bx+jx(),by+jy(),k,k,rr()),offset:.44},{transform:tf(bx,by,k,k),offset:.5},
+      {transform:tf(bx,by,k,k),offset:ls},{transform:tf(0,0,1,1),offset:ls+fly},{transform:tf(0,0,1,1),offset:1}],{duration:ms,easing:'linear',fill:'forwards'});
+    setTimeout(()=>d.classList.remove('live','blank'),.27*ms);
+    setTimeout(()=>{ d.remove(); const s=$('mag').children[q]; if(s){ s.style.visibility=''; s.classList.add('land'); } if(q+1<n) place(q+1); },(ls+fly)*ms); });
+  setTimeout(()=>{ place(0); ring.classList.add('on'); },.48*ms);
+  setTimeout(()=>{ layer.remove(); [...$('mag').children].forEach(s=>s.style.visibility=''); },ms+80);
+}
 function renderClues(){ $('clueList').innerHTML=G.clues.length?G.clues.map(c=>`<li>${c.t}</li>`).join(''):'<li>В этом раунде без улик: только счёт.</li>'; renderCandCount(); }
 function renderCandCount(){ $('cands').textContent=`раскладов: ${G.cands.length} из ${G.total0}`; $('meter').style.width=Math.max(4,100*G.cands.length/G.total0)+'%'; }
 function setChance(p){ $('chance').textContent=Math.round(p*100)+' %'; }
@@ -1329,7 +1358,7 @@ function burst(sh,ok){ if(CALM) return; const r=cv.getBoundingClientRect(), x=r.
 function fxFrame(){ const t=performance.now()/1000, dt=Math.min(.05,t-(FXS.last||t)); FXS.last=t;
   if(FXS.w!==innerWidth||FXS.h!==innerHeight) fxResize();
   const play=G.phase==='play', app=document.querySelector('.app'), z=play&&!CALM?FXS.cam:1;
-  const ed=$('edge'); ed.style.opacity=(play?Math.min(.72,.6*FXS.edge):0).toFixed(3); ed.style.setProperty('--ec',FXS.ec); FXS.kick*=.9; FXS.edge=0; FXS.cam=1;
+  const ed=$('edge'); FXS.eo=Math.max(play?Math.min(.72,.6*FXS.edge):0,(FXS.eo||0)*Math.exp(-dt/.09)); ed.style.opacity=FXS.eo.toFixed(3); ed.style.setProperty('--ec',FXS.ec); FXS.kick*=.9; FXS.edge=0; FXS.cam=1;
   /* the camera zooms the whole page about the trigger point (the graph centre); the point is taken while the page is at rest */
   if(Math.abs(z-1)<.0005){ if(app.style.scale){ app.style.scale=''; } const c=cv.getBoundingClientRect(), a=app.getBoundingClientRect(); FXS.org=`${(c.left+c.width/2-a.left).toFixed(1)}px ${(c.top+c.height/2-a.top).toFixed(1)}px`; }
   else { app.style.transformOrigin=FXS.org; app.style.scale=z.toFixed(4); }
@@ -1384,19 +1413,21 @@ function drawShell(sh,now,countdown){
   /* grid; it breathes with the beat: barely in the question, fully under a live answer, softly under a blank one */
   const bph=tau>0&&tau<sh.len?mod(tau/sh.bt,1):1, beatN=Math.floor(tau/sh.bt), kickP=Math.exp(-bph*7)*(revealed?(sh.out?1:.45):.3)*(beatN%4===0?1:.6);
   X.lineWidth=1; FXS.kick=kickP;
-  /* camera and edge light, measured frame by frame from the reference video. Over the last bar before the trigger the screen
-     edge flashes red-orange on every beat (with a short second flicker), growing 20 → 100 %; the whole page punches in ~1.5 %
-     on each beat and creeps 2 % closer just before the shot. The shot throws the camera 8.5 % in on a live shell and pulls it
-     3 % back on a blank one. Nothing before the trigger depends on the answer. */
+  /* camera and edge light, measured frame by frame from the reference video (25 fps). Over the last bar before the trigger the
+     screen edge flashes red-orange on every beat (with a short second flicker), growing 20 → 100 %, and the whole page punches in
+     ~1.4 % on each beat (40 ms rise, ~0.3 s fall), creeping 2 % closer in the last 0.16 s. The shot throws the camera 8.5 % in on
+     a live shell (fast drop, slow tail), and a live answer keeps punching on every beat; a blank one pulls the camera 3 % back and
+     lets it float home over a second while the edge breathes. Each shell ends with a short push before the cut to the next.
+     Nothing before the trigger depends on the answer. */
+  const hit=(ph,a)=>a*(ph<.04?ph/.04:Math.exp(-(ph-.04)/.15));
   const nb=Math.max(1,Math.min(4,Math.round(sh.tr/sh.bt/2))), w0=sh.tr-nb*sh.bt;
   if(tau>=w0&&tau<sh.tr){ const e=(tau-w0)/sh.bt, j=Math.floor(e), ph=(e-j)*sh.bt, left=sh.tr-tau;
     FXS.edge=(nb>1?.2+.8*j/(nb-1):1)*Math.min(1,Math.exp(-ph/.09)+(ph>.12?.5*Math.exp(-(ph-.12)/.1):0));
-    FXS.cam=1+.014*Math.exp(-ph/.1)+(left<.16?.02*(1-left/.16):0); FXS.ec='#ff5a1f'; }
-  else if(tau>=sh.tr&&tau<sh.len){ const d=tau-sh.tr, ph=mod(d,sh.bt), on=d>sh.bt*.75;
-    /* the answer, in time with the music: a live shell keeps hitting on every beat (camera punch + edge flash), a blank one floats:
-       the camera stays pulled back and the edge breathes slowly over a bar */
-    if(sh.out){ FXS.cam=1+.085*Math.exp(-d/.12)+(on?.016*Math.exp(-ph/.1):0); FXS.edge=on?1.15*Math.exp(-ph/.12):0; FXS.ec=COL.live; }
-    else { FXS.cam=1-.028*Math.exp(-d/.4)-.006; FXS.edge=Math.min(1,d/.4)*(.38+.14*Math.sin(2*Math.PI*d/(4*sh.bt))); FXS.ec=COL.blank; } }
+    FXS.cam=1+hit(ph,.014)+(left<.16?.02*(1-left/.16):0); FXS.ec='#ff5a1f'; }
+  else if(tau>=sh.tr&&tau<sh.len){ const d=tau-sh.tr, ph=mod(d,sh.bt), on=d>sh.bt*.75, end=clamp((sh.len-tau)/.5,0,1);
+    if(sh.out){ FXS.cam=1+.045*Math.exp(-d/.07)+.04*Math.exp(-d/.28)+(on?hit(ph,.018):0); FXS.edge=on?1.15*Math.exp(-ph/.12):0; FXS.ec=COL.live; }
+    else { FXS.cam=1-(1-Math.exp(-d/.03))*(.026*Math.exp(-d/.3)+.004*Math.max(0,1-d/1.2)); FXS.edge=Math.min(1,d/.4)*end*end*(3-2*end)*(.38+.14*Math.sin(2*Math.PI*d/(4*sh.bt))); FXS.ec=COL.blank; }
+    if(sh.len-tau<.09) FXS.cam=Math.max(FXS.cam,1.018); }
   const fade=(x0,y0,x1,y1,c)=>{ const g=X.createLinearGradient(x0,y0,x1,y1); g.addColorStop(0,'rgba(0,0,0,0)'); g.addColorStop(.2,c); g.addColorStop(.8,c); g.addColorStop(1,'rgba(0,0,0,0)'); return g; };
   const gV1=fade(0,T,0,B,COL.grid), gV2=fade(0,T,0,B,COL.grid2), gH=fade(L,0,Rr,0,COL.grid2);
   for(let i=1;i<16;i++){ const x=Math.round(L+(Rr-L)*i/16)+.5; X.strokeStyle=i%4===0?gV2:gV1; X.globalAlpha=(i%4===0?1:.85+.15*kickP)*Math.min(1,Math.min(i,16-i)/3); X.beginPath(); X.moveTo(x,T); X.lineTo(x,B); X.stroke(); }
@@ -1492,7 +1523,7 @@ function frame(){
     const now=audioNow();
     if(ph==='play'){
       const sh=G.shells[Math.max(0,G.cur)];
-      if(G.cur<0&&sh){ const cd=4-Math.floor((now-G.t0)/beat()); drawShell(sh,sh.start-.001,clamp(cd,1,4)); setProg(0,false); }
+      if(G.cur<0&&sh){ const cd=4-Math.floor((now-G.t0)/beat()); drawShell(sh,sh.start-.001,performance.now()<G.loadUntil?null:clamp(cd,1,4)); setProg(0,false); }
       else if(sh){ drawShell(sh,now); const p=(now-sh.start)/sh.tr; setProg(clamp(p,0,1),p>.75); }
     } else { const sh=G.shells[Math.max(0,G.cur)]; if(sh) drawShell(sh,Math.min(now,sh.start+sh.len)); }
   } else if(ph==='loading'||ph==='intro'){ const sh=G.shells[0]; if(sh) drawShell(sh,sh.start-.001,ph==='loading'?4:null); }
